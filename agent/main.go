@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/wiremesh/agent/agent"
 	"github.com/wiremesh/agent/config"
 )
 
@@ -25,10 +26,18 @@ func main() {
 	log.Printf("Config loaded: server=%s node_id=%d report_interval=%ds",
 		cfg.ServerURL, cfg.NodeID, cfg.ReportInterval)
 
-	// Wait for shutdown signal (will be replaced with agent.Run in Task 8)
+	a := agent.New(cfg)
+
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-	<-sigCh
+	go func() {
+		<-sigCh
+		log.Println("Received shutdown signal")
+		a.Stop()
+	}()
 
-	log.Println("Agent shutting down...")
+	if err := a.Run(); err != nil {
+		log.Fatalf("Agent error: %v", err)
+	}
+	log.Println("WireMesh Agent stopped")
 }

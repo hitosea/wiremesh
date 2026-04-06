@@ -1,39 +1,34 @@
-# ---- Build stage ----
-FROM node:20-alpine AS builder
+FROM node:20-alpine AS base
 
+# Build Agent
+FROM golang:1.22-alpine AS agent-builder
+WORKDIR /agent
+COPY agent/go.mod agent/go.sum ./
+RUN go mod download
+COPY agent/ .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o wiremesh-agent .
+
+# Build Next.js
+FROM base AS builder
 WORKDIR /app
-
-COPY package.json package-lock.json ./
+COPY package*.json ./
 RUN npm ci
-
 COPY . .
 RUN npm run build
 
-# ---- Runner stage ----
-FROM node:20-alpine AS runner
-
+# Runtime
+FROM base AS runner
 WORKDIR /app
-
 ENV NODE_ENV=production
-
-# Copy standalone Next.js output
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
-
-# Copy worker files
-COPY --from=builder /app/worker ./worker
-
-# Copy drizzle migrations
 COPY --from=builder /app/drizzle ./drizzle
-
-# Install better-sqlite3 for worker (it's a native module, needs to be installed in runner)
 COPY --from=builder /app/node_modules ./node_modules
+COPY worker/ ./worker/
+
+# Copy Agent binary
+COPY --from=agent-builder /agent/wiremesh-agent ./public/agent/wiremesh-agent-linux-amd64
 
 EXPOSE 3000
-
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
-# Run worker + Next.js server together
-CMD node worker/index.js & node server.js
+CMD ["sh", "-c", "node worker/index.js & node server.js"]
