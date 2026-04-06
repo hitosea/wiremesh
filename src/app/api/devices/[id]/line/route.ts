@@ -1,9 +1,16 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { devices, lines } from "@/lib/db/schema";
+import { devices, lines, lineNodes } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
+import { sseManager } from "@/lib/sse-manager";
+
+function getEntryNodeId(lineId: number): number | null {
+  const entry = db.select({ nodeId: lineNodes.nodeId }).from(lineNodes)
+    .where(and(eq(lineNodes.lineId, lineId), eq(lineNodes.role, "entry"))).get();
+  return entry?.nodeId ?? null;
+}
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -13,7 +20,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (isNaN(deviceId)) return error("VALIDATION_ERROR", "无效的设备 ID");
 
   const existing = db
-    .select({ id: devices.id, name: devices.name })
+    .select({ id: devices.id, name: devices.name, lineId: devices.lineId })
     .from(devices)
     .where(eq(devices.id, deviceId))
     .get();
@@ -53,6 +60,21 @@ export async function PUT(request: NextRequest, { params }: Params) {
     targetName: existing.name,
     detail: lineId ? `lineId=${lineId}` : "unlinked line",
   });
+
+  // Notify old entry node
+  if (existing.lineId && existing.lineId !== lineId) {
+    const oldEntryNodeId = getEntryNodeId(existing.lineId);
+    if (oldEntryNodeId !== null) {
+      sseManager.notifyNodePeerUpdate(oldEntryNodeId);
+    }
+  }
+  // Notify new entry node
+  if (lineId) {
+    const newEntryNodeId = getEntryNodeId(lineId);
+    if (newEntryNodeId !== null) {
+      sseManager.notifyNodePeerUpdate(newEntryNodeId);
+    }
+  }
 
   return success(updated);
 }

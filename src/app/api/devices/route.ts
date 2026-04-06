@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "@/lib/db";
-import { devices, settings, nodes } from "@/lib/db/schema";
+import { devices, settings, nodes, lineNodes } from "@/lib/db/schema";
 import { success, created, error, paginated } from "@/lib/api-response";
 import { parsePaginationParams, paginationOffset } from "@/lib/pagination";
 import { eq, or, like, count, and, SQL } from "drizzle-orm";
@@ -9,6 +9,13 @@ import { encrypt } from "@/lib/crypto";
 import { generateKeyPair } from "@/lib/wireguard";
 import { allocateDeviceIp } from "@/lib/ip-allocator";
 import { writeAuditLog } from "@/lib/audit-log";
+import { sseManager } from "@/lib/sse-manager";
+
+function getEntryNodeId(lineId: number): number | null {
+  const entry = db.select({ nodeId: lineNodes.nodeId }).from(lineNodes)
+    .where(and(eq(lineNodes.lineId, lineId), eq(lineNodes.role, "entry"))).get();
+  return entry?.nodeId ?? null;
+}
 
 export async function GET(request: NextRequest) {
   const params = parsePaginationParams(request.nextUrl.searchParams);
@@ -144,6 +151,13 @@ export async function POST(request: NextRequest) {
     targetName: name,
     detail: `protocol=${protocol}`,
   });
+
+  if (result.lineId) {
+    const entryNodeId = getEntryNodeId(result.lineId);
+    if (entryNodeId !== null) {
+      sseManager.notifyNodePeerUpdate(entryNodeId);
+    }
+  }
 
   return created(result);
 }

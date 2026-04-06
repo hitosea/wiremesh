@@ -4,6 +4,7 @@ import { nodes } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
 import { eq, ne, and } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
+import { sseManager } from "@/lib/sse-manager";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -127,6 +128,8 @@ export async function PUT(request: NextRequest, { params }: Params) {
     targetId: nodeId,
     targetName: existing.name,
   });
+
+  sseManager.notifyNodeConfigUpdate(nodeId);
 
   return success(updated);
 }

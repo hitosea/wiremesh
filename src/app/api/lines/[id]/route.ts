@@ -4,6 +4,7 @@ import { lines, lineNodes, lineTunnels, nodes, devices } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
 import { eq, count } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
+import { sseManager } from "@/lib/sse-manager";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -127,6 +128,14 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     .get();
   if (!existing) return error("NOT_FOUND", "线路不存在");
 
+  // Collect node IDs before deleting
+  const affectedNodeIds = db
+    .select({ nodeId: lineNodes.nodeId })
+    .from(lineNodes)
+    .where(eq(lineNodes.lineId, lineId))
+    .all()
+    .map((r) => r.nodeId);
+
   // Unlink devices first
   db.update(devices)
     .set({ lineId: null })
@@ -142,6 +151,10 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     targetId: lineId,
     targetName: existing.name,
   });
+
+  for (const nodeId of affectedNodeIds) {
+    sseManager.notifyNodeTunnelUpdate(nodeId);
+  }
 
   return success({ message: "线路已删除" });
 }

@@ -59,7 +59,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     const endpoint = entryNodeRow.nodeDomain ?? entryNodeRow.nodeIp;
     const config = `[Interface]
 PrivateKey = ${privateKey}
-Address = ${device.wgAddress}/32
+Address = ${device.wgAddress}
 DNS = 8.8.8.8
 
 [Peer]

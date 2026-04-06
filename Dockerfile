@@ -24,6 +24,9 @@ COPY --from=builder /app/public ./public
 # Copy worker files
 COPY --from=builder /app/worker ./worker
 
+# Copy drizzle migrations
+COPY --from=builder /app/drizzle ./drizzle
+
 # Install better-sqlite3 for worker (it's a native module, needs to be installed in runner)
 COPY --from=builder /app/node_modules ./node_modules
 

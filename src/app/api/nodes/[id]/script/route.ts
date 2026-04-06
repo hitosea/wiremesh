@@ -50,7 +50,7 @@ echo "[2/6] 写入 WireGuard 配置..."
 cat > /etc/wiremesh/wireguard/wm-wg0.conf << 'WGEOF'
 [Interface]
 PrivateKey = ${wgPrivateKey}
-Address = ${node.wgAddress}/24
+Address = ${node.wgAddress}
 ListenPort = ${node.port}
 WGEOF
 
@@ -65,7 +65,7 @@ sysctl -p
 echo "[4/6] 启动 WireGuard 接口..."
 ip link add dev wm-wg0 type wireguard 2>/dev/null || true
 wg setconf wm-wg0 /etc/wiremesh/wireguard/wm-wg0.conf
-ip addr add ${node.wgAddress}/24 dev wm-wg0 2>/dev/null || true
+ip addr add ${node.wgAddress} dev wm-wg0 2>/dev/null || true
 ip link set up dev wm-wg0
 ${xrayEnabled ? `
 # 6. 安装 Xray

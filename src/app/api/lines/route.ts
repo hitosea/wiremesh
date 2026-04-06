@@ -8,6 +8,7 @@ import { encrypt } from "@/lib/crypto";
 import { generateKeyPair } from "@/lib/wireguard";
 import { allocateTunnelSubnet, allocateTunnelPort } from "@/lib/ip-allocator";
 import { writeAuditLog } from "@/lib/audit-log";
+import { sseManager } from "@/lib/sse-manager";
 
 export async function GET(request: NextRequest) {
   const params = parsePaginationParams(request.nextUrl.searchParams);
@@ -83,7 +84,7 @@ export async function POST(request: NextRequest) {
     settingsMap[row.key] = row.value;
   }
   const tunnelSubnet = settingsMap["tunnel_subnet"] ?? "10.1.0.0/16";
-  const tunnelPortStart = parseInt(settingsMap["tunnel_port_start"] ?? "51821");
+  const tunnelPortStart = parseInt(settingsMap["tunnel_port_start"] ?? "51830");
 
   // Insert line
   const line = db
@@ -174,6 +175,10 @@ export async function POST(request: NextRequest) {
     targetName: name.trim(),
     detail: `nodes=${nodeIds.join(",")}`,
   });
+
+  for (const nodeId of nodeIds) {
+    sseManager.notifyNodeTunnelUpdate(nodeId);
+  }
 
   return created(line);
 }

@@ -5,6 +5,12 @@ import { eq, or } from "drizzle-orm";
 import { decrypt } from "@/lib/crypto";
 import { authenticateAgent } from "@/lib/agent-auth";
 
+function getNodePublicHost(nodeId: number): string {
+  const n = db.select({ ip: nodes.ip, domain: nodes.domain }).from(nodes).where(eq(nodes.id, nodeId)).get();
+  if (!n) return "";
+  return n.domain || n.ip;
+}
+
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
@@ -45,7 +51,7 @@ export async function GET(request: NextRequest) {
         .all();
       for (const d of lineDevices) {
         if (d.wgPublicKey && d.wgAddress) {
-          peers.push({ publicKey: d.wgPublicKey, allowedIps: d.wgAddress + "/32" });
+          peers.push({ publicKey: d.wgPublicKey, allowedIps: d.wgAddress.split("/")[0] + "/32" });
         }
       }
     }
@@ -97,7 +103,7 @@ export async function GET(request: NextRequest) {
           address = tunnel.fromWgAddress;
           listenPort = tunnel.fromWgPort;
           peerPublicKey = tunnel.toWgPublicKey;
-          peerAddress = tunnel.toWgAddress;
+          peerAddress = getNodePublicHost(tunnel.toNodeId);
           peerPort = tunnel.toWgPort;
           role = "from";
         } else {
@@ -106,7 +112,7 @@ export async function GET(request: NextRequest) {
           address = tunnel.toWgAddress;
           listenPort = tunnel.toWgPort;
           peerPublicKey = tunnel.fromWgPublicKey;
-          peerAddress = tunnel.fromWgAddress;
+          peerAddress = getNodePublicHost(tunnel.fromNodeId);
           peerPort = tunnel.fromWgPort;
           role = "to";
         }
@@ -127,8 +133,10 @@ export async function GET(request: NextRequest) {
           iptablesRules.push(`-A FORWARD -o ${ifaceName} -m comment --comment ${lineTag} -j ACCEPT`);
         } else if (myRole === "exit") {
           // exit: tun -> eth0 + NAT
+          const tunnelSubnet = address.split("/")[0].replace(/\.\d+$/, ".0") + "/30";
           iptablesRules.push(`-A FORWARD -i ${ifaceName} -o eth0 -m comment --comment ${lineTag} -j ACCEPT`);
-          iptablesRules.push(`-t nat -A POSTROUTING -o eth0 -m comment --comment ${lineTag} -j MASQUERADE`);
+          iptablesRules.push(`-A FORWARD -i eth0 -o ${ifaceName} -m state --state RELATED,ESTABLISHED -m comment --comment ${lineTag} -j ACCEPT`);
+          iptablesRules.push(`-t nat -A POSTROUTING -o eth0 -s ${tunnelSubnet} -m comment --comment ${lineTag} -j MASQUERADE`);
         }
       }
     }
