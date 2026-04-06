@@ -7,32 +7,41 @@ import (
 	"strings"
 )
 
+// SyncRules applies the desired iptables rules and removes stale ones.
+// Rules are identified by "wm-" in their comment tags.
+// Desired rules come in the format from the management platform:
+//   "-A FORWARD -i wm-wg0 -o wm-tun1 -m comment --comment wm-line-1 -j ACCEPT"
+//   "-t nat -A POSTROUTING -s 10.0.0.0/8 -o eth0 -m comment --comment wm-line-1 -j MASQUERADE"
 func SyncRules(desiredRules []string) error {
+	// 1. List all existing WireMesh rules (normalized with table prefix)
 	existingRules, err := listWireMeshRules()
 	if err != nil {
 		log.Printf("[iptables] Warning: failed to list existing rules: %v", err)
 	}
 
+	// 2. Build sets for comparison (use normalized form)
 	desiredSet := make(map[string]bool)
 	for _, rule := range desiredRules {
-		desiredSet[strings.TrimSpace(rule)] = true
-	}
-
-	for _, rule := range existingRules {
-		if !desiredSet[strings.TrimSpace(rule)] {
-			log.Printf("[iptables] Removing: iptables %s", rule)
-			removeRule(rule)
-		}
+		desiredSet[normalizeRule(rule)] = true
 	}
 
 	existingSet := make(map[string]bool)
 	for _, rule := range existingRules {
-		existingSet[strings.TrimSpace(rule)] = true
+		existingSet[normalizeRule(rule)] = true
 	}
 
+	// 3. Remove rules not in desired set
+	for _, rule := range existingRules {
+		if !desiredSet[normalizeRule(rule)] {
+			log.Printf("[iptables] Removing: %s", rule)
+			removeRule(rule)
+		}
+	}
+
+	// 4. Add rules not in existing set
 	for _, rule := range desiredRules {
-		if !existingSet[strings.TrimSpace(rule)] {
-			log.Printf("[iptables] Adding: iptables %s", rule)
+		if !existingSet[normalizeRule(rule)] {
+			log.Printf("[iptables] Adding: %s", rule)
 			if err := addRule(rule); err != nil {
 				log.Printf("[iptables] Error adding rule: %v", err)
 			}
@@ -41,6 +50,7 @@ func SyncRules(desiredRules []string) error {
 	return nil
 }
 
+// RemoveAllWireMeshRules removes all iptables rules with "wm-" comments
 func RemoveAllWireMeshRules() error {
 	rules, err := listWireMeshRules()
 	if err != nil {
@@ -52,16 +62,14 @@ func RemoveAllWireMeshRules() error {
 	return nil
 }
 
+// listWireMeshRules returns all wm- tagged rules in normalized format.
+// NAT rules include the "-t nat" prefix so they can be correctly compared
+// with desired rules from the management platform.
 func listWireMeshRules() ([]string, error) {
 	var allRules []string
-	for _, args := range [][]string{
-		{"-t", "filter", "-S", "FORWARD"},
-		{"-t", "nat", "-S", "POSTROUTING"},
-	} {
-		output, err := exec.Command("iptables", args...).CombinedOutput()
-		if err != nil {
-			continue
-		}
+
+	// filter table FORWARD chain
+	if output, err := exec.Command("iptables", "-t", "filter", "-S", "FORWARD").CombinedOutput(); err == nil {
 		for _, line := range strings.Split(string(output), "\n") {
 			line = strings.TrimSpace(line)
 			if strings.Contains(line, "wm-") && strings.HasPrefix(line, "-A ") {
@@ -69,6 +77,17 @@ func listWireMeshRules() ([]string, error) {
 			}
 		}
 	}
+
+	// nat table POSTROUTING chain — prefix with "-t nat" for correct matching
+	if output, err := exec.Command("iptables", "-t", "nat", "-S", "POSTROUTING").CombinedOutput(); err == nil {
+		for _, line := range strings.Split(string(output), "\n") {
+			line = strings.TrimSpace(line)
+			if strings.Contains(line, "wm-") && strings.HasPrefix(line, "-A ") {
+				allRules = append(allRules, "-t nat "+line)
+			}
+		}
+	}
+
 	return allRules, nil
 }
 
@@ -82,7 +101,12 @@ func addRule(rule string) error {
 }
 
 func removeRule(rule string) {
+	// Convert -A to -D for deletion
 	deleteRule := strings.Replace(rule, "-A ", "-D ", 1)
 	args := strings.Fields(deleteRule)
 	exec.Command("iptables", args...).CombinedOutput()
+}
+
+func normalizeRule(rule string) string {
+	return strings.TrimSpace(rule)
 }

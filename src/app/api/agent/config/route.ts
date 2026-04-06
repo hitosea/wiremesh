@@ -133,11 +133,11 @@ export async function GET(request: NextRequest) {
           iptablesRules.push(`-A FORWARD -o ${ifaceName} -m comment --comment ${lineTag} -j ACCEPT`);
         } else if (myRole === "exit") {
           // exit: tun -> eth0 + NAT
-          // MASQUERADE all traffic from tunnel interface — source IPs include
-          // both device subnet (10.0.0.x) and tunnel subnet (10.1.x.x)
+          // Only MASQUERADE VPN traffic (10.0.0.0/8 covers device + tunnel subnets)
+          // to avoid affecting the server's own or other services' outbound traffic
           iptablesRules.push(`-A FORWARD -i ${ifaceName} -o eth0 -m comment --comment ${lineTag} -j ACCEPT`);
           iptablesRules.push(`-A FORWARD -i eth0 -o ${ifaceName} -m state --state RELATED,ESTABLISHED -m comment --comment ${lineTag} -j ACCEPT`);
-          iptablesRules.push(`-t nat -A POSTROUTING -o eth0 -j MASQUERADE -m comment --comment ${lineTag}`);
+          iptablesRules.push(`-t nat -A POSTROUTING -s 10.0.0.0/8 -o eth0 -m comment --comment ${lineTag} -j MASQUERADE`);
         }
       }
     }
