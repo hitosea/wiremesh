@@ -1,7 +1,7 @@
 FROM node:20-alpine AS base
 
 # Build Agent
-FROM golang:1.22-alpine AS agent-builder
+FROM golang:1.25-alpine AS agent-builder
 WORKDIR /agent
 COPY agent/go.mod agent/go.sum ./
 RUN go mod download
@@ -12,7 +12,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o wiremesh-agent .
 FROM base AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 COPY . .
 RUN npm run build
 
