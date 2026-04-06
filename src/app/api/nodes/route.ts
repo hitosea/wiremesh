@@ -1,0 +1,175 @@
+import { NextRequest } from "next/server";
+import { v4 as uuidv4 } from "uuid";
+import { db } from "@/lib/db";
+import { nodes, settings } from "@/lib/db/schema";
+import { success, created, error, paginated } from "@/lib/api-response";
+import { parsePaginationParams, paginationOffset } from "@/lib/pagination";
+import { eq, or, like, count, and, SQL } from "drizzle-orm";
+import { encrypt } from "@/lib/crypto";
+import { generateKeyPair } from "@/lib/wireguard";
+import { allocateNodeIp } from "@/lib/ip-allocator";
+import { writeAuditLog } from "@/lib/audit-log";
+
+export async function GET(request: NextRequest) {
+  const params = parsePaginationParams(request.nextUrl.searchParams);
+  const search = request.nextUrl.searchParams.get("search");
+  const status = request.nextUrl.searchParams.get("status");
+  const tags = request.nextUrl.searchParams.get("tags");
+
+  const conditions: SQL[] = [];
+  if (search) {
+    conditions.push(
+      or(like(nodes.name, `%${search}%`), like(nodes.ip, `%${search}%`))!
+    );
+  }
+  if (status) conditions.push(eq(nodes.status, status));
+  if (tags) conditions.push(like(nodes.tags, `%${tags}%`));
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const total =
+    db.select({ count: count() }).from(nodes).where(where).get()?.count ?? 0;
+
+  const rows = db
+    .select({
+      id: nodes.id,
+      name: nodes.name,
+      ip: nodes.ip,
+      domain: nodes.domain,
+      port: nodes.port,
+      agentToken: nodes.agentToken,
+      wgPublicKey: nodes.wgPublicKey,
+      wgAddress: nodes.wgAddress,
+      xrayEnabled: nodes.xrayEnabled,
+      xrayProtocol: nodes.xrayProtocol,
+      xrayTransport: nodes.xrayTransport,
+      xrayPort: nodes.xrayPort,
+      xrayConfig: nodes.xrayConfig,
+      status: nodes.status,
+      errorMessage: nodes.errorMessage,
+      tags: nodes.tags,
+      remark: nodes.remark,
+      createdAt: nodes.createdAt,
+      updatedAt: nodes.updatedAt,
+    })
+    .from(nodes)
+    .where(where)
+    .limit(params.pageSize)
+    .offset(paginationOffset(params))
+    .all();
+
+  return paginated(rows, {
+    page: params.page,
+    pageSize: params.pageSize,
+    total,
+  });
+}
+
+export async function POST(request: NextRequest) {
+  const body = await request.json();
+  const {
+    name,
+    ip,
+    domain,
+    port,
+    xrayEnabled,
+    xrayProtocol,
+    xrayTransport,
+    xrayPort,
+    xrayConfig,
+    tags,
+    remark,
+  } = body;
+
+  if (!name || !ip) {
+    return error("VALIDATION_ERROR", "name 和 ip 为必填项");
+  }
+
+  // Check IP uniqueness
+  const existing = db
+    .select({ id: nodes.id })
+    .from(nodes)
+    .where(eq(nodes.ip, ip))
+    .get();
+  if (existing) {
+    return error("CONFLICT", "该 IP 地址已存在");
+  }
+
+  // Read settings
+  const settingsRows = db.select().from(settings).all();
+  const settingsMap: Record<string, string> = {};
+  for (const row of settingsRows) {
+    settingsMap[row.key] = row.value;
+  }
+
+  // Determine port
+  const resolvedPort =
+    port ?? parseInt(settingsMap["wg_default_port"] ?? "51820");
+
+  // Allocate WG address
+  const usedAddresses = db
+    .select({ wgAddress: nodes.wgAddress })
+    .from(nodes)
+    .all()
+    .map((r) => r.wgAddress);
+  const subnet = settingsMap["wg_default_subnet"] ?? "10.0.0.0/24";
+  const startPos = parseInt(settingsMap["wg_node_ip_start"] ?? "1");
+  const wgAddress = allocateNodeIp(usedAddresses, subnet, startPos);
+
+  // Generate WG key pair
+  const { privateKey, publicKey } = generateKeyPair();
+  const encryptedPrivateKey = encrypt(privateKey);
+
+  // Generate agent token
+  const agentToken = uuidv4();
+
+  const result = db
+    .insert(nodes)
+    .values({
+      name,
+      ip,
+      domain: domain ?? null,
+      port: resolvedPort,
+      agentToken,
+      wgPrivateKey: encryptedPrivateKey,
+      wgPublicKey: publicKey,
+      wgAddress,
+      xrayEnabled: xrayEnabled ?? false,
+      xrayProtocol: xrayProtocol ?? null,
+      xrayTransport: xrayTransport ?? null,
+      xrayPort: xrayPort ?? null,
+      xrayConfig: xrayConfig ?? null,
+      tags: tags ?? null,
+      remark: remark ?? null,
+    })
+    .returning({
+      id: nodes.id,
+      name: nodes.name,
+      ip: nodes.ip,
+      domain: nodes.domain,
+      port: nodes.port,
+      agentToken: nodes.agentToken,
+      wgPublicKey: nodes.wgPublicKey,
+      wgAddress: nodes.wgAddress,
+      xrayEnabled: nodes.xrayEnabled,
+      xrayProtocol: nodes.xrayProtocol,
+      xrayTransport: nodes.xrayTransport,
+      xrayPort: nodes.xrayPort,
+      xrayConfig: nodes.xrayConfig,
+      status: nodes.status,
+      tags: nodes.tags,
+      remark: nodes.remark,
+      createdAt: nodes.createdAt,
+      updatedAt: nodes.updatedAt,
+    })
+    .get();
+
+  writeAuditLog({
+    action: "create",
+    targetType: "node",
+    targetId: result.id,
+    targetName: name,
+    detail: `ip=${ip}, wgAddress=${wgAddress}`,
+  });
+
+  return created(result);
+}
