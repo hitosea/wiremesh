@@ -29,16 +29,16 @@ export async function POST(request: Request) {
   });
 
   const defaultSettings = [
-    { key: "wg_default_port", value: "51820" },
-    { key: "wg_default_subnet", value: wgDefaultSubnet || "10.0.0.0/24" },
+    { key: "wg_default_port", value: "41820" },
+    { key: "wg_default_subnet", value: wgDefaultSubnet || "10.210.0.0/24" },
     { key: "wg_default_dns", value: "1.1.1.1" },
     { key: "wg_node_ip_start", value: "1" },
     { key: "wg_device_ip_start", value: "100" },
     { key: "xray_default_protocol", value: "vless" },
     { key: "xray_default_transport", value: "ws" },
     { key: "xray_default_port", value: "443" },
-    { key: "tunnel_subnet", value: "10.1.0.0/16" },
-    { key: "tunnel_port_start", value: "51830" },
+    { key: "tunnel_subnet", value: "10.211.0.0/16" },
+    { key: "tunnel_port_start", value: "41830" },
     { key: "node_check_interval", value: "5" },
   ];
 

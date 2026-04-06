@@ -83,8 +83,8 @@ export async function POST(request: NextRequest) {
   for (const row of settingsRows) {
     settingsMap[row.key] = row.value;
   }
-  const tunnelSubnet = settingsMap["tunnel_subnet"] ?? "10.1.0.0/16";
-  const tunnelPortStart = parseInt(settingsMap["tunnel_port_start"] ?? "51830");
+  const tunnelSubnet = settingsMap["tunnel_subnet"] ?? "10.211.0.0/16";
+  const tunnelPortStart = parseInt(settingsMap["tunnel_port_start"] ?? "41830");
 
   // Insert line
   const line = db

@@ -125,7 +125,7 @@ export default function SetupPage() {
               id="wgDefaultSubnet"
               value={form.wgDefaultSubnet}
               onChange={(e) => setForm({ ...form, wgDefaultSubnet: e.target.value })}
-              placeholder="10.0.0.0/24"
+              placeholder="10.210.0.0/24"
             />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>

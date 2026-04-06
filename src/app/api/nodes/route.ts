@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
 
   // Determine port
   const resolvedPort =
-    port ?? parseInt(settingsMap["wg_default_port"] ?? "51820");
+    port ?? parseInt(settingsMap["wg_default_port"] ?? "41820");
 
   // Allocate WG address
   const usedAddresses = db
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     .from(nodes)
     .all()
     .map((r) => r.wgAddress);
-  const subnet = settingsMap["wg_default_subnet"] ?? "10.0.0.0/24";
+  const subnet = settingsMap["wg_default_subnet"] ?? "10.210.0.0/24";
   const startPos = parseInt(settingsMap["wg_node_ip_start"] ?? "1");
   const wgAddress = allocateNodeIp(usedAddresses, subnet, startPos);
 

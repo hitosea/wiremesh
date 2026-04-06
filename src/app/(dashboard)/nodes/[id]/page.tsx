@@ -237,7 +237,7 @@ export default function NodeDetailPage() {
               type="number"
               value={port}
               onChange={(e) => setPort(e.target.value)}
-              placeholder="51820"
+              placeholder="41820"
             />
           </div>
 

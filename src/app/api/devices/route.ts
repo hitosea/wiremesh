@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
       .filter((a): a is string => a !== null);
     const usedAddresses = [...usedNodeAddresses, ...usedDeviceAddresses];
 
-    const subnet = settingsMap["wg_default_subnet"] ?? "10.0.0.0/24";
+    const subnet = settingsMap["wg_default_subnet"] ?? "10.210.0.0/24";
     const startPos = parseInt(settingsMap["wg_device_ip_start"] ?? "100");
     wgAddress = allocateDeviceIp(usedAddresses, subnet, startPos);
   } else {

@@ -136,7 +136,7 @@ export default function NewNodePage() {
                 type="number"
                 value={port}
                 onChange={(e) => setPort(e.target.value)}
-                placeholder="51820"
+                placeholder="41820"
               />
             </div>
             <div className="space-y-1">
