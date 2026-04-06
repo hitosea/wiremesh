@@ -81,6 +81,10 @@ func (a *Agent) handleSSEEvent(evt api.SSEEvent) {
 	switch evt.Event {
 	case "connected":
 		log.Println("[agent] SSE connected to management platform")
+		// Force re-pull on reconnect — may have missed events during disconnect
+		if err := a.pullAndApplyConfigForce(true); err != nil {
+			log.Printf("[agent] Config pull on reconnect failed: %v", err)
+		}
 	case "peer_update", "config_update", "tunnel_update":
 		if err := a.pullAndApplyConfig(); err != nil {
 			log.Printf("[agent] Config apply failed: %v", err)
@@ -90,12 +94,16 @@ func (a *Agent) handleSSEEvent(evt api.SSEEvent) {
 }
 
 func (a *Agent) pullAndApplyConfig() error {
+	return a.pullAndApplyConfigForce(false)
+}
+
+func (a *Agent) pullAndApplyConfigForce(force bool) error {
 	cfgData, err := a.client.FetchConfig()
 	if err != nil {
 		return err
 	}
 
-	if cfgData.Version == a.lastVersion && a.lastVersion != "" {
+	if !force && cfgData.Version == a.lastVersion && a.lastVersion != "" {
 		log.Println("[agent] Config version unchanged, skipping")
 		return nil
 	}
@@ -117,6 +125,11 @@ func (a *Agent) pullAndApplyConfig() error {
 	// 3. Sync iptables rules
 	if err := iptables.SyncRules(cfgData.Tunnels.IptablesRules); err != nil {
 		log.Printf("[agent] iptables sync error: %v", err)
+	}
+
+	// 4. Sync routing (entry nodes: policy routing, exit nodes: return route)
+	if err := wg.SyncRouting(cfgData.Node, cfgData.Tunnels.Interfaces, len(cfgData.Peers) > 0); err != nil {
+		log.Printf("[agent] routing sync error: %v", err)
 	}
 
 	a.lastVersion = cfgData.Version
@@ -145,6 +158,7 @@ func (a *Agent) shutdown() {
 		wg.IpLinkSetDown(name)
 		wg.IpLinkDel(name)
 	}
+	wg.CleanupRouting()
 	iptables.RemoveAllWireMeshRules()
 	log.Println("[agent] Shutdown complete")
 }

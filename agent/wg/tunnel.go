@@ -113,11 +113,10 @@ func writeTunnelConf(iface api.TunnelInterface) string {
 	sb.WriteString(fmt.Sprintf("ListenPort = %d\n", iface.ListenPort))
 	sb.WriteString("\n[Peer]\n")
 	sb.WriteString(fmt.Sprintf("PublicKey = %s\n", iface.PeerPublicKey))
-	if iface.Role == "from" {
-		sb.WriteString("AllowedIPs = 0.0.0.0/0\n")
-	} else {
-		sb.WriteString(fmt.Sprintf("AllowedIPs = %s\n", peerSubnet(iface.Address)))
-	}
+	// Both sides need 0.0.0.0/0 to allow all traffic through the tunnel.
+	// The "to" (upstream) side must accept device-subnet traffic (e.g. 10.0.0.0/24),
+	// not just the tunnel /30 subnet.
+	sb.WriteString("AllowedIPs = 0.0.0.0/0\n")
 	sb.WriteString(fmt.Sprintf("Endpoint = %s:%d\n", iface.PeerAddress, iface.PeerPort))
 	sb.WriteString("PersistentKeepalive = 25\n")
 	os.MkdirAll(WgConfigDir, 0700)

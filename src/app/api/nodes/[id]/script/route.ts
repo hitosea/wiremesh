@@ -27,7 +27,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     return error("INTERNAL_ERROR", "解密私钥失败");
   }
 
-  const serverUrl = request.nextUrl.origin;
+  const serverUrl = process.env.PUBLIC_URL || request.nextUrl.origin;
   const xrayEnabled = node.xrayEnabled;
 
   const script = `#!/bin/bash
@@ -50,7 +50,6 @@ echo "[2/6] 写入 WireGuard 配置..."
 cat > /etc/wiremesh/wireguard/wm-wg0.conf << 'WGEOF'
 [Interface]
 PrivateKey = ${wgPrivateKey}
-Address = ${node.wgAddress}
 ListenPort = ${node.port}
 WGEOF
 

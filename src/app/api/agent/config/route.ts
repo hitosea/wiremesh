@@ -133,10 +133,11 @@ export async function GET(request: NextRequest) {
           iptablesRules.push(`-A FORWARD -o ${ifaceName} -m comment --comment ${lineTag} -j ACCEPT`);
         } else if (myRole === "exit") {
           // exit: tun -> eth0 + NAT
-          const tunnelSubnet = address.split("/")[0].replace(/\.\d+$/, ".0") + "/30";
+          // MASQUERADE all traffic from tunnel interface — source IPs include
+          // both device subnet (10.0.0.x) and tunnel subnet (10.1.x.x)
           iptablesRules.push(`-A FORWARD -i ${ifaceName} -o eth0 -m comment --comment ${lineTag} -j ACCEPT`);
           iptablesRules.push(`-A FORWARD -i eth0 -o ${ifaceName} -m state --state RELATED,ESTABLISHED -m comment --comment ${lineTag} -j ACCEPT`);
-          iptablesRules.push(`-t nat -A POSTROUTING -o eth0 -s ${tunnelSubnet} -m comment --comment ${lineTag} -j MASQUERADE`);
+          iptablesRules.push(`-t nat -A POSTROUTING -o eth0 -j MASQUERADE -m comment --comment ${lineTag}`);
         }
       }
     }
