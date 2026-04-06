@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -14,35 +15,31 @@ import {
 } from "@/components/ui/dialog";
 import { DataTable, Column, PaginationInfo } from "@/components/data-table";
 
-type Node = {
+type Filter = {
   id: number;
   name: string;
-  ip: string;
-  wgAddress: string;
-  status: string;
+  mode: string;
+  isEnabled: boolean;
   tags: string | null;
+  remark: string | null;
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  online: "在线",
-  offline: "离线",
-  installing: "安装中",
-  error: "异常",
+const MODE_LABELS: Record<string, string> = {
+  whitelist: "白名单",
+  blacklist: "黑名单",
 };
 
-const STATUS_VARIANTS: Record<
+const MODE_VARIANTS: Record<
   string,
   "default" | "secondary" | "destructive" | "outline"
 > = {
-  online: "default",
-  offline: "secondary",
-  installing: "outline",
-  error: "destructive",
+  whitelist: "default",
+  blacklist: "destructive",
 };
 
-export default function NodesPage() {
+export default function FiltersPage() {
   const router = useRouter();
-  const [data, setData] = useState<Node[]>([]);
+  const [data, setData] = useState<Filter[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
     pageSize: 20,
@@ -53,49 +50,71 @@ export default function NodesPage() {
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
 
-  const fetchNodes = async (page = 1, q = search) => {
+  const fetchFilters = async (page = 1, q = search) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        page: String(page),
-        pageSize: "20",
-      });
+      const params = new URLSearchParams({ page: String(page), pageSize: "20" });
       if (q) params.set("search", q);
-      const res = await fetch(`/api/nodes?${params}`);
+      const res = await fetch(`/api/filters?${params}`);
       const json = await res.json();
       setData(json.data ?? []);
       if (json.pagination) setPagination(json.pagination);
     } catch {
-      toast.error("加载节点列表失败");
+      toast.error("加载过滤规则列表失败");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchNodes(1, "");
+    fetchFilters(1, "");
   }, []);
 
   const handleSearch = (q: string) => {
     setSearch(q);
-    fetchNodes(1, q);
+    fetchFilters(1, q);
   };
 
   const handlePageChange = (page: number) => {
     setPagination((p) => ({ ...p, page }));
-    fetchNodes(page);
+    fetchFilters(page);
+  };
+
+  const handleToggle = async (filter: Filter) => {
+    setTogglingId(filter.id);
+    try {
+      const res = await fetch(`/api/filters/${filter.id}/toggle`, {
+        method: "PUT",
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setData((prev) =>
+          prev.map((f) =>
+            f.id === filter.id ? { ...f, isEnabled: json.data.isEnabled } : f
+          )
+        );
+        toast.success(json.data.isEnabled ? "规则已启用" : "规则已停用");
+      } else {
+        toast.error(json.error?.message ?? "操作失败");
+      }
+    } catch {
+      toast.error("操作失败，请重试");
+    } finally {
+      setTogglingId(null);
+    }
   };
 
   const handleDelete = async () => {
     if (!deleteId) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/nodes/${deleteId}`, { method: "DELETE" });
+      const res = await fetch(`/api/filters/${deleteId}`, { method: "DELETE" });
       if (res.ok) {
-        toast.success("节点已删除");
+        toast.success("过滤规则已删除");
         setDeleteId(null);
-        fetchNodes(pagination.page);
+        fetchFilters(pagination.page);
       } else {
         const json = await res.json();
         toast.error(json.error?.message ?? "删除失败");
@@ -107,35 +126,42 @@ export default function NodesPage() {
     }
   };
 
-  const columns: Column<Node>[] = [
+  const columns: Column<Filter>[] = [
     {
       key: "name",
       label: "名称",
       render: (row) => (
         <Link
-          href={`/nodes/${row.id}`}
+          href={`/filters/${row.id}`}
           className="text-blue-600 hover:underline font-medium"
         >
           {row.name}
         </Link>
       ),
     },
-    { key: "ip", label: "IP 地址" },
-    { key: "wgAddress", label: "内网地址" },
     {
-      key: "status",
-      label: "状态",
+      key: "mode",
+      label: "模式",
       render: (row) => (
-        <Badge variant={STATUS_VARIANTS[row.status] ?? "secondary"}>
-          {STATUS_LABELS[row.status] ?? row.status}
+        <Badge variant={MODE_VARIANTS[row.mode] ?? "secondary"}>
+          {MODE_LABELS[row.mode] ?? row.mode}
         </Badge>
       ),
     },
     {
-      key: "tags",
-      label: "标签",
+      key: "isEnabled",
+      label: "状态",
       render: (row) => (
-        <span className="text-muted-foreground text-sm">{row.tags ?? "—"}</span>
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={row.isEnabled}
+            disabled={togglingId === row.id}
+            onCheckedChange={() => handleToggle(row)}
+          />
+          <Badge variant={row.isEnabled ? "default" : "secondary"}>
+            {row.isEnabled ? "已启用" : "已停用"}
+          </Badge>
+        </div>
       ),
     },
     {
@@ -146,16 +172,9 @@ export default function NodesPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => router.push(`/nodes/${row.id}`)}
+            onClick={() => router.push(`/filters/${row.id}`)}
           >
             编辑
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => router.push(`/nodes/${row.id}/script`)}
-          >
-            安装脚本
           </Button>
           <Button
             variant="destructive"
@@ -172,8 +191,8 @@ export default function NodesPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">节点管理</h1>
-        <Button onClick={() => router.push("/nodes/new")}>新增节点</Button>
+        <h1 className="text-2xl font-semibold">过滤规则</h1>
+        <Button onClick={() => router.push("/filters/new")}>新增规则</Button>
       </div>
 
       {loading ? (
@@ -187,7 +206,7 @@ export default function NodesPage() {
           pagination={pagination}
           onPageChange={handlePageChange}
           onSearch={handleSearch}
-          searchPlaceholder="搜索节点名称或 IP..."
+          searchPlaceholder="搜索规则名称..."
         />
       )}
 
@@ -196,7 +215,7 @@ export default function NodesPage() {
           <DialogHeader>
             <DialogTitle>确认删除</DialogTitle>
           </DialogHeader>
-          <p className="text-muted-foreground">确定要删除该节点吗？此操作不可恢复。</p>
+          <p className="text-muted-foreground">确定要删除该过滤规则吗？此操作不可恢复。</p>
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={() => setDeleteId(null)}>
               取消

@@ -177,7 +177,7 @@ export default function DevicesPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => router.push(`/devices/${row.id}`)}
+            onClick={() => router.push(`/devices/${row.id}/config`)}
           >
             配置
           </Button>
