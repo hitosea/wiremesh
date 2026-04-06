@@ -1,0 +1,28 @@
+import { NextRequest } from "next/server";
+import { db } from "@/lib/db";
+import { devices } from "@/lib/db/schema";
+import { success, error } from "@/lib/api-response";
+import { eq } from "drizzle-orm";
+
+type Params = { params: Promise<{ id: string }> };
+
+export async function GET(request: NextRequest, { params }: Params) {
+  const { id } = await params;
+  const lineId = parseInt(id);
+  if (isNaN(lineId)) return error("VALIDATION_ERROR", "无效的线路 ID");
+
+  const rows = db
+    .select({
+      id: devices.id,
+      name: devices.name,
+      protocol: devices.protocol,
+      status: devices.status,
+      wgAddress: devices.wgAddress,
+      xrayUuid: devices.xrayUuid,
+    })
+    .from(devices)
+    .where(eq(devices.lineId, lineId))
+    .all();
+
+  return success(rows);
+}
