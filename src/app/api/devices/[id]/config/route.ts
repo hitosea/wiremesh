@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { devices, lineNodes, nodes } from "@/lib/db/schema";
+import { devices, lineNodes, nodes, settings } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
 import { eq, and } from "drizzle-orm";
 import { decrypt } from "@/lib/crypto";
@@ -56,11 +56,13 @@ export async function GET(request: NextRequest, { params }: Params) {
       return error("INTERNAL_ERROR", "解密设备私钥失败");
     }
 
+    const dns = db.select().from(settings).where(eq(settings.key, "wg_default_dns")).get()?.value || "1.1.1.1";
+
     const endpoint = entryNodeRow.nodeDomain ?? entryNodeRow.nodeIp;
     const config = `[Interface]
 PrivateKey = ${privateKey}
 Address = ${device.wgAddress}
-DNS = 8.8.8.8
+DNS = ${dns}
 
 [Peer]
 PublicKey = ${entryNodeRow.nodeWgPublicKey}
