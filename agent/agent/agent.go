@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/wiremesh/agent/config"
 	"github.com/wiremesh/agent/iptables"
 	"github.com/wiremesh/agent/wg"
+	"github.com/wiremesh/agent/xray"
 )
 
 type Agent struct {
@@ -132,9 +134,18 @@ func (a *Agent) pullAndApplyConfigForce(force bool) error {
 		log.Printf("[agent] routing sync error: %v", err)
 	}
 
+	// 5. Sync Xray config
+	if err := xray.Sync(cfgData.Xray); err != nil {
+		log.Printf("[agent] xray sync error: %v", err)
+	}
+
 	a.lastVersion = cfgData.Version
-	log.Printf("[agent] Config applied. Tunnels: %d, iptables rules: %d",
-		len(a.activeTunnels), len(cfgData.Tunnels.IptablesRules))
+	xrayStatus := "disabled"
+	if cfgData.Xray != nil && cfgData.Xray.Enabled {
+		xrayStatus = fmt.Sprintf("enabled (%d clients)", len(cfgData.Xray.UUIDs))
+	}
+	log.Printf("[agent] Config applied. Tunnels: %d, iptables: %d, xray: %s",
+		len(a.activeTunnels), len(cfgData.Tunnels.IptablesRules), xrayStatus)
 	return nil
 }
 
@@ -153,6 +164,7 @@ func (a *Agent) shutdown() {
 	if a.sse != nil {
 		a.sse.Stop()
 	}
+	xray.Stop()
 	for name := range a.activeTunnels {
 		log.Printf("[agent] Destroying tunnel %s", name)
 		wg.IpLinkSetDown(name)
