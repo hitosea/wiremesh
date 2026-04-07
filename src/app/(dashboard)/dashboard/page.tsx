@@ -258,13 +258,17 @@ export default function DashboardPage() {
                         {device.protocol}
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant={
-                            NODE_STATUS_VARIANTS[device.status] ?? "secondary"
-                          }
-                        >
-                          {DEVICE_STATUS_LABELS[device.status] ?? device.status}
-                        </Badge>
+                        {device.status === "-" ? (
+                          <span className="text-muted-foreground text-sm">-</span>
+                        ) : (
+                          <Badge
+                            variant={
+                              NODE_STATUS_VARIANTS[device.status] ?? "secondary"
+                            }
+                          >
+                            {DEVICE_STATUS_LABELS[device.status] ?? device.status}
+                          </Badge>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))

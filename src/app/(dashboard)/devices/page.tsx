@@ -237,11 +237,14 @@ export default function DevicesPage() {
     {
       key: "status",
       label: "状态",
-      render: (row) => (
-        <Badge variant={STATUS_VARIANTS[row.status] ?? "secondary"}>
-          {STATUS_LABELS[row.status] ?? row.status}
-        </Badge>
-      ),
+      render: (row) =>
+        row.status === "-" ? (
+          <span className="text-muted-foreground text-sm">-</span>
+        ) : (
+          <Badge variant={STATUS_VARIANTS[row.status] ?? "secondary"}>
+            {STATUS_LABELS[row.status] ?? row.status}
+          </Badge>
+        ),
     },
     {
       key: "actions",

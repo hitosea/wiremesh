@@ -145,9 +145,13 @@ export default function DeviceDetailPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold">{device.name}</h1>
-          <Badge variant={STATUS_VARIANTS[device.status] ?? "secondary"}>
-            {STATUS_LABELS[device.status] ?? device.status}
-          </Badge>
+          {device.status === "-" ? (
+            <span className="text-muted-foreground text-sm">-</span>
+          ) : (
+            <Badge variant={STATUS_VARIANTS[device.status] ?? "secondary"}>
+              {STATUS_LABELS[device.status] ?? device.status}
+            </Badge>
+          )}
         </div>
         <Button variant="outline" onClick={() => router.push("/devices")}>
           返回
