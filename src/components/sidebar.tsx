@@ -9,7 +9,7 @@ const NAV_ITEMS = [
   { href: "/nodes", label: "节点管理" },
   { href: "/devices", label: "设备管理" },
   { href: "/lines", label: "线路管理" },
-  { href: "/filters", label: "分流规则" },
+  // { href: "/filters", label: "分流规则" }, // TODO: 未完成，暂时隐藏
   { href: "/settings", label: "系统设置" },
 ];
 
