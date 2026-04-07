@@ -69,7 +69,7 @@ export default function NewDevicePage() {
   };
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 w-full max-w-2xl">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">新增设备</h1>
         <Button variant="outline" onClick={() => router.back()}>
@@ -133,7 +133,7 @@ export default function NewDevicePage() {
           </CardContent>
         </Card>
 
-        <div className="flex gap-2">
+        <div className="flex flex-col-reverse sm:flex-row gap-2">
           <Button type="submit" disabled={submitting}>
             {submitting ? "创建中..." : "创建设备"}
           </Button>

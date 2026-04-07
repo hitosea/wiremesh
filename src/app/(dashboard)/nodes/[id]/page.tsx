@@ -172,7 +172,7 @@ export default function NodeDetailPage() {
         </Button>
       </div>
 
-      <div className="max-w-2xl space-y-6">
+      <div className="w-full max-w-2xl space-y-6">
       {/* Read-only info */}
       <Card>
         <CardHeader>
@@ -322,7 +322,7 @@ export default function NodeDetailPage() {
         </CardContent>
       </Card>
 
-      <div className="flex gap-2">
+      <div className="flex flex-col-reverse sm:flex-row gap-2">
         <Button onClick={handleSave} disabled={saving}>
           {saving ? "保存中..." : "保存"}
         </Button>

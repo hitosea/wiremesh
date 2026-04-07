@@ -134,7 +134,7 @@ export default function EditFilterPage() {
   if (!filter) return null;
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 w-full max-w-2xl">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">编辑过滤规则</h1>
         <Button variant="outline" onClick={() => router.push("/filters")}>
@@ -231,7 +231,7 @@ export default function EditFilterPage() {
         </CardContent>
       </Card>
 
-      <div className="flex gap-2">
+      <div className="flex flex-col-reverse sm:flex-row gap-2">
         <Button onClick={handleSave} disabled={saving}>
           {saving ? "保存中..." : "保存"}
         </Button>

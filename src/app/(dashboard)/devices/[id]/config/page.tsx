@@ -57,10 +57,10 @@ export default function DeviceConfigPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 w-full max-w-3xl">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">客户端配置</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-col-reverse sm:flex-row gap-2">
           <Button onClick={handleCopy} disabled={loading || !configData}>
             复制
           </Button>
@@ -95,7 +95,7 @@ export default function DeviceConfigPage() {
               <p className="text-sm text-muted-foreground mb-3">
                 文件名：<code className="bg-muted px-1 rounded">{configData.filename}</code>
               </p>
-              <pre className="code-block p-4 rounded-lg text-xs overflow-auto max-h-[500px] whitespace-pre-wrap break-all">
+              <pre className="code-block p-4 rounded-lg text-xs w-full overflow-x-auto max-h-[500px] whitespace-pre-wrap break-all">
                 {configData.config}
               </pre>
             </>

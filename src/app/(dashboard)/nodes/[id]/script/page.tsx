@@ -51,7 +51,7 @@ export default function NodeScriptPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 w-full max-w-4xl">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">安装脚本</h1>
         <Button variant="outline" onClick={() => router.push(`/nodes/${nodeId}`)}>
@@ -110,7 +110,7 @@ export default function NodeScriptPage() {
                 加载中...
               </div>
             ) : (
-              <pre className="code-block p-4 rounded-lg text-xs overflow-auto max-h-[500px] whitespace-pre-wrap break-all">
+              <pre className="code-block p-4 rounded-lg text-xs w-full overflow-x-auto max-h-[500px] whitespace-pre-wrap break-all">
                 {script}
               </pre>
             )}

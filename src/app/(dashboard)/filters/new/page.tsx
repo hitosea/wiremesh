@@ -90,7 +90,7 @@ export default function NewFilterPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 w-full max-w-2xl">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">新增过滤规则</h1>
         <Button variant="outline" onClick={() => router.push("/filters")}>
@@ -192,7 +192,7 @@ export default function NewFilterPage() {
         </CardContent>
       </Card>
 
-      <div className="flex gap-2">
+      <div className="flex flex-col-reverse sm:flex-row gap-2">
         <Button onClick={handleSave} disabled={saving}>
           {saving ? "创建中..." : "创建规则"}
         </Button>
