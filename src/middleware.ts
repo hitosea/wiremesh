@@ -11,6 +11,10 @@ function isAgentPath(pathname: string): boolean {
   return pathname.startsWith("/api/agent/");
 }
 
+function isNodeScriptPath(pathname: string): boolean {
+  return /^\/api\/nodes\/\d+\/script$/.test(pathname);
+}
+
 function isStaticPath(pathname: string): boolean {
   return pathname.startsWith("/_next") || pathname === "/favicon.ico";
 }
@@ -29,7 +33,7 @@ async function checkInitialized(request: NextRequest): Promise<boolean> {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (isStaticPath(pathname) || isAgentPath(pathname)) {
+  if (isStaticPath(pathname) || isAgentPath(pathname) || isNodeScriptPath(pathname)) {
     return NextResponse.next();
   }
 

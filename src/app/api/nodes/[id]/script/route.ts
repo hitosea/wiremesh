@@ -20,6 +20,13 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   if (!node) return error("NOT_FOUND", "节点不存在");
 
+  // Allow access via agentToken query param (for curl one-liner)
+  const token = request.nextUrl.searchParams.get("token");
+  const hasSession = request.cookies.get("token")?.value;
+  if (!hasSession && token !== node.agentToken) {
+    return error("UNAUTHORIZED", "无权访问");
+  }
+
   let wgPrivateKey: string;
   try {
     wgPrivateKey = decrypt(node.wgPrivateKey);
