@@ -35,7 +35,6 @@ export async function GET(request: NextRequest, { params }: Params) {
   }
 
   const serverUrl = process.env.PUBLIC_URL || request.nextUrl.origin;
-  const xrayEnabled = node.xrayEnabled;
 
   const script = `#!/bin/bash
 #
@@ -279,16 +278,33 @@ else
   ip link set up dev wm-wg0
 fi
 ok "WireGuard interface wm-wg0 is up"
-${xrayEnabled ? `
+
 # 3.5 Install Xray
 if command -v xray &>/dev/null; then
   ok "Xray already installed"
 else
   info "Installing Xray..."
   bash <(curl -fsSL https://github.com/XTLS/Xray-install/raw/main/install-release.sh) install >/dev/null 2>&1
-  ok "Xray installed"
+  if ! command -v xray &>/dev/null; then
+    warn "Xray installation failed (non-fatal, can be installed later)"
+  else
+    ok "Xray installed"
+  fi
 fi
-` : ""}
+
+# 3.6 Configure Xray service for WireMesh
+mkdir -p /etc/wiremesh/xray
+mkdir -p /etc/systemd/system/xray.service.d
+cat > /etc/systemd/system/xray.service.d/wiremesh.conf << 'XRAYEOF'
+[Service]
+ExecStart=
+ExecStart=/usr/local/bin/xray run -config /etc/wiremesh/xray/config.json
+XRAYEOF
+systemctl daemon-reload
+# Do not start xray here — Agent will start it after pulling config
+systemctl stop xray 2>/dev/null || true
+ok "Xray service configured"
+
 echo ""
 
 # ============================================================
