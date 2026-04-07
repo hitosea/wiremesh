@@ -30,6 +30,14 @@ type PeerConfig struct {
 type TunnelConfig struct {
 	Interfaces    []TunnelInterface `json:"interfaces"`
 	IptablesRules []string          `json:"iptablesRules"`
+	DeviceRoutes  []DeviceRoute     `json:"deviceRoutes"`
+}
+
+// DeviceRoute maps a device IP to the tunnel it should use.
+type DeviceRoute struct {
+	Destination string `json:"destination"` // e.g. "10.210.0.100/32"
+	Tunnel      string `json:"tunnel"`      // e.g. "wm-tun1"
+	Type        string `json:"type"`        // "entry" = source-based routing, "exit" = destination-based routing
 }
 
 type TunnelInterface struct {

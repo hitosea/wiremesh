@@ -127,8 +127,8 @@ func (a *Agent) pullAndApplyConfigForce(force bool) error {
 		log.Printf("[agent] iptables sync error: %v", err)
 	}
 
-	// 4. Sync routing (entry nodes: policy routing, exit nodes: return route)
-	if err := wg.SyncRouting(cfgData.Node, cfgData.Tunnels.Interfaces, len(cfgData.Peers) > 0); err != nil {
+	// 4. Sync per-device routing
+	if err := wg.SyncRouting(cfgData.Tunnels.DeviceRoutes); err != nil {
 		log.Printf("[agent] routing sync error: %v", err)
 	}
 

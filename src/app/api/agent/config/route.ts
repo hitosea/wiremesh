@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
   }
 
   // ---- Tunnels ----
+  // Track lineId for each interface so we can compute device routes
   const interfaces: {
     name: string;
     privateKey: string;
@@ -68,6 +69,10 @@ export async function GET(request: NextRequest) {
     peerPort: number;
     role: "from" | "to";
   }[] = [];
+
+  // Internal tracking: lineId -> interface name, by node role
+  const lineToDownstreamIface = new Map<number, string>(); // entry: line -> "from" tunnel
+  const lineToUpstreamIface = new Map<number, string>();   // exit: line -> "to" tunnel
 
   const iptablesRules: string[] = [];
 
@@ -85,6 +90,8 @@ export async function GET(request: NextRequest) {
         .all()
         .filter((t) => t.lineId === lineId);
 
+      const myRole = myLineNodes.find((ln) => ln.lineId === lineId)?.role;
+
       for (let i = 0; i < tunnels.length; i++) {
         const tunnel = tunnels[i];
         const ifaceName = `wm-tun${interfaces.length + 1}`;
@@ -98,7 +105,6 @@ export async function GET(request: NextRequest) {
         let role: "from" | "to";
 
         if (tunnel.fromNodeId === nodeId) {
-          // This node is the "from" side
           try { privateKey = decrypt(tunnel.fromWgPrivateKey); } catch { continue; }
           address = tunnel.fromWgAddress;
           listenPort = tunnel.fromWgPort;
@@ -107,7 +113,6 @@ export async function GET(request: NextRequest) {
           peerPort = tunnel.toWgPort;
           role = "from";
         } else {
-          // This node is the "to" side
           try { privateKey = decrypt(tunnel.toWgPrivateKey); } catch { continue; }
           address = tunnel.toWgAddress;
           listenPort = tunnel.toWgPort;
@@ -119,26 +124,62 @@ export async function GET(request: NextRequest) {
 
         interfaces.push({ name: ifaceName, privateKey, address, listenPort, peerPublicKey, peerAddress, peerPort, role });
 
+        // Track line-to-interface mapping for device routes
+        if (myRole === "entry" && role === "from") {
+          lineToDownstreamIface.set(lineId, ifaceName);
+        }
+        if (myRole === "exit" && role === "to") {
+          lineToUpstreamIface.set(lineId, ifaceName);
+        }
+
         // Generate iptables rules based on role in this line
-        const myRole = myLineNodes.find((ln) => ln.lineId === lineId)?.role;
         const lineTag = `wm-line-${lineId}`;
 
         if (myRole === "entry") {
-          // entry: wm-wg0 <-> tun
           iptablesRules.push(`-A FORWARD -i wm-wg0 -o ${ifaceName} -m comment --comment ${lineTag} -j ACCEPT`);
           iptablesRules.push(`-A FORWARD -i ${ifaceName} -o wm-wg0 -m comment --comment ${lineTag} -j ACCEPT`);
         } else if (myRole === "relay") {
-          // relay: tun <-> tun (handled when both tunnels are processed)
           iptablesRules.push(`-A FORWARD -i ${ifaceName} -m comment --comment ${lineTag} -j ACCEPT`);
           iptablesRules.push(`-A FORWARD -o ${ifaceName} -m comment --comment ${lineTag} -j ACCEPT`);
         } else if (myRole === "exit") {
-          // exit: tun -> eth0 + NAT
-          // Only MASQUERADE VPN traffic (10.0.0.0/8 covers device + tunnel subnets)
-          // to avoid affecting the server's own or other services' outbound traffic
           iptablesRules.push(`-A FORWARD -i ${ifaceName} -o eth0 -m comment --comment ${lineTag} -j ACCEPT`);
           iptablesRules.push(`-A FORWARD -i eth0 -o ${ifaceName} -m state --state RELATED,ESTABLISHED -m comment --comment ${lineTag} -j ACCEPT`);
           iptablesRules.push(`-t nat -A POSTROUTING -s 10.0.0.0/8 -o eth0 -m comment --comment ${lineTag} -j MASQUERADE`);
         }
+      }
+    }
+  }
+
+  // ---- Device Routes ----
+  // Maps each device IP to the tunnel interface it should use.
+  // Entry nodes: device traffic FROM this IP goes through the downstream tunnel.
+  // Exit nodes: return traffic TO this IP goes back through the upstream tunnel.
+  const deviceRoutes: { destination: string; tunnel: string; type: string }[] = [];
+
+  // Entry node routes (source-based: traffic FROM this IP)
+  for (const [lineId, ifaceName] of lineToDownstreamIface) {
+    const lineDevices = db
+      .select({ wgAddress: devices.wgAddress })
+      .from(devices)
+      .where(eq(devices.lineId, lineId))
+      .all();
+    for (const d of lineDevices) {
+      if (d.wgAddress) {
+        deviceRoutes.push({ destination: d.wgAddress.split("/")[0] + "/32", tunnel: ifaceName, type: "entry" });
+      }
+    }
+  }
+
+  // Exit node routes (destination-based: return traffic TO this IP)
+  for (const [lineId, ifaceName] of lineToUpstreamIface) {
+    const lineDevices = db
+      .select({ wgAddress: devices.wgAddress })
+      .from(devices)
+      .where(eq(devices.lineId, lineId))
+      .all();
+    for (const d of lineDevices) {
+      if (d.wgAddress) {
+        deviceRoutes.push({ destination: d.wgAddress.split("/")[0] + "/32", tunnel: ifaceName, type: "exit" });
       }
     }
   }
@@ -166,6 +207,7 @@ export async function GET(request: NextRequest) {
     tunnels: {
       interfaces,
       iptablesRules,
+      deviceRoutes,
     },
     xray: xrayConfig,
     version: node.updatedAt,

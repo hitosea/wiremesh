@@ -8,120 +8,68 @@ import (
 	"github.com/wiremesh/agent/api"
 )
 
-const (
-	routeTable   = "100"
-	rulePriority = "100"
-)
+const routeTableStart = 100
 
-// SyncRouting configures routing rules based on the node's role:
-//
-// Entry node (has peers): Policy routing so device subnet (10.0.0.0/24)
-// traffic is forwarded through the tunnel instead of the default route.
-//
-// Exit node (has upstream tunnel, no peers): Return route so response
-// packets destined for the device subnet go back through the tunnel,
-// not to the local wm-wg0 interface.
-func SyncRouting(node api.NodeConfig, tunnels []api.TunnelInterface, hasPeers bool) error {
+// SyncRouting applies per-device routing rules based on deviceRoutes.
+// Each route has a type:
+//   "entry" → source-based policy routing (ip rule from X lookup tableN)
+//   "exit"  → destination-based route (ip route replace X dev tunN)
+func SyncRouting(deviceRoutes []api.DeviceRoute) error {
 	cleanRouting()
 
-	if len(tunnels) == 0 {
+	if len(deviceRoutes) == 0 {
 		return nil
 	}
 
-	deviceSubnet := subnetFromAddress(node.WgAddress)
-	if deviceSubnet == "" {
-		return fmt.Errorf("cannot determine device subnet from %s", node.WgAddress)
-	}
+	entryIdx := 0
+	for _, route := range deviceRoutes {
+		switch route.Type {
+		case "entry":
+			tableNum := routeTableStart + entryIdx + 1 // 101, 102, ...
+			table := fmt.Sprintf("%d", tableNum)
 
-	if hasPeers {
-		return syncEntryRouting(deviceSubnet, tunnels)
-	}
-	return syncExitRouting(deviceSubnet, tunnels)
-}
+			if _, err := Run("ip", "route", "replace", "default", "dev", route.Tunnel, "table", table); err != nil {
+				log.Printf("[routing] Error adding route table %s: %v", table, err)
+				continue
+			}
+			if _, err := Run("ip", "rule", "add", "from", route.Destination, "lookup", table, "priority", table); err != nil {
+				if !strings.Contains(err.Error(), "File exists") {
+					log.Printf("[routing] Error adding rule for %s: %v", route.Destination, err)
+					continue
+				}
+			}
+			log.Printf("[routing] Entry: %s → %s (table %s)", route.Destination, route.Tunnel, table)
+			entryIdx++
 
-// syncEntryRouting: device subnet → tunnel (policy routing via table 100)
-func syncEntryRouting(deviceSubnet string, tunnels []api.TunnelInterface) error {
-	// Find downstream tunnel (role "from")
-	var downstreamIface string
-	for _, t := range tunnels {
-		if t.Role == "from" {
-			downstreamIface = t.Name
-			break
-		}
-	}
-	if downstreamIface == "" {
-		return nil
-	}
-
-	log.Printf("[routing] Entry node: %s → %s (policy routing)", deviceSubnet, downstreamIface)
-
-	if _, err := Run("ip", "route", "replace", "default", "dev", downstreamIface, "table", routeTable); err != nil {
-		return fmt.Errorf("add route table: %w", err)
-	}
-
-	if _, err := Run("ip", "rule", "add", "from", deviceSubnet, "lookup", routeTable, "priority", rulePriority); err != nil {
-		if !strings.Contains(err.Error(), "File exists") {
-			return fmt.Errorf("add ip rule: %w", err)
+		case "exit":
+			if _, err := Run("ip", "route", "replace", route.Destination, "dev", route.Tunnel); err != nil {
+				log.Printf("[routing] Error adding return route %s → %s: %v", route.Destination, route.Tunnel, err)
+				continue
+			}
+			log.Printf("[routing] Exit: %s → %s", route.Destination, route.Tunnel)
 		}
 	}
 
-	log.Printf("[routing] Entry routing configured: from %s lookup table %s via %s", deviceSubnet, routeTable, downstreamIface)
-	return nil
-}
-
-// syncExitRouting: return packets for device subnet → tunnel (not local wm-wg0)
-// Without this, the exit node routes 10.0.0.x packets to its local wm-wg0
-// (because wm-wg0 has an address in 10.0.0.0/24), instead of sending them
-// back through the tunnel to the entry node.
-func syncExitRouting(deviceSubnet string, tunnels []api.TunnelInterface) error {
-	// Find upstream tunnel (role "to")
-	var upstreamIface string
-	for _, t := range tunnels {
-		if t.Role == "to" {
-			upstreamIface = t.Name
-			break
-		}
-	}
-	if upstreamIface == "" {
-		return nil
-	}
-
-	log.Printf("[routing] Exit node: %s return via %s", deviceSubnet, upstreamIface)
-
-	// Replace the device subnet route: point to tunnel instead of wm-wg0
-	if _, err := Run("ip", "route", "replace", deviceSubnet, "dev", upstreamIface); err != nil {
-		return fmt.Errorf("replace device subnet route: %w", err)
-	}
-
-	log.Printf("[routing] Exit routing configured: %s via %s", deviceSubnet, upstreamIface)
+	log.Printf("[routing] Routing configured: %d routes", len(deviceRoutes))
 	return nil
 }
 
 func cleanRouting() {
-	// Clean policy routing (entry node)
-	for i := 0; i < 10; i++ {
-		_, err := RunSilent("ip", "rule", "del", "lookup", routeTable, "priority", rulePriority)
+	for i := routeTableStart + 1; i <= routeTableStart+100; i++ {
+		table := fmt.Sprintf("%d", i)
+		_, err := RunSilent("ip", "rule", "del", "lookup", table, "priority", table)
 		if err != nil {
 			break
 		}
+		RunSilent("ip", "route", "flush", "table", table)
 	}
-	RunSilent("ip", "route", "flush", "table", routeTable)
+	// Clean legacy table 100
+	RunSilent("ip", "rule", "del", "lookup", "100", "priority", "100")
+	RunSilent("ip", "route", "flush", "table", "100")
 }
 
 // CleanupRouting is called during shutdown
 func CleanupRouting() {
 	cleanRouting()
-	log.Println("[routing] Policy routing cleaned up")
-}
-
-func subnetFromAddress(addr string) string {
-	parts := strings.Split(addr, "/")
-	if len(parts) != 2 {
-		return ""
-	}
-	ipParts := strings.Split(parts[0], ".")
-	if len(ipParts) != 4 {
-		return ""
-	}
-	return fmt.Sprintf("%s.%s.%s.0/%s", ipParts[0], ipParts[1], ipParts[2], parts[1])
+	log.Println("[routing] Routing cleaned up")
 }
