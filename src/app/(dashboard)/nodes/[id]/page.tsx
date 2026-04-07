@@ -123,10 +123,7 @@ export default function NodeDetailPage() {
         remark: remark.trim() || null,
         xrayEnabled,
         xrayPort: xrayEnabled && xrayPort ? parseInt(xrayPort) : null,
-        realityDest: xrayEnabled ? realityDest || "www.microsoft.com:443" : undefined,
-        realityServerName: xrayEnabled
-          ? (realityDest || "www.microsoft.com:443").replace(/:\d+$/, "")
-          : undefined,
+        realityDest: xrayEnabled ? realityDest || undefined : undefined,
       };
 
       const res = await fetch(`/api/nodes/${nodeId}`, {

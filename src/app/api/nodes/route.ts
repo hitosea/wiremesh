@@ -9,6 +9,7 @@ import { encrypt } from "@/lib/crypto";
 import { generateKeyPair } from "@/lib/wireguard";
 import { allocateNodeIp } from "@/lib/ip-allocator";
 import { generateRealityKeypair, generateShortId } from "@/lib/reality";
+import { normalizeRealityDest } from "@/lib/reality-dest";
 import { writeAuditLog } from "@/lib/audit-log";
 
 export async function GET(request: NextRequest) {
@@ -127,12 +128,13 @@ export async function POST(request: NextRequest) {
   if (xrayEnabled) {
     const realityKeys = generateRealityKeypair();
     const shortId = generateShortId();
+    const { realityDest, realityServerName } = normalizeRealityDest(body.realityDest);
     resolvedXrayConfig = JSON.stringify({
       realityPrivateKey: encrypt(realityKeys.privateKey),
       realityPublicKey: realityKeys.publicKey,
       realityShortId: shortId,
-      realityDest: body.realityDest || "www.microsoft.com:443",
-      realityServerName: body.realityServerName || "www.microsoft.com",
+      realityDest,
+      realityServerName,
     });
   }
 

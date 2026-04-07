@@ -14,13 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { DEFAULT_REALITY_DEST } from "@/lib/reality-dest";
 
 export default function NewNodePage() {
   const router = useRouter();
@@ -33,8 +27,8 @@ export default function NewNodePage() {
   const [tags, setTags] = useState("");
   const [remark, setRemark] = useState("");
   const [xrayEnabled, setXrayEnabled] = useState(false);
-  const [xrayTransport, setXrayTransport] = useState("");
   const [xrayPort, setXrayPort] = useState("");
+  const [realityDest, setRealityDest] = useState(DEFAULT_REALITY_DEST);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,8 +53,8 @@ export default function NewNodePage() {
         xrayEnabled,
       };
       if (xrayEnabled) {
-        body.xrayTransport = xrayTransport || null;
         body.xrayPort = xrayPort ? parseInt(xrayPort) : null;
+        body.realityDest = realityDest || undefined;
       }
 
       const res = await fetch("/api/nodes", {
@@ -177,18 +171,6 @@ export default function NewNodePage() {
             {xrayEnabled && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="xrayTransport">传输方式</Label>
-                  <Select value={xrayTransport} onValueChange={setXrayTransport}>
-                    <SelectTrigger id="xrayTransport">
-                      <SelectValue placeholder="选择传输方式" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ws">WebSocket</SelectItem>
-                      <SelectItem value="grpc">gRPC</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
                   <Label htmlFor="xrayPort">Xray 端口</Label>
                   <Input
                     id="xrayPort"
@@ -197,6 +179,18 @@ export default function NewNodePage() {
                     onChange={(e) => setXrayPort(e.target.value)}
                     placeholder="443"
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="realityDest">Reality 目标网站</Label>
+                  <Input
+                    id="realityDest"
+                    value={realityDest}
+                    onChange={(e) => setRealityDest(e.target.value)}
+                    placeholder="www.microsoft.com:443"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    伪装目标，需支持 TLS 1.3，如 www.microsoft.com:443
+                  </p>
                 </div>
               </>
             )}

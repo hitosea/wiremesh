@@ -6,6 +6,7 @@ import { eq, ne, and } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
 import { encrypt } from "@/lib/crypto";
 import { generateRealityKeypair, generateShortId } from "@/lib/reality";
+import { normalizeRealityDest } from "@/lib/reality-dest";
 import { sseManager } from "@/lib/sse-manager";
 
 type Params = { params: Promise<{ id: string }> };
@@ -110,18 +111,20 @@ export async function PUT(request: NextRequest, { params }: Params) {
     if (needKeys) {
       const realityKeys = generateRealityKeypair();
       const shortId = generateShortId();
+      const { realityDest, realityServerName } = normalizeRealityDest(body.realityDest);
       updateData.xrayConfig = JSON.stringify({
         realityPrivateKey: encrypt(realityKeys.privateKey),
         realityPublicKey: realityKeys.publicKey,
         realityShortId: shortId,
-        realityDest: body.realityDest || "www.microsoft.com:443",
-        realityServerName: body.realityServerName || "www.microsoft.com",
+        realityDest,
+        realityServerName,
       });
-    } else if (body.realityDest !== undefined || body.realityServerName !== undefined) {
+    } else if (body.realityDest !== undefined) {
       // Update dest/serverName without regenerating keys
       const parsed = JSON.parse(currentNode!.xrayConfig!);
-      if (body.realityDest !== undefined) parsed.realityDest = body.realityDest;
-      if (body.realityServerName !== undefined) parsed.realityServerName = body.realityServerName;
+      const normalized = normalizeRealityDest(body.realityDest);
+      parsed.realityDest = normalized.realityDest;
+      parsed.realityServerName = normalized.realityServerName;
       updateData.xrayConfig = JSON.stringify(parsed);
     }
     updateData.xrayProtocol = "vless";
