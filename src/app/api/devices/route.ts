@@ -4,12 +4,13 @@ import { db } from "@/lib/db";
 import { devices, settings, nodes, lineNodes } from "@/lib/db/schema";
 import { success, created, error, paginated } from "@/lib/api-response";
 import { parsePaginationParams, paginationOffset } from "@/lib/pagination";
-import { eq, or, like, count, and, SQL } from "drizzle-orm";
+import { eq, or, like, count, and, gt, lte, isNull, SQL } from "drizzle-orm";
 import { encrypt } from "@/lib/crypto";
 import { generateKeyPair } from "@/lib/wireguard";
 import { allocateDeviceIp } from "@/lib/ip-allocator";
 import { writeAuditLog } from "@/lib/audit-log";
 import { sseManager } from "@/lib/sse-manager";
+import { computeDeviceStatus } from "@/lib/device-status";
 
 function getEntryNodeId(lineId: number): number | null {
   const entry = db.select({ nodeId: lineNodes.nodeId }).from(lineNodes)
@@ -27,7 +28,19 @@ export async function GET(request: NextRequest) {
   if (search) {
     conditions.push(like(devices.name, `%${search}%`));
   }
-  if (status) conditions.push(eq(devices.status, status));
+  if (status) {
+    const threshold = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    if (status === "online") {
+      conditions.push(gt(devices.lastHandshake, threshold));
+    } else {
+      conditions.push(
+        or(
+          isNull(devices.lastHandshake),
+          lte(devices.lastHandshake, threshold),
+        )!
+      );
+    }
+  }
   if (protocol) conditions.push(eq(devices.protocol, protocol));
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -57,7 +70,12 @@ export async function GET(request: NextRequest) {
     .offset(paginationOffset(params))
     .all();
 
-  return paginated(rows, {
+  const data = rows.map((row) => ({
+    ...row,
+    status: computeDeviceStatus(row.lastHandshake),
+  }));
+
+  return paginated(data, {
     page: params.page,
     pageSize: params.pageSize,
     total,

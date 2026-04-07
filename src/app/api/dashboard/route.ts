@@ -2,7 +2,8 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { nodes, devices, lines, nodeStatus } from "@/lib/db/schema";
 import { success } from "@/lib/api-response";
-import { eq, count, desc, sql } from "drizzle-orm";
+import { eq, count, desc, sql, gt, or, isNull, lte } from "drizzle-orm";
+import { computeDeviceStatus } from "@/lib/device-status";
 
 export async function GET(request: NextRequest) {
   // Node counts
@@ -14,12 +15,12 @@ export async function GET(request: NextRequest) {
   const errorNodes =
     db.select({ count: count() }).from(nodes).where(eq(nodes.status, "error")).get()?.count ?? 0;
 
-  // Device counts
+  // Device counts (status computed from lastHandshake)
   const totalDevices = db.select({ count: count() }).from(devices).get()?.count ?? 0;
+  const deviceThreshold = new Date(Date.now() - 10 * 60 * 1000).toISOString();
   const onlineDevices =
-    db.select({ count: count() }).from(devices).where(eq(devices.status, "online")).get()?.count ?? 0;
-  const offlineDevices =
-    db.select({ count: count() }).from(devices).where(eq(devices.status, "offline")).get()?.count ?? 0;
+    db.select({ count: count() }).from(devices).where(gt(devices.lastHandshake, deviceThreshold)).get()?.count ?? 0;
+  const offlineDevices = totalDevices - onlineDevices;
 
   // Line counts
   const totalLines = db.select({ count: count() }).from(lines).get()?.count ?? 0;
@@ -74,13 +75,13 @@ export async function GET(request: NextRequest) {
     .all();
 
   // Recent devices (top 10)
-  const recentDevices = db
+  const recentDevicesRaw = db
     .select({
       id: devices.id,
       name: devices.name,
       protocol: devices.protocol,
       wgAddress: devices.wgAddress,
-      status: devices.status,
+      lastHandshake: devices.lastHandshake,
       lineId: devices.lineId,
       updatedAt: devices.updatedAt,
     })
@@ -88,6 +89,10 @@ export async function GET(request: NextRequest) {
     .orderBy(desc(devices.updatedAt))
     .limit(10)
     .all();
+  const recentDevices = recentDevicesRaw.map((d) => ({
+    ...d,
+    status: computeDeviceStatus(d.lastHandshake),
+  }));
 
   return success({
     nodes: {

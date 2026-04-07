@@ -5,6 +5,7 @@ import { success, error } from "@/lib/api-response";
 import { eq, and } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
 import { sseManager } from "@/lib/sse-manager";
+import { computeDeviceStatus } from "@/lib/device-status";
 
 function getEntryNodeId(lineId: number): number | null {
   const entry = db.select({ nodeId: lineNodes.nodeId }).from(lineNodes)
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     .get();
 
   if (!device) return error("NOT_FOUND", "设备不存在");
-  return success(device);
+  return success({ ...device, status: computeDeviceStatus(device.lastHandshake) });
 }
 
 export async function PUT(request: NextRequest, { params }: Params) {

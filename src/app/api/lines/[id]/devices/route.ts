@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { devices } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
 import { eq } from "drizzle-orm";
+import { computeDeviceStatus } from "@/lib/device-status";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -16,13 +17,18 @@ export async function GET(request: NextRequest, { params }: Params) {
       id: devices.id,
       name: devices.name,
       protocol: devices.protocol,
-      status: devices.status,
       wgAddress: devices.wgAddress,
       xrayUuid: devices.xrayUuid,
+      lastHandshake: devices.lastHandshake,
     })
     .from(devices)
     .where(eq(devices.lineId, lineId))
     .all();
 
-  return success(rows);
+  const data = rows.map((r) => ({
+    ...r,
+    status: computeDeviceStatus(r.lastHandshake),
+  }));
+
+  return success(data);
 }

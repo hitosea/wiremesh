@@ -52,7 +52,8 @@ export async function POST(request: NextRequest) {
     .where(eq(nodes.id, node.id))
     .run();
 
-  // Update device last_handshake and status for matching handshakes
+  // Update device last_handshake for matching handshakes
+  // Device online/offline status is computed from lastHandshake at query time
   for (const h of handshakes) {
     const device = db
       .select({ id: devices.id })
@@ -63,7 +64,6 @@ export async function POST(request: NextRequest) {
       db.update(devices)
         .set({
           lastHandshake: h.last_handshake,
-          status: "online",
           updatedAt: new Date().toISOString(),
         })
         .where(eq(devices.id, device.id))
