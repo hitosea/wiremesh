@@ -280,8 +280,7 @@ export default function DevicesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">设备管理</h1>
+      <div className="flex justify-end">
         <Button onClick={() => router.push("/devices/new")}>新增设备</Button>
       </div>
 

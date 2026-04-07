@@ -191,8 +191,7 @@ export default function FiltersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">过滤规则</h1>
+      <div className="flex justify-end">
         <Button onClick={() => router.push("/filters/new")}>新增规则</Button>
       </div>
 

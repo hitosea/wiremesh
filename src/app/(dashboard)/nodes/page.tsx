@@ -228,8 +228,7 @@ export default function NodesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">节点管理</h1>
+      <div className="flex justify-end">
         <Button onClick={() => router.push("/nodes/new")}>新增节点</Button>
       </div>
 

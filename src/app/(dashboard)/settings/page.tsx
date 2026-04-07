@@ -126,8 +126,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">系统设置</h1>
+      <div className="flex justify-end">
         <Button onClick={handleSave} disabled={saving}>
           {saving ? "保存中..." : "保存设置"}
         </Button>

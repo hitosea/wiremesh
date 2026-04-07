@@ -105,8 +105,6 @@ export default function AuditLogsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">审计日志</h1>
-
       <div className="rounded-md border">
         <Table>
           <TableHeader>
