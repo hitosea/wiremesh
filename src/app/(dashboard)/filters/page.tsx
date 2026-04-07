@@ -166,7 +166,7 @@ export default function FiltersPage() {
     },
     {
       key: "actions",
-      label: "操作",
+      label: "",
       align: "right",
       render: (row) => (
         <div className="flex gap-2">
