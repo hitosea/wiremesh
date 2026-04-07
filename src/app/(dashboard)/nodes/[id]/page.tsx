@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { NodeStatusChart } from "@/components/node-status-chart";
 
 type NodeDetail = {
   id: number;
@@ -153,7 +154,7 @@ export default function NodeDetailPage() {
   if (!node) return null;
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold">{node.name}</h1>
@@ -166,6 +167,7 @@ export default function NodeDetailPage() {
         </Button>
       </div>
 
+      <div className="max-w-2xl space-y-6">
       {/* Read-only info */}
       <Card>
         <CardHeader>
@@ -310,6 +312,9 @@ export default function NodeDetailPage() {
           返回
         </Button>
       </div>
+      </div>
+
+      <NodeStatusChart nodeId={nodeId} />
     </div>
   );
 }
