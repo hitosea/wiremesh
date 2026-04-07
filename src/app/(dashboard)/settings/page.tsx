@@ -17,32 +17,22 @@ type SettingsData = Record<string, string>;
 const SETTING_GROUPS = [
   {
     title: "WireGuard",
+    description: "以下设置仅对新建节点/设备生效，不影响已有资源",
     fields: [
-      { key: "wg_default_port", label: "默认端口" },
-      { key: "wg_default_subnet", label: "默认子网" },
-      { key: "wg_default_dns", label: "默认 DNS" },
-      { key: "wg_node_ip_start", label: "节点 IP 起始位" },
-      { key: "wg_device_ip_start", label: "设备 IP 起始位" },
-    ],
-  },
-  {
-    title: "Xray",
-    fields: [
-      { key: "xray_default_protocol", label: "默认协议" },
-      { key: "xray_default_transport", label: "默认传输方式" },
-      { key: "xray_default_port", label: "默认端口" },
+      { key: "wg_default_port", label: "默认端口", hint: "新建节点时的默认 WireGuard 监听端口" },
+      { key: "wg_default_subnet", label: "默认子网", hint: "IP 自动分配的网段" },
+      { key: "wg_default_dns", label: "默认 DNS", hint: "客户端配置使用的 DNS，修改后立即生效" },
+      { key: "wg_node_ip_start", label: "节点 IP 起始位", hint: "节点内网 IP 从该位开始分配" },
+      { key: "wg_device_ip_start", label: "设备 IP 起始位", hint: "设备内网 IP 从该位开始分配" },
     ],
   },
   {
     title: "隧道",
+    description: "以下设置仅对新建线路生效",
     fields: [
-      { key: "tunnel_subnet", label: "隧道子网" },
-      { key: "tunnel_port_start", label: "隧道端口起始" },
+      { key: "tunnel_subnet", label: "隧道子网", hint: "节点间点对点隧道的 IP 地址池" },
+      { key: "tunnel_port_start", label: "隧道端口起始", hint: "隧道 WireGuard 端口自动分配起始值" },
     ],
-  },
-  {
-    title: "监控",
-    fields: [{ key: "node_check_interval", label: "节点检查间隔（秒）" }],
   },
 ];
 
@@ -147,6 +137,9 @@ export default function SettingsPage() {
         <Card key={group.title}>
           <CardHeader>
             <CardTitle>{group.title}</CardTitle>
+            {group.description && (
+              <p className="text-sm text-muted-foreground">{group.description}</p>
+            )}
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -159,6 +152,9 @@ export default function SettingsPage() {
                     onChange={(e) => handleChange(field.key, e.target.value)}
                     placeholder={field.key}
                   />
+                  {field.hint && (
+                    <p className="text-xs text-muted-foreground">{field.hint}</p>
+                  )}
                 </div>
               ))}
             </div>
