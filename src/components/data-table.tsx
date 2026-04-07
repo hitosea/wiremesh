@@ -75,7 +75,7 @@ export function DataTable<T extends Record<string, unknown>>({
             onChange={(e) => setSearchValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={searchPlaceholder}
-            className="max-w-sm"
+            className="sm:max-w-sm"
           />
           <Button variant="outline" onClick={handleSearch}>
             搜索

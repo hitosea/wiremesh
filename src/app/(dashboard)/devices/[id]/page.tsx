@@ -164,7 +164,7 @@ export default function DeviceDetailPage() {
           <CardTitle>设备信息</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-1">
+          <div className="space-y-2">
             <Label>协议</Label>
             <p className="text-sm font-medium">
               {PROTOCOL_LABELS[device.protocol] ?? device.protocol}
@@ -172,11 +172,11 @@ export default function DeviceDetailPage() {
           </div>
           {device.protocol === "wireguard" && (
             <>
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <Label>WireGuard 内网地址</Label>
                 <p className="text-sm font-medium">{device.wgAddress ?? "—"}</p>
               </div>
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <Label>WireGuard 公钥</Label>
                 <code className="block text-xs bg-muted px-3 py-2 rounded break-all">
                   {device.wgPublicKey ?? "—"}
@@ -185,7 +185,7 @@ export default function DeviceDetailPage() {
             </>
           )}
           {device.protocol === "xray" && (
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Label>Xray UUID</Label>
               <code className="block text-xs bg-muted px-3 py-2 rounded break-all">
                 {device.xrayUuid ?? "—"}
@@ -193,7 +193,7 @@ export default function DeviceDetailPage() {
             </div>
           )}
           {device.lastHandshake && (
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Label>最后握手时间</Label>
               <p className="text-sm text-muted-foreground">
                 {device.lastHandshake}
@@ -209,7 +209,7 @@ export default function DeviceDetailPage() {
           <CardTitle>编辑设备</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-1">
+          <div className="space-y-2">
             <Label htmlFor="name">
               设备名称 <span className="text-destructive">*</span>
             </Label>
@@ -219,7 +219,7 @@ export default function DeviceDetailPage() {
               onChange={(e) => setName(e.target.value)}
             />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-2">
             <Label htmlFor="tags">标签（逗号分隔）</Label>
             <Input
               id="tags"
@@ -228,7 +228,7 @@ export default function DeviceDetailPage() {
               placeholder="例如：工作,个人"
             />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-2">
             <Label htmlFor="remark">备注</Label>
             <Textarea
               id="remark"
@@ -237,7 +237,7 @@ export default function DeviceDetailPage() {
               rows={3}
             />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-2">
             <Label htmlFor="lineId">线路 ID</Label>
             <Input
               id="lineId"
@@ -253,7 +253,7 @@ export default function DeviceDetailPage() {
         </CardContent>
       </Card>
 
-      <div className="flex flex-col-reverse sm:flex-row gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         <Button onClick={handleSave} disabled={saving}>
           {saving ? "保存中..." : "保存"}
         </Button>

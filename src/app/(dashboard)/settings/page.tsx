@@ -143,7 +143,7 @@ export default function SettingsPage() {
           <CardContent>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {group.fields.map((field) => (
-                <div key={field.key} className="space-y-1">
+                <div key={field.key} className="space-y-2">
                   <Label htmlFor={field.key}>{field.label}</Label>
                   <Input
                     id={field.key}
@@ -167,7 +167,7 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
           <div className="max-w-md space-y-4">
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Label htmlFor="currentPassword">当前密码</Label>
               <Input
                 id="currentPassword"
@@ -176,7 +176,7 @@ export default function SettingsPage() {
                 onChange={(e) => setCurrentPassword(e.target.value)}
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Label htmlFor="newPassword">新密码</Label>
               <Input
                 id="newPassword"
@@ -186,7 +186,7 @@ export default function SettingsPage() {
                 placeholder="至少 6 位字符"
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Label htmlFor="confirmPassword">确认新密码</Label>
               <Input
                 id="confirmPassword"

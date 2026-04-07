@@ -60,7 +60,7 @@ export default function DeviceConfigPage() {
     <div className="space-y-6 w-full max-w-3xl">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">客户端配置</h1>
-        <div className="flex flex-col-reverse sm:flex-row gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <Button onClick={handleCopy} disabled={loading || !configData}>
             复制
           </Button>

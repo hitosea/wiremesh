@@ -83,7 +83,7 @@ export default function NewDevicePage() {
             <CardTitle>基本信息</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Label htmlFor="name">
                 设备名称 <span className="text-destructive">*</span>
               </Label>
@@ -94,7 +94,7 @@ export default function NewDevicePage() {
                 placeholder="例如：我的笔记本"
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Label htmlFor="protocol">
                 协议类型 <span className="text-destructive">*</span>
               </Label>
@@ -111,7 +111,7 @@ export default function NewDevicePage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Label htmlFor="tags">标签（逗号分隔）</Label>
               <Input
                 id="tags"
@@ -120,7 +120,7 @@ export default function NewDevicePage() {
                 placeholder="例如：工作,个人"
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Label htmlFor="remark">备注</Label>
               <Textarea
                 id="remark"
@@ -133,7 +133,7 @@ export default function NewDevicePage() {
           </CardContent>
         </Card>
 
-        <div className="flex flex-col-reverse sm:flex-row gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <Button type="submit" disabled={submitting}>
             {submitting ? "创建中..." : "创建设备"}
           </Button>

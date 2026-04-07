@@ -307,7 +307,7 @@ export default function LineDetailPage() {
           <CardTitle>编辑线路</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-1">
+          <div className="space-y-2">
             <Label htmlFor="name">
               线路名称 <span className="text-destructive">*</span>
             </Label>
@@ -317,7 +317,7 @@ export default function LineDetailPage() {
               onChange={(e) => setName(e.target.value)}
             />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-2">
             <Label htmlFor="status">状态</Label>
             <Select value={status} onValueChange={setStatus}>
               <SelectTrigger id="status">
@@ -329,7 +329,7 @@ export default function LineDetailPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
+          <div className="space-y-2">
             <Label htmlFor="tags">标签（逗号分隔）</Label>
             <Input
               id="tags"
@@ -338,7 +338,7 @@ export default function LineDetailPage() {
               placeholder="例如：低延迟,稳定"
             />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-2">
             <Label htmlFor="remark">备注</Label>
             <Textarea
               id="remark"
@@ -350,7 +350,7 @@ export default function LineDetailPage() {
         </CardContent>
       </Card>
 
-      <div className="flex flex-col-reverse sm:flex-row gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         <Button onClick={handleSave} disabled={saving}>
           {saving ? "保存中..." : "保存"}
         </Button>

@@ -179,24 +179,24 @@ export default function NodeDetailPage() {
           <CardTitle>节点信息</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-1">
+          <div className="space-y-2">
             <Label>WireGuard 内网地址</Label>
             <p className="text-sm font-medium">{node.wgAddress}</p>
           </div>
-          <div className="space-y-1">
+          <div className="space-y-2">
             <Label>WireGuard 公钥</Label>
             <code className="block text-xs bg-muted px-3 py-2 rounded break-all">
               {node.wgPublicKey}
             </code>
           </div>
-          <div className="space-y-1">
+          <div className="space-y-2">
             <Label>Agent Token</Label>
             <code className="block text-xs bg-muted px-3 py-2 rounded break-all">
               {node.agentToken}
             </code>
           </div>
           {node.errorMessage && (
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Label className="text-destructive">错误信息</Label>
               <p className="text-sm text-destructive">{node.errorMessage}</p>
             </div>
@@ -210,7 +210,7 @@ export default function NodeDetailPage() {
           <CardTitle>编辑节点</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-1">
+          <div className="space-y-2">
             <Label htmlFor="name">
               节点名称 <span className="text-destructive">*</span>
             </Label>
@@ -220,7 +220,7 @@ export default function NodeDetailPage() {
               onChange={(e) => setName(e.target.value)}
             />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-2">
             <Label htmlFor="ip">IP 地址</Label>
             <Input
               id="ip"
@@ -228,7 +228,7 @@ export default function NodeDetailPage() {
               onChange={(e) => setIp(e.target.value)}
             />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-2">
             <Label htmlFor="domain">域名</Label>
             <Input
               id="domain"
@@ -237,7 +237,7 @@ export default function NodeDetailPage() {
               placeholder="例如：node1.example.com"
             />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-2">
             <Label htmlFor="port">WireGuard 端口</Label>
             <Input
               id="port"
@@ -259,7 +259,7 @@ export default function NodeDetailPage() {
             </div>
             {xrayEnabled && (
               <>
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <Label htmlFor="xrayPort">Xray 端口</Label>
                   <Input
                     id="xrayPort"
@@ -269,7 +269,7 @@ export default function NodeDetailPage() {
                     placeholder="443"
                   />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <Label htmlFor="realityDest">Reality 目标网站</Label>
                   <Input
                     id="realityDest"
@@ -283,13 +283,13 @@ export default function NodeDetailPage() {
                 </div>
                 {realityPublicKey && (
                   <>
-                    <div className="space-y-1">
+                    <div className="space-y-2">
                       <Label>Reality Public Key</Label>
                       <code className="block text-xs bg-muted px-3 py-2 rounded break-all">
                         {realityPublicKey}
                       </code>
                     </div>
-                    <div className="space-y-1">
+                    <div className="space-y-2">
                       <Label>Reality Short ID</Label>
                       <code className="block text-xs bg-muted px-3 py-2 rounded break-all">
                         {realityShortId}
@@ -301,7 +301,7 @@ export default function NodeDetailPage() {
             )}
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-2">
             <Label htmlFor="tags">标签（逗号分隔）</Label>
             <Input
               id="tags"
@@ -310,7 +310,7 @@ export default function NodeDetailPage() {
               placeholder="例如：香港,高速"
             />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-2">
             <Label htmlFor="remark">备注</Label>
             <Textarea
               id="remark"
@@ -322,7 +322,7 @@ export default function NodeDetailPage() {
         </CardContent>
       </Card>
 
-      <div className="flex flex-col-reverse sm:flex-row gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         <Button onClick={handleSave} disabled={saving}>
           {saving ? "保存中..." : "保存"}
         </Button>

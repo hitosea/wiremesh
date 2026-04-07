@@ -98,7 +98,7 @@ export default function NewNodePage() {
             <CardTitle>基本信息</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Label htmlFor="name">
                 节点名称 <span className="text-destructive">*</span>
               </Label>
@@ -109,7 +109,7 @@ export default function NewNodePage() {
                 placeholder="例如：香港节点01"
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Label htmlFor="ip">
                 IP 地址 <span className="text-destructive">*</span>
               </Label>
@@ -120,7 +120,7 @@ export default function NewNodePage() {
                 placeholder="例如：1.2.3.4"
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Label htmlFor="domain">域名</Label>
               <Input
                 id="domain"
@@ -129,7 +129,7 @@ export default function NewNodePage() {
                 placeholder="例如：node1.example.com"
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Label htmlFor="port">WireGuard 端口</Label>
               <Input
                 id="port"
@@ -139,7 +139,7 @@ export default function NewNodePage() {
                 placeholder="41820"
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Label htmlFor="tags">标签（逗号分隔）</Label>
               <Input
                 id="tags"
@@ -148,7 +148,7 @@ export default function NewNodePage() {
                 placeholder="例如：香港,高速"
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Label htmlFor="remark">备注</Label>
               <Textarea
                 id="remark"
@@ -176,7 +176,7 @@ export default function NewNodePage() {
             </div>
             {xrayEnabled && (
               <>
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <Label htmlFor="xrayTransport">传输方式</Label>
                   <Select value={xrayTransport} onValueChange={setXrayTransport}>
                     <SelectTrigger id="xrayTransport">
@@ -188,7 +188,7 @@ export default function NewNodePage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <Label htmlFor="xrayPort">Xray 端口</Label>
                   <Input
                     id="xrayPort"
@@ -203,7 +203,7 @@ export default function NewNodePage() {
           </CardContent>
         </Card>
 
-        <div className="flex flex-col-reverse sm:flex-row gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <Button type="submit" disabled={submitting}>
             {submitting ? "创建中..." : "创建节点"}
           </Button>
