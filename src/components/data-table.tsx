@@ -10,6 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 
 export interface Column<T> {
@@ -32,6 +33,10 @@ interface DataTableProps<T> {
   onPageChange?: (page: number) => void;
   onSearch?: (query: string) => void;
   searchPlaceholder?: string;
+  selectable?: boolean;
+  selectedIds?: Set<number>;
+  onSelectionChange?: (ids: Set<number>) => void;
+  getRowId?: (row: T) => number;
 }
 
 export function DataTable<T extends Record<string, unknown>>({
@@ -41,6 +46,10 @@ export function DataTable<T extends Record<string, unknown>>({
   onPageChange,
   onSearch,
   searchPlaceholder = "搜索...",
+  selectable = false,
+  selectedIds = new Set(),
+  onSelectionChange,
+  getRowId = (row) => row.id as number,
 }: DataTableProps<T>) {
   const [searchValue, setSearchValue] = useState("");
 
@@ -75,6 +84,21 @@ export function DataTable<T extends Record<string, unknown>>({
         <Table>
           <TableHeader>
             <TableRow>
+              {selectable && (
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={data.length > 0 && data.every((row) => selectedIds.has(getRowId(row)))}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        onSelectionChange?.(new Set([...selectedIds, ...data.map(getRowId)]));
+                      } else {
+                        const pageIds = new Set(data.map(getRowId));
+                        onSelectionChange?.(new Set([...selectedIds].filter((id) => !pageIds.has(id))));
+                      }
+                    }}
+                  />
+                </TableHead>
+              )}
               {columns.map((col) => (
                 <TableHead key={col.key}>{col.label}</TableHead>
               ))}
@@ -84,7 +108,7 @@ export function DataTable<T extends Record<string, unknown>>({
             {data.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length}
+                  colSpan={columns.length + (selectable ? 1 : 0)}
                   className="h-24 text-center text-muted-foreground"
                 >
                   暂无数据
@@ -93,6 +117,18 @@ export function DataTable<T extends Record<string, unknown>>({
             ) : (
               data.map((row, idx) => (
                 <TableRow key={idx}>
+                  {selectable && (
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.has(getRowId(row))}
+                        onCheckedChange={(checked) => {
+                          const next = new Set(selectedIds);
+                          if (checked) { next.add(getRowId(row)); } else { next.delete(getRowId(row)); }
+                          onSelectionChange?.(next);
+                        }}
+                      />
+                    </TableCell>
+                  )}
                   {columns.map((col) => (
                     <TableCell key={col.key}>
                       {col.render
