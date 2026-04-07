@@ -9,7 +9,7 @@ type ConfigData struct {
 	Node    NodeConfig   `json:"node"`
 	Peers   []PeerConfig `json:"peers"`
 	Tunnels TunnelConfig `json:"tunnels"`
-	Xray    interface{}  `json:"xray"`
+	Xray    *XrayConfig  `json:"xray"`
 	Version string       `json:"version"`
 }
 
@@ -49,4 +49,15 @@ type TunnelInterface struct {
 	PeerAddress   string `json:"peerAddress"`
 	PeerPort      int    `json:"peerPort"`
 	Role          string `json:"role"` // "from" or "to"
+}
+
+type XrayConfig struct {
+	Enabled            bool     `json:"enabled"`
+	Protocol           string   `json:"protocol"`
+	Port               int      `json:"port"`
+	UUIDs              []string `json:"uuids"`
+	RealityPrivateKey  string   `json:"realityPrivateKey"`
+	RealityShortId     string   `json:"realityShortId"`
+	RealityDest        string   `json:"realityDest"`
+	RealityServerNames []string `json:"realityServerNames"`
 }
