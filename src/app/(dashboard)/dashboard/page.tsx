@@ -115,8 +115,8 @@ export default function DashboardPage() {
   if (!data) {
     return (
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900 mb-4">仪表盘</h1>
-        <p className="text-gray-500">加载数据失败</p>
+        <h1 className="text-2xl font-semibold mb-4">仪表盘</h1>
+        <p className="text-muted-foreground">加载数据失败</p>
       </div>
     );
   }
@@ -126,7 +126,7 @@ export default function DashboardPage() {
       <h1 className="text-2xl font-semibold">仪表盘</h1>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">节点</CardTitle>
@@ -134,10 +134,10 @@ export default function DashboardPage() {
           <CardContent>
             <div className="text-3xl font-bold">{data.nodes.total}</div>
             <div className="text-sm text-muted-foreground mt-1 space-x-3">
-              <span className="text-green-600">在线 {data.nodes.online}</span>
+              <span className="text-emerald-500 dark:text-emerald-400">在线 {data.nodes.online}</span>
               <span>离线 {data.nodes.offline}</span>
               {data.nodes.error > 0 && (
-                <span className="text-red-500">异常 {data.nodes.error}</span>
+                <span className="text-destructive">异常 {data.nodes.error}</span>
               )}
             </div>
           </CardContent>
@@ -150,7 +150,7 @@ export default function DashboardPage() {
           <CardContent>
             <div className="text-3xl font-bold">{data.devices.total}</div>
             <div className="text-sm text-muted-foreground mt-1 space-x-3">
-              <span className="text-green-600">在线 {data.devices.online}</span>
+              <span className="text-emerald-500 dark:text-emerald-400">在线 {data.devices.online}</span>
               <span>离线 {data.devices.offline}</span>
             </div>
           </CardContent>
@@ -163,7 +163,7 @@ export default function DashboardPage() {
           <CardContent>
             <div className="text-3xl font-bold">{data.lines.total}</div>
             <div className="text-sm text-muted-foreground mt-1 space-x-3">
-              <span className="text-green-600">活跃 {data.lines.active}</span>
+              <span className="text-emerald-500 dark:text-emerald-400">活跃 {data.lines.active}</span>
               <span>停用 {data.lines.inactive}</span>
             </div>
           </CardContent>
@@ -171,7 +171,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent Nodes & Devices */}
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Nodes */}
         <Card>
           <CardHeader>
@@ -199,7 +199,7 @@ export default function DashboardPage() {
                       <TableCell>
                         <Link
                           href={`/nodes/${node.id}`}
-                          className="text-blue-600 hover:underline font-medium"
+                          className="text-primary hover:underline font-medium"
                         >
                           {node.name}
                         </Link>
@@ -249,7 +249,7 @@ export default function DashboardPage() {
                       <TableCell>
                         <Link
                           href={`/devices/${device.id}`}
-                          className="text-blue-600 hover:underline font-medium"
+                          className="text-primary hover:underline font-medium"
                         >
                           {device.name}
                         </Link>
@@ -301,7 +301,7 @@ export default function DashboardPage() {
                     <TableCell>
                       <Link
                         href={`/nodes/${t.nodeId}`}
-                        className="text-blue-600 hover:underline font-medium"
+                        className="text-primary hover:underline font-medium"
                       >
                         {t.nodeName}
                       </Link>

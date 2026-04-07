@@ -128,7 +128,7 @@ export default function LinesPage() {
       render: (row) => (
         <Link
           href={`/lines/${row.id}`}
-          className="text-blue-600 hover:underline font-medium"
+          className="text-primary hover:underline font-medium"
         >
           {row.name}
         </Link>

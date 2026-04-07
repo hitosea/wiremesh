@@ -215,7 +215,7 @@ export default function LineDetailPage() {
                     <TableCell>
                       <Link
                         href={`/nodes/${n.nodeId}`}
-                        className="text-blue-600 hover:underline"
+                        className="text-primary hover:underline"
                       >
                         {n.nodeName}
                       </Link>
@@ -293,7 +293,7 @@ export default function LineDetailPage() {
             共关联{" "}
             <Link
               href={`/devices?lineId=${line.id}`}
-              className="text-blue-600 hover:underline font-medium"
+              className="text-primary hover:underline font-medium"
             >
               {line.deviceCount} 台设备
             </Link>

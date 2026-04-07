@@ -133,7 +133,7 @@ export default function FiltersPage() {
       render: (row) => (
         <Link
           href={`/filters/${row.id}`}
-          className="text-blue-600 hover:underline font-medium"
+          className="text-primary hover:underline font-medium"
         >
           {row.name}
         </Link>

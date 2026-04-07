@@ -68,7 +68,7 @@ export default function NodeScriptPage() {
             在目标服务器上以 root 身份执行以下命令：
           </p>
           <div className="flex gap-2">
-            <pre className="flex-1 bg-gray-900 text-gray-100 p-3 rounded-lg text-sm overflow-x-auto whitespace-pre-wrap break-all">
+            <pre className="flex-1 code-block p-3 rounded-lg text-sm overflow-x-auto whitespace-pre-wrap break-all">
               {oneliner || "加载中..."}
             </pre>
             <Button onClick={handleCopy} disabled={!oneliner}>
@@ -110,7 +110,7 @@ export default function NodeScriptPage() {
                 加载中...
               </div>
             ) : (
-              <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg text-xs overflow-auto max-h-[500px] whitespace-pre-wrap break-all">
+              <pre className="code-block p-4 rounded-lg text-xs overflow-auto max-h-[500px] whitespace-pre-wrap break-all">
                 {script}
               </pre>
             )}

@@ -170,7 +170,7 @@ export default function NodesPage() {
       render: (row) => (
         <Link
           href={`/nodes/${row.id}`}
-          className="text-blue-600 hover:underline font-medium"
+          className="text-primary hover:underline font-medium"
         >
           {row.name}
         </Link>

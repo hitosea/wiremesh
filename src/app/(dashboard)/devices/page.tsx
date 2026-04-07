@@ -208,7 +208,7 @@ export default function DevicesPage() {
       render: (row) => (
         <Link
           href={`/devices/${row.id}`}
-          className="text-blue-600 hover:underline font-medium"
+          className="text-primary hover:underline font-medium"
         >
           {row.name}
         </Link>
