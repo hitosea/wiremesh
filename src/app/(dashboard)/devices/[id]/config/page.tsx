@@ -135,6 +135,9 @@ export default function DeviceConfigPage() {
           >
             下载
           </Button>
+          <Button variant="outline" onClick={() => router.push(`/devices/${deviceId}?from=config`)}>
+            编辑
+          </Button>
           <Button variant="outline" onClick={() => router.push("/devices")}>
             返回
           </Button>
@@ -167,9 +170,6 @@ export default function DeviceConfigPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                文件名：<code className="bg-muted px-1 rounded">{configData.filename}</code>
-              </p>
               <pre className="code-block p-4 rounded-lg text-xs w-full overflow-x-auto max-h-[500px] whitespace-pre-wrap break-all">
                 {configData.config}
               </pre>

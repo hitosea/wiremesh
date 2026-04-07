@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
     })
     .from(nodeStatus)
     .groupBy(nodeStatus.nodeId)
+    .limit(1000)
     .all();
 
   // Join with node names for traffic display

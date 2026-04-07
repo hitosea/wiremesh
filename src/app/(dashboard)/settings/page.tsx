@@ -126,12 +126,6 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? "保存中..." : "保存设置"}
-        </Button>
-      </div>
-
       {SETTING_GROUPS.map((group) => (
         <Card key={group.title}>
           <CardHeader>
@@ -140,7 +134,7 @@ export default function SettingsPage() {
               <p className="text-sm text-muted-foreground">{group.description}</p>
             )}
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {group.fields.map((field) => (
                 <div key={field.key} className="space-y-2">
@@ -156,6 +150,11 @@ export default function SettingsPage() {
                   )}
                 </div>
               ))}
+            </div>
+            <div className="flex justify-end pt-2">
+              <Button onClick={handleSave} disabled={saving}>
+                {saving ? "保存中..." : "保存设置"}
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -195,6 +194,8 @@ export default function SettingsPage() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
               />
             </div>
+          </div>
+          <div className="flex justify-end pt-2">
             <Button onClick={handleChangePassword} disabled={changingPassword}>
               {changingPassword ? "修改中..." : "修改密码"}
             </Button>

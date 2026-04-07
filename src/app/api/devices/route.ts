@@ -42,6 +42,8 @@ export async function GET(request: NextRequest) {
     }
   }
   if (protocol) conditions.push(eq(devices.protocol, protocol));
+  const lineId = request.nextUrl.searchParams.get("lineId");
+  if (lineId) conditions.push(eq(devices.lineId, parseInt(lineId)));
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
   const total =

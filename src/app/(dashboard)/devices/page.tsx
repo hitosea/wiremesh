@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -66,7 +66,17 @@ const PROTOCOL_VARIANTS: Record<
 };
 
 export default function DevicesPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-48 text-muted-foreground">加载中...</div>}>
+      <DevicesContent />
+    </Suspense>
+  );
+}
+
+function DevicesContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const lineId = searchParams.get("lineId");
   const [data, setData] = useState<Device[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
@@ -85,6 +95,16 @@ export default function DevicesPage() {
   const [batchLineId, setBatchLineId] = useState<string>("");
   const [batchSwitching, setBatchSwitching] = useState(false);
   const [lineOptions, setLineOptions] = useState<LineOption[]>([]);
+  const [filterLineName, setFilterLineName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (lineId) {
+      fetch(`/api/lines/${lineId}`)
+        .then((r) => r.json())
+        .then((json) => setFilterLineName(json.data?.name ?? `线路 ${lineId}`))
+        .catch(() => setFilterLineName(`线路 ${lineId}`));
+    }
+  }, [lineId]);
 
   const fetchDevices = async (page = 1, q = search) => {
     setLoading(true);
@@ -94,6 +114,7 @@ export default function DevicesPage() {
         pageSize: "20",
       });
       if (q) params.set("search", q);
+      if (lineId) params.set("lineId", lineId);
       const res = await fetch(`/api/devices?${params}`);
       const json = await res.json();
       setData(json.data ?? []);
@@ -207,7 +228,7 @@ export default function DevicesPage() {
       label: "名称",
       render: (row) => (
         <Link
-          href={`/devices/${row.id}`}
+          href={`/devices/${row.id}/config`}
           className="text-primary hover:underline font-medium"
         >
           {row.name}
@@ -255,16 +276,16 @@ export default function DevicesPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => router.push(`/devices/${row.id}`)}
+            onClick={() => router.push(`/devices/${row.id}/config`)}
           >
-            编辑
+            配置
           </Button>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => router.push(`/devices/${row.id}/config`)}
+            onClick={() => router.push(`/devices/${row.id}`)}
           >
-            配置
+            编辑
           </Button>
           <Button
             variant="destructive"
@@ -296,6 +317,20 @@ export default function DevicesPage() {
           <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
             取消选择
           </Button>
+        </div>
+      )}
+
+      {lineId && (
+        <div className="flex items-center justify-between gap-2 p-3 bg-muted rounded-md">
+          <span className="text-sm">
+            筛选线路：<span className="font-medium">{filterLineName ?? `线路 ${lineId}`}</span>
+          </span>
+          <button
+            className="w-6 h-6 flex items-center justify-center text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            onClick={() => router.push("/devices")}
+          >
+            ✕
+          </button>
         </div>
       )}
 

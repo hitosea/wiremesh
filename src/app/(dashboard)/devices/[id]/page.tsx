@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,9 +51,20 @@ const PROTOCOL_LABELS: Record<string, string> = {
 };
 
 export default function DeviceDetailPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-48 text-muted-foreground">加载中...</div>}>
+      <DeviceDetailContent />
+    </Suspense>
+  );
+}
+
+function DeviceDetailContent() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const deviceId = params.id as string;
+  const from = searchParams.get("from");
+  const backPath = from === "config" ? `/devices/${deviceId}/config` : "/devices";
 
   const [device, setDevice] = useState<DeviceDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -145,15 +156,13 @@ export default function DeviceDetailPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold">{device.name}</h1>
-          {device.status === "-" ? (
-            <span className="text-muted-foreground text-sm">-</span>
-          ) : (
+          {device.status !== "-" && (
             <Badge variant={STATUS_VARIANTS[device.status] ?? "secondary"}>
               {STATUS_LABELS[device.status] ?? device.status}
             </Badge>
           )}
         </div>
-        <Button variant="outline" onClick={() => router.push("/devices")}>
+        <Button variant="outline" onClick={() => router.push(backPath)}>
           返回
         </Button>
       </div>
@@ -257,7 +266,7 @@ export default function DeviceDetailPage() {
         <Button onClick={handleSave} disabled={saving}>
           {saving ? "保存中..." : "保存"}
         </Button>
-        <Button variant="outline" onClick={() => router.push("/devices")}>
+        <Button variant="outline" onClick={() => router.push(backPath)}>
           返回
         </Button>
       </div>
