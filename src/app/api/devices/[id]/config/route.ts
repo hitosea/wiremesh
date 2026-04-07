@@ -102,7 +102,9 @@ PersistentKeepalive = 25
         realityPublicKey = parsed.realityPublicKey ?? "";
         realityShortId = parsed.realityShortId ?? "";
         realityServerName = parsed.realityServerName ?? "www.microsoft.com";
-      } catch {}
+      } catch (e) {
+        console.warn(`[devices/${deviceId}/config] Failed to parse node xrayConfig:`, e);
+      }
     }
 
     if (!realityPublicKey) {

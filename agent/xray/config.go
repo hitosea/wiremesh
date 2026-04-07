@@ -2,6 +2,7 @@ package xray
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/wiremesh/agent/api"
 )
@@ -31,6 +32,9 @@ type xrayOutbound struct {
 
 // GenerateConfig produces the Xray server JSON config for Reality mode.
 func GenerateConfig(cfg *api.XrayConfig) ([]byte, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("xray config is nil")
+	}
 	clients := make([]map[string]interface{}, len(cfg.UUIDs))
 	for i, uuid := range cfg.UUIDs {
 		clients[i] = map[string]interface{}{

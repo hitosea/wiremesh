@@ -22,6 +22,11 @@ func Sync(cfg *api.XrayConfig) error {
 		return stopIfRunning()
 	}
 
+	if len(cfg.UUIDs) == 0 {
+		log.Println("[xray] No clients configured, skipping")
+		return stopIfRunning()
+	}
+
 	configBytes, err := GenerateConfig(cfg)
 	if err != nil {
 		return fmt.Errorf("generate xray config: %w", err)

@@ -206,7 +206,9 @@ export async function GET(request: NextRequest) {
     } = {};
     try {
       realitySettings = JSON.parse(node.xrayConfig);
-    } catch {}
+    } catch (e) {
+      console.warn(`[agent/config] Failed to parse xrayConfig for node ${nodeId}:`, e);
+    }
 
     // Decrypt Reality private key
     let realityPrivateKey = "";

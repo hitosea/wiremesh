@@ -67,7 +67,6 @@ export async function PUT(request: NextRequest, { params }: Params) {
     xrayProtocol,
     xrayTransport,
     xrayPort,
-    xrayConfig,
     tags,
     remark,
   } = body;
@@ -93,7 +92,6 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (xrayProtocol !== undefined) updateData.xrayProtocol = xrayProtocol;
   if (xrayTransport !== undefined) updateData.xrayTransport = xrayTransport;
   if (xrayPort !== undefined) updateData.xrayPort = xrayPort;
-  if (xrayConfig !== undefined) updateData.xrayConfig = xrayConfig;
   if (tags !== undefined) updateData.tags = tags;
   if (remark !== undefined) updateData.remark = remark;
 
@@ -105,7 +103,9 @@ export async function PUT(request: NextRequest, { params }: Params) {
       try {
         const parsed = JSON.parse(currentNode.xrayConfig);
         if (parsed.realityPublicKey) needKeys = false;
-      } catch {}
+      } catch (e) {
+        console.warn(`[nodes/${nodeId}] Failed to parse xrayConfig:`, e);
+      }
     }
     if (needKeys) {
       const realityKeys = generateRealityKeypair();
