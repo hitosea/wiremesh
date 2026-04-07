@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
 
   const data = rows.map((row) => ({
     ...row,
-    status: computeDeviceStatus(row.lastHandshake),
+    status: computeDeviceStatus(row.lastHandshake, row.protocol),
   }));
 
   return paginated(data, {

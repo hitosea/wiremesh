@@ -39,6 +39,7 @@ const STATUS_LABELS: Record<string, string> = {
   online: "在线",
   offline: "离线",
   error: "异常",
+  "-": "-",
 };
 
 const STATUS_VARIANTS: Record<
@@ -48,6 +49,7 @@ const STATUS_VARIANTS: Record<
   online: "default",
   offline: "secondary",
   error: "destructive",
+  "-": "outline",
 };
 
 const PROTOCOL_LABELS: Record<string, string> = {

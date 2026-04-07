@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
     .all();
   const recentDevices = recentDevicesRaw.map((d) => ({
     ...d,
-    status: computeDeviceStatus(d.lastHandshake),
+    status: computeDeviceStatus(d.lastHandshake, d.protocol),
   }));
 
   return success({

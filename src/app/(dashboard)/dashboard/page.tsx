@@ -89,6 +89,7 @@ const DEVICE_STATUS_LABELS: Record<string, string> = {
   online: "在线",
   offline: "离线",
   error: "异常",
+  "-": "-",
 };
 
 export default function DashboardPage() {
