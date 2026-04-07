@@ -52,9 +52,14 @@ func (s *SSEClient) connectLoop() {
 			return
 		default:
 		}
+		start := time.Now()
 		err := s.connect()
 		if err != nil {
 			log.Printf("[SSE] Connection error: %v", err)
+		}
+		// Reset delay if connection lasted more than 30 seconds (was a healthy connection)
+		if time.Since(start) > 30*time.Second {
+			delay = sseReconnectDelay
 		}
 		select {
 		case <-s.ctx.Done():

@@ -6,6 +6,25 @@ type SSEConnection = {
 
 class SSEManager {
   private connections = new Map<number, SSEConnection>();
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+
+  constructor() {
+    this.startHeartbeat();
+  }
+
+  private startHeartbeat(): void {
+    if (this.heartbeatTimer) return;
+    this.heartbeatTimer = setInterval(() => {
+      const ping = new TextEncoder().encode(": ping\n\n");
+      for (const [nodeId, conn] of this.connections) {
+        try {
+          conn.controller.enqueue(ping);
+        } catch {
+          this.connections.delete(nodeId);
+        }
+      }
+    }, 30_000);
+  }
 
   addConnection(nodeId: number, controller: ReadableStreamDefaultController): void {
     const existing = this.connections.get(nodeId);
