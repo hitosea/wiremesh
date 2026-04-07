@@ -4,6 +4,8 @@ import { nodes } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
 import { eq, ne, and } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
+import { encrypt } from "@/lib/crypto";
+import { generateRealityKeypair, generateShortId } from "@/lib/reality";
 import { sseManager } from "@/lib/sse-manager";
 
 type Params = { params: Promise<{ id: string }> };
@@ -94,6 +96,37 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (xrayConfig !== undefined) updateData.xrayConfig = xrayConfig;
   if (tags !== undefined) updateData.tags = tags;
   if (remark !== undefined) updateData.remark = remark;
+
+  // Auto-generate Reality keys when enabling Xray for the first time
+  if (xrayEnabled === true) {
+    const currentNode = db.select({ xrayConfig: nodes.xrayConfig, xrayEnabled: nodes.xrayEnabled }).from(nodes).where(eq(nodes.id, nodeId)).get();
+    let needKeys = true;
+    if (currentNode?.xrayConfig) {
+      try {
+        const parsed = JSON.parse(currentNode.xrayConfig);
+        if (parsed.realityPublicKey) needKeys = false;
+      } catch {}
+    }
+    if (needKeys) {
+      const realityKeys = generateRealityKeypair();
+      const shortId = generateShortId();
+      updateData.xrayConfig = JSON.stringify({
+        realityPrivateKey: encrypt(realityKeys.privateKey),
+        realityPublicKey: realityKeys.publicKey,
+        realityShortId: shortId,
+        realityDest: body.realityDest || "www.microsoft.com:443",
+        realityServerName: body.realityServerName || "www.microsoft.com",
+      });
+    } else if (body.realityDest !== undefined || body.realityServerName !== undefined) {
+      // Update dest/serverName without regenerating keys
+      const parsed = JSON.parse(currentNode!.xrayConfig!);
+      if (body.realityDest !== undefined) parsed.realityDest = body.realityDest;
+      if (body.realityServerName !== undefined) parsed.realityServerName = body.realityServerName;
+      updateData.xrayConfig = JSON.stringify(parsed);
+    }
+    updateData.xrayProtocol = "vless";
+    updateData.xrayTransport = "tcp";
+  }
 
   const updated = db
     .update(nodes)

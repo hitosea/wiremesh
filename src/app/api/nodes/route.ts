@@ -8,6 +8,7 @@ import { eq, or, like, count, and, SQL } from "drizzle-orm";
 import { encrypt } from "@/lib/crypto";
 import { generateKeyPair } from "@/lib/wireguard";
 import { allocateNodeIp } from "@/lib/ip-allocator";
+import { generateRealityKeypair, generateShortId } from "@/lib/reality";
 import { writeAuditLog } from "@/lib/audit-log";
 
 export async function GET(request: NextRequest) {
@@ -121,6 +122,20 @@ export async function POST(request: NextRequest) {
   // Generate agent token
   const agentToken = uuidv4();
 
+  // Generate Reality keypair if Xray is enabled
+  let resolvedXrayConfig = xrayConfig ?? null;
+  if (xrayEnabled) {
+    const realityKeys = generateRealityKeypair();
+    const shortId = generateShortId();
+    resolvedXrayConfig = JSON.stringify({
+      realityPrivateKey: encrypt(realityKeys.privateKey),
+      realityPublicKey: realityKeys.publicKey,
+      realityShortId: shortId,
+      realityDest: body.realityDest || "www.microsoft.com:443",
+      realityServerName: body.realityServerName || "www.microsoft.com",
+    });
+  }
+
   const result = db
     .insert(nodes)
     .values({
@@ -133,10 +148,10 @@ export async function POST(request: NextRequest) {
       wgPublicKey: publicKey,
       wgAddress,
       xrayEnabled: xrayEnabled ?? false,
-      xrayProtocol: xrayEnabled ? (xrayProtocol || "vless") : null,
-      xrayTransport: xrayTransport ?? null,
+      xrayProtocol: xrayEnabled ? "vless" : null,
+      xrayTransport: xrayEnabled ? "tcp" : null,
       xrayPort: xrayPort ?? null,
-      xrayConfig: xrayConfig ?? null,
+      xrayConfig: resolvedXrayConfig,
       tags: tags ?? null,
       remark: remark ?? null,
     })
