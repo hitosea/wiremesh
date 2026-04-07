@@ -71,8 +71,8 @@ export async function GET(request: NextRequest) {
   }[] = [];
 
   // Internal tracking: lineId -> interface name, by node role
-  const lineToDownstreamIface = new Map<number, string>(); // entry: line -> "from" tunnel
-  const lineToUpstreamIface = new Map<number, string>();   // exit: line -> "to" tunnel
+  const lineToDownstreamIface = new Map<number, string>(); // entry/relay: line -> "from" tunnel
+  const lineToUpstreamIface = new Map<number, string>();   // exit/relay: line -> "to" tunnel
 
   const iptablesRules: string[] = [];
 
@@ -125,11 +125,11 @@ export async function GET(request: NextRequest) {
         interfaces.push({ name: ifaceName, privateKey, address, listenPort, peerPublicKey, peerAddress, peerPort, role });
 
         // Track line-to-interface mapping for device routes
-        if (myRole === "entry" && role === "from") {
-          lineToDownstreamIface.set(lineId, ifaceName);
+        if (role === "from") {
+          lineToDownstreamIface.set(lineId, ifaceName); // entry or relay downstream
         }
-        if (myRole === "exit" && role === "to") {
-          lineToUpstreamIface.set(lineId, ifaceName);
+        if (role === "to") {
+          lineToUpstreamIface.set(lineId, ifaceName); // exit or relay upstream
         }
 
         // Generate iptables rules based on role in this line
