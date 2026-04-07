@@ -140,7 +140,7 @@ export default function NewDevicePage() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => router.push("/devices")}
+            onClick={() => router.back()}
           >
             取消
           </Button>

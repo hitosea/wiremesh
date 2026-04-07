@@ -241,7 +241,7 @@ export default function NewLinePage() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => router.push("/lines")}
+            onClick={() => router.back()}
           >
             取消
           </Button>

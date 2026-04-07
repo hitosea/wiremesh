@@ -210,7 +210,7 @@ export default function NewNodePage() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => router.push("/nodes")}
+            onClick={() => router.back()}
           >
             取消
           </Button>

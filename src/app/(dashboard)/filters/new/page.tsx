@@ -52,7 +52,8 @@ export default function NewFilterPage() {
     );
   };
 
-  const handleSave = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!name.trim()) {
       toast.error("规则名称不能为空");
       return;
@@ -93,11 +94,12 @@ export default function NewFilterPage() {
     <div className="space-y-6 w-full max-w-2xl">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">新增过滤规则</h1>
-        <Button variant="outline" onClick={() => router.push("/filters")}>
+        <Button variant="outline" onClick={() => router.back()}>
           返回
         </Button>
       </div>
 
+      <form onSubmit={handleSubmit} className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>规则配置</CardTitle>
@@ -193,13 +195,14 @@ export default function NewFilterPage() {
       </Card>
 
       <div className="flex flex-col sm:flex-row gap-2">
-        <Button onClick={handleSave} disabled={saving}>
+        <Button type="submit" disabled={saving}>
           {saving ? "创建中..." : "创建规则"}
         </Button>
-        <Button variant="outline" onClick={() => router.push("/filters")}>
+        <Button type="button" variant="outline" onClick={() => router.back()}>
           取消
         </Button>
       </div>
+      </form>
     </div>
   );
 }
