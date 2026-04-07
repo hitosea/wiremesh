@@ -14,13 +14,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { NodeStatusChart } from "@/components/node-status-chart";
 
@@ -77,8 +70,10 @@ export default function NodeDetailPage() {
   const [tags, setTags] = useState("");
   const [remark, setRemark] = useState("");
   const [xrayEnabled, setXrayEnabled] = useState(false);
-  const [xrayTransport, setXrayTransport] = useState("");
   const [xrayPort, setXrayPort] = useState("");
+  const [realityDest, setRealityDest] = useState("");
+  const [realityPublicKey, setRealityPublicKey] = useState("");
+  const [realityShortId, setRealityShortId] = useState("");
 
   useEffect(() => {
     fetch(`/api/nodes/${nodeId}`)
@@ -98,8 +93,15 @@ export default function NodeDetailPage() {
         setTags(n.tags ?? "");
         setRemark(n.remark ?? "");
         setXrayEnabled(n.xrayEnabled ?? false);
-        setXrayTransport(n.xrayTransport ?? "");
         setXrayPort(n.xrayPort ? String(n.xrayPort) : "");
+        if (n.xrayConfig) {
+          try {
+            const cfg = JSON.parse(n.xrayConfig);
+            setRealityDest(cfg.realityDest ?? "");
+            setRealityPublicKey(cfg.realityPublicKey ?? "");
+            setRealityShortId(cfg.realityShortId ?? "");
+          } catch {}
+        }
       })
       .catch(() => toast.error("加载节点失败"))
       .finally(() => setLoading(false));
@@ -120,8 +122,11 @@ export default function NodeDetailPage() {
         tags: tags.trim() || null,
         remark: remark.trim() || null,
         xrayEnabled,
-        xrayTransport: xrayEnabled ? xrayTransport || null : null,
         xrayPort: xrayEnabled && xrayPort ? parseInt(xrayPort) : null,
+        realityDest: xrayEnabled ? realityDest || "www.microsoft.com:443" : undefined,
+        realityServerName: xrayEnabled
+          ? (realityDest || "www.microsoft.com:443").replace(/:\d+$/, "")
+          : undefined,
       };
 
       const res = await fetch(`/api/nodes/${nodeId}`, {
@@ -255,21 +260,6 @@ export default function NodeDetailPage() {
             {xrayEnabled && (
               <>
                 <div className="space-y-1">
-                  <Label htmlFor="xrayTransport">传输方式</Label>
-                  <Select
-                    value={xrayTransport}
-                    onValueChange={setXrayTransport}
-                  >
-                    <SelectTrigger id="xrayTransport">
-                      <SelectValue placeholder="选择传输方式" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ws">WebSocket</SelectItem>
-                      <SelectItem value="grpc">gRPC</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
                   <Label htmlFor="xrayPort">Xray 端口</Label>
                   <Input
                     id="xrayPort"
@@ -279,6 +269,34 @@ export default function NodeDetailPage() {
                     placeholder="443"
                   />
                 </div>
+                <div className="space-y-1">
+                  <Label htmlFor="realityDest">Reality 目标网站</Label>
+                  <Input
+                    id="realityDest"
+                    value={realityDest}
+                    onChange={(e) => setRealityDest(e.target.value)}
+                    placeholder="www.microsoft.com:443"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    伪装目标，需支持 TLS 1.3，如 www.microsoft.com:443
+                  </p>
+                </div>
+                {realityPublicKey && (
+                  <>
+                    <div className="space-y-1">
+                      <Label>Reality Public Key</Label>
+                      <code className="block text-xs bg-muted px-3 py-2 rounded break-all">
+                        {realityPublicKey}
+                      </code>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Reality Short ID</Label>
+                      <code className="block text-xs bg-muted px-3 py-2 rounded break-all">
+                        {realityShortId}
+                      </code>
+                    </div>
+                  </>
+                )}
               </>
             )}
           </div>
