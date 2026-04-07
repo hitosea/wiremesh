@@ -69,7 +69,7 @@ export function DataTable<T extends Record<string, unknown>>({
   return (
     <div className="space-y-4">
       {onSearch && (
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <Input
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
@@ -88,8 +88,8 @@ export function DataTable<T extends Record<string, unknown>>({
         </div>
       )}
 
-      <div className="rounded-md border">
-        <Table>
+      <div className="rounded-md border overflow-x-auto">
+        <Table className="tabular-nums">
           <TableHeader>
             <TableRow>
               {selectable && (
