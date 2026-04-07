@@ -197,6 +197,7 @@ export default function NodesPage() {
     {
       key: "actions",
       label: "操作",
+      align: "right",
       render: (row) => (
         <div className="flex gap-2">
           <Button
@@ -258,6 +259,7 @@ export default function NodesPage() {
           pagination={pagination}
           onPageChange={handlePageChange}
           onSearch={handleSearch}
+          onRefresh={() => fetchNodes(pagination.page)}
           searchPlaceholder="搜索节点名称或 IP..."
           selectable
           selectedIds={selectedIds}

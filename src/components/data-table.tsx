@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 export interface Column<T> {
   key: string;
   label: string;
+  align?: "left" | "right";
   render?: (row: T) => ReactNode;
 }
 
@@ -32,6 +33,7 @@ interface DataTableProps<T> {
   pagination?: PaginationInfo;
   onPageChange?: (page: number) => void;
   onSearch?: (query: string) => void;
+  onRefresh?: () => void;
   searchPlaceholder?: string;
   selectable?: boolean;
   selectedIds?: Set<number>;
@@ -45,6 +47,7 @@ export function DataTable<T extends Record<string, unknown>>({
   pagination,
   onPageChange,
   onSearch,
+  onRefresh,
   searchPlaceholder = "搜索...",
   selectable = false,
   selectedIds = new Set(),
@@ -77,6 +80,11 @@ export function DataTable<T extends Record<string, unknown>>({
           <Button variant="outline" onClick={handleSearch}>
             搜索
           </Button>
+          {onRefresh && (
+            <Button variant="outline" onClick={onRefresh}>
+              刷新
+            </Button>
+          )}
         </div>
       )}
 
@@ -100,7 +108,7 @@ export function DataTable<T extends Record<string, unknown>>({
                 </TableHead>
               )}
               {columns.map((col) => (
-                <TableHead key={col.key}>{col.label}</TableHead>
+                <TableHead key={col.key} className={col.align === "right" ? "text-right" : undefined}>{col.label}</TableHead>
               ))}
             </TableRow>
           </TableHeader>
@@ -130,7 +138,7 @@ export function DataTable<T extends Record<string, unknown>>({
                     </TableCell>
                   )}
                   {columns.map((col) => (
-                    <TableCell key={col.key}>
+                    <TableCell key={col.key} className={col.align === "right" ? "text-right" : undefined}>
                       {col.render
                         ? col.render(row)
                         : (row[col.key] as ReactNode)}

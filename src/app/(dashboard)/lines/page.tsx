@@ -155,6 +155,7 @@ export default function LinesPage() {
     {
       key: "actions",
       label: "操作",
+      align: "right",
       render: (row) => (
         <div className="flex gap-2">
           <Button
@@ -194,6 +195,7 @@ export default function LinesPage() {
           pagination={pagination}
           onPageChange={handlePageChange}
           onSearch={handleSearch}
+          onRefresh={() => fetchLines(pagination.page)}
           searchPlaceholder="搜索线路名称..."
         />
       )}

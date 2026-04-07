@@ -167,6 +167,7 @@ export default function FiltersPage() {
     {
       key: "actions",
       label: "操作",
+      align: "right",
       render: (row) => (
         <div className="flex gap-2">
           <Button
@@ -206,6 +207,7 @@ export default function FiltersPage() {
           pagination={pagination}
           onPageChange={handlePageChange}
           onSearch={handleSearch}
+          onRefresh={() => fetchFilters(pagination.page)}
           searchPlaceholder="搜索规则名称..."
         />
       )}
