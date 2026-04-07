@@ -100,10 +100,17 @@ export function NodeStatusChart({ nodeId }: { nodeId: string }) {
         <CardContent>
           <ResponsiveContainer width="100%" height={250}>
             <LineChart data={points}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="time" />
-              <YAxis />
-              <Tooltip />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="time" fontSize={12} tick={{ fill: "hsl(var(--muted-foreground))" }} />
+              <YAxis fontSize={12} tick={{ fill: "hsl(var(--muted-foreground))" }} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "hsl(var(--popover))",
+                  borderColor: "hsl(var(--border))",
+                  color: "hsl(var(--popover-foreground))",
+                  borderRadius: "var(--radius)",
+                }}
+              />
               <Line
                 type="monotone"
                 dataKey="latency"
@@ -123,23 +130,31 @@ export function NodeStatusChart({ nodeId }: { nodeId: string }) {
         <CardContent>
           <ResponsiveContainer width="100%" height={250}>
             <AreaChart data={points}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="time" />
-              <YAxis tickFormatter={formatBytes} />
-              <Tooltip formatter={(value) => formatBytes(Number(value))} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="time" fontSize={12} tick={{ fill: "hsl(var(--muted-foreground))" }} />
+              <YAxis tickFormatter={formatBytes} fontSize={12} tick={{ fill: "hsl(var(--muted-foreground))" }} />
+              <Tooltip
+                formatter={(value) => formatBytes(Number(value))}
+                contentStyle={{
+                  backgroundColor: "hsl(var(--popover))",
+                  borderColor: "hsl(var(--border))",
+                  color: "hsl(var(--popover-foreground))",
+                  borderRadius: "var(--radius)",
+                }}
+              />
               <Area
                 type="monotone"
                 dataKey="upload"
-                stroke="#3b82f6"
-                fill="#3b82f6"
+                stroke="hsl(var(--chart-1))"
+                fill="hsl(var(--chart-1))"
                 fillOpacity={0.2}
                 name="上传"
               />
               <Area
                 type="monotone"
                 dataKey="download"
-                stroke="#22c55e"
-                fill="#22c55e"
+                stroke="hsl(var(--chart-2))"
+                fill="hsl(var(--chart-2))"
                 fillOpacity={0.2}
                 name="下载"
               />
