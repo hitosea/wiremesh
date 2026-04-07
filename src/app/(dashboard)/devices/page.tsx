@@ -13,6 +13,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DataTable, Column, PaginationInfo } from "@/components/data-table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type Device = {
   id: number;
@@ -21,6 +28,11 @@ type Device = {
   wgAddress: string | null;
   xrayUuid: string | null;
   status: string;
+};
+
+type LineOption = {
+  id: number;
+  name: string;
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -64,6 +76,13 @@ export default function DevicesPage() {
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [batchDeleting, setBatchDeleting] = useState(false);
+  const [showBatchDelete, setShowBatchDelete] = useState(false);
+  const [showBatchLine, setShowBatchLine] = useState(false);
+  const [batchLineId, setBatchLineId] = useState<string>("");
+  const [batchSwitching, setBatchSwitching] = useState(false);
+  const [lineOptions, setLineOptions] = useState<LineOption[]>([]);
 
   const fetchDevices = async (page = 1, q = search) => {
     setLoading(true);
@@ -81,6 +100,16 @@ export default function DevicesPage() {
       toast.error("加载设备列表失败");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchLineOptions = async () => {
+    try {
+      const res = await fetch("/api/lines?page=1&pageSize=100");
+      const json = await res.json();
+      setLineOptions((json.data ?? []).map((l: { id: number; name: string }) => ({ id: l.id, name: l.name })));
+    } catch {
+      // ignore
     }
   };
 
@@ -117,6 +146,56 @@ export default function DevicesPage() {
       toast.error("删除失败，请重试");
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    setBatchDeleting(true);
+    try {
+      const res = await fetch("/api/devices/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", ids: [...selectedIds] }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        toast.success(json.data.message);
+        setSelectedIds(new Set());
+        setShowBatchDelete(false);
+        fetchDevices(pagination.page);
+      } else {
+        toast.error(json.error?.message ?? "批量删除失败");
+      }
+    } catch {
+      toast.error("批量删除失败，请重试");
+    } finally {
+      setBatchDeleting(false);
+    }
+  };
+
+  const handleBatchSwitchLine = async () => {
+    setBatchSwitching(true);
+    try {
+      const lineId = batchLineId === "none" ? null : parseInt(batchLineId);
+      const res = await fetch("/api/devices/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "switchLine", ids: [...selectedIds], lineId }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        toast.success(json.data.message);
+        setSelectedIds(new Set());
+        setShowBatchLine(false);
+        setBatchLineId("");
+        fetchDevices(pagination.page);
+      } else {
+        toast.error(json.error?.message ?? "批量切换失败");
+      }
+    } catch {
+      toast.error("批量切换失败，请重试");
+    } finally {
+      setBatchSwitching(false);
     }
   };
 
@@ -200,6 +279,21 @@ export default function DevicesPage() {
         <Button onClick={() => router.push("/devices/new")}>新增设备</Button>
       </div>
 
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
+          <span className="text-sm font-medium">已选择 {selectedIds.size} 项</span>
+          <Button size="sm" variant="outline" onClick={() => { fetchLineOptions(); setShowBatchLine(true); }}>
+            批量切换线路
+          </Button>
+          <Button size="sm" variant="destructive" onClick={() => setShowBatchDelete(true)}>
+            批量删除
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+            取消选择
+          </Button>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex items-center justify-center h-48 text-muted-foreground">
           加载中...
@@ -212,6 +306,9 @@ export default function DevicesPage() {
           onPageChange={handlePageChange}
           onSearch={handleSearch}
           searchPlaceholder="搜索设备名称..."
+          selectable
+          selectedIds={selectedIds}
+          onSelectionChange={setSelectedIds}
         />
       )}
 
@@ -231,6 +328,52 @@ export default function DevicesPage() {
               disabled={deleting}
             >
               {deleting ? "删除中..." : "确认删除"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showBatchDelete} onOpenChange={() => setShowBatchDelete(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>批量删除</DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground">
+            确定要删除选中的 {selectedIds.size} 个设备吗？此操作不可恢复。
+          </p>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setShowBatchDelete(false)}>取消</Button>
+            <Button variant="destructive" onClick={handleBatchDelete} disabled={batchDeleting}>
+              {batchDeleting ? "删除中..." : "确认删除"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showBatchLine} onOpenChange={() => setShowBatchLine(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>批量切换线路</DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground text-sm mb-2">
+            为选中的 {selectedIds.size} 个设备切换线路：
+          </p>
+          <Select value={batchLineId} onValueChange={setBatchLineId}>
+            <SelectTrigger>
+              <SelectValue placeholder="选择线路" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">无（取消绑定）</SelectItem>
+              {lineOptions.map((line) => (
+                <SelectItem key={line.id} value={String(line.id)}>
+                  {line.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setShowBatchLine(false)}>取消</Button>
+            <Button onClick={handleBatchSwitchLine} disabled={batchSwitching || !batchLineId}>
+              {batchSwitching ? "切换中..." : "确认切换"}
             </Button>
           </div>
         </DialogContent>
