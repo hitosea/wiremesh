@@ -5,10 +5,19 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/wiremesh/agent/api"
 	"github.com/wiremesh/agent/wg"
+)
+
+// previousTransfers stores cumulative values from the last collection,
+// keyed by peer public key. Used to calculate deltas.
+var (
+	previousUpload   = make(map[string]int64)
+	previousDownload = make(map[string]int64)
+	prevMu           sync.Mutex
 )
 
 func Collect(serverURL string) *api.StatusReport {
@@ -34,26 +43,44 @@ func measureLatency(serverURL string) int {
 }
 
 func collectTransfers() []api.TransferReport {
+	// Only collect from wm-wg0 (device access interface).
+	// Tunnel interfaces (wm-tun*) are excluded to avoid double-counting.
+	raw := parseRawTransfers(wg.MainInterface)
+
+	prevMu.Lock()
+	defer prevMu.Unlock()
+
 	var transfers []api.TransferReport
-	transfers = append(transfers, parseTransferOutput(wg.MainInterface)...)
-	// Also check tunnel interfaces
-	output, err := wg.RunSilent("ip", "-o", "link", "show")
-	if err != nil {
-		return transfers
-	}
-	for _, line := range strings.Split(output, "\n") {
-		for _, field := range strings.Fields(line) {
-			if strings.HasPrefix(field, "wm-tun") {
-				name := strings.TrimSuffix(field, ":")
-				transfers = append(transfers, parseTransferOutput(name)...)
-				break
-			}
+	for _, r := range raw {
+		prevUp := previousUpload[r.PeerPublicKey]
+		prevDown := previousDownload[r.PeerPublicKey]
+
+		deltaUp := r.UploadBytes - prevUp
+		deltaDown := r.DownloadBytes - prevDown
+
+		// Handle counter reset (interface restart)
+		if deltaUp < 0 {
+			deltaUp = r.UploadBytes
+		}
+		if deltaDown < 0 {
+			deltaDown = r.DownloadBytes
+		}
+
+		previousUpload[r.PeerPublicKey] = r.UploadBytes
+		previousDownload[r.PeerPublicKey] = r.DownloadBytes
+
+		if deltaUp > 0 || deltaDown > 0 {
+			transfers = append(transfers, api.TransferReport{
+				PeerPublicKey: r.PeerPublicKey,
+				UploadBytes:   deltaUp,
+				DownloadBytes: deltaDown,
+			})
 		}
 	}
 	return transfers
 }
 
-func parseTransferOutput(iface string) []api.TransferReport {
+func parseRawTransfers(iface string) []api.TransferReport {
 	output, err := wg.WgShow(iface, "transfer")
 	if err != nil {
 		return nil

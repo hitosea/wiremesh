@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { nodes, nodeStatus, devices } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { authenticateAgent } from "@/lib/agent-auth";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +52,13 @@ export async function POST(request: NextRequest) {
     .where(eq(nodes.id, node.id))
     .run();
 
-  // Update device last_handshake for matching handshakes
+  // Build a map of peer transfers for quick lookup
+  const transferMap = new Map<string, Transfer>();
+  for (const t of transfers) {
+    transferMap.set(t.peer_public_key, t);
+  }
+
+  // Update device last_handshake and accumulate traffic deltas
   // Device online/offline status is computed from lastHandshake at query time
   for (const h of handshakes) {
     const device = db
@@ -61,9 +67,14 @@ export async function POST(request: NextRequest) {
       .where(eq(devices.wgPublicKey, h.peer_public_key))
       .get();
     if (device) {
+      const t = transferMap.get(h.peer_public_key);
       db.update(devices)
         .set({
           lastHandshake: h.last_handshake,
+          ...(t && {
+            uploadBytes: sql`${devices.uploadBytes} + ${t.upload_bytes}`,
+            downloadBytes: sql`${devices.downloadBytes} + ${t.download_bytes}`,
+          }),
           updatedAt: new Date().toISOString(),
         })
         .where(eq(devices.id, device.id))

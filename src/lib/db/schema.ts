@@ -110,6 +110,8 @@ export const devices = sqliteTable("devices", {
   lineId: integer("line_id").references(() => lines.id, { onDelete: "set null" }),
   status: text("status").notNull().default("offline"),
   lastHandshake: text("last_handshake"),
+  uploadBytes: integer("upload_bytes").notNull().default(0),
+  downloadBytes: integer("download_bytes").notNull().default(0),
   tags: text("tags"),
   remark: text("remark"),
   ...timestamps,
