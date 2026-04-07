@@ -32,7 +32,7 @@ func Sync(cfg *api.XrayConfig) error {
 		return fmt.Errorf("generate xray config: %w", err)
 	}
 
-	if err := os.MkdirAll(XrayConfigDir, 0700); err != nil {
+	if err := os.MkdirAll(XrayConfigDir, 0755); err != nil {
 		return fmt.Errorf("create xray config dir: %w", err)
 	}
 
@@ -43,7 +43,7 @@ func Sync(cfg *api.XrayConfig) error {
 		return ensureRunning()
 	}
 
-	if err := os.WriteFile(XrayConfigFile, configBytes, 0600); err != nil {
+	if err := os.WriteFile(XrayConfigFile, configBytes, 0644); err != nil {
 		return fmt.Errorf("write xray config: %w", err)
 	}
 	log.Printf("[xray] Config written to %s (%d clients)", XrayConfigFile, len(cfg.UUIDs))
