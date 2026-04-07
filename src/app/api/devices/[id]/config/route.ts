@@ -79,9 +79,35 @@ PersistentKeepalive = 25
       return error("VALIDATION_ERROR", "设备 Xray UUID 不完整");
     }
 
+    if (!entryNodeRow.nodeXrayEnabled) {
+      return error("VALIDATION_ERROR", "入口节点未启用 Xray");
+    }
+
     const endpoint = entryNodeRow.nodeDomain ?? entryNodeRow.nodeIp;
     const xrayPort = entryNodeRow.nodeXrayPort ?? 443;
-    const transport = entryNodeRow.nodeXrayTransport ?? "ws";
+
+    // Parse Reality settings from node's xrayConfig
+    let realityPublicKey = "";
+    let realityShortId = "";
+    let realityServerName = "www.microsoft.com";
+
+    const nodeXrayConfig = db
+      .select({ xrayConfig: nodes.xrayConfig })
+      .from(nodes)
+      .where(eq(nodes.id, entryNodeRow.nodeId))
+      .get();
+    if (nodeXrayConfig?.xrayConfig) {
+      try {
+        const parsed = JSON.parse(nodeXrayConfig.xrayConfig);
+        realityPublicKey = parsed.realityPublicKey ?? "";
+        realityShortId = parsed.realityShortId ?? "";
+        realityServerName = parsed.realityServerName ?? "www.microsoft.com";
+      } catch {}
+    }
+
+    if (!realityPublicKey) {
+      return error("VALIDATION_ERROR", "入口节点 Reality 配置不完整");
+    }
 
     const xrayConfig = {
       log: { loglevel: "warning" },
@@ -105,17 +131,21 @@ PersistentKeepalive = 25
                   {
                     id: device.xrayUuid,
                     encryption: "none",
+                    flow: "xtls-rprx-vision",
                   },
                 ],
               },
             ],
           },
           streamSettings: {
-            network: transport,
-            security: "tls",
-            ...(transport === "ws"
-              ? { wsSettings: { path: "/ws" } }
-              : { grpcSettings: { serviceName: "grpc" } }),
+            network: "tcp",
+            security: "reality",
+            realitySettings: {
+              serverName: realityServerName,
+              fingerprint: "chrome",
+              publicKey: realityPublicKey,
+              shortId: realityShortId,
+            },
           },
         },
         {
