@@ -185,13 +185,65 @@ export async function GET(request: NextRequest) {
   }
 
   // ---- Xray config ----
-  let xrayConfig = null;
+  let xrayConfig: {
+    enabled: boolean;
+    protocol: string;
+    port: number;
+    uuids: string[];
+    realityPrivateKey: string;
+    realityShortId: string;
+    realityDest: string;
+    realityServerNames: string[];
+  } | null = null;
+
   if (node.xrayEnabled && node.xrayConfig) {
+    let realitySettings: {
+      realityPrivateKey?: string;
+      realityPublicKey?: string;
+      realityShortId?: string;
+      realityDest?: string;
+      realityServerName?: string;
+    } = {};
     try {
-      xrayConfig = JSON.parse(node.xrayConfig);
-    } catch {
-      xrayConfig = node.xrayConfig;
+      realitySettings = JSON.parse(node.xrayConfig);
+    } catch {}
+
+    // Decrypt Reality private key
+    let realityPrivateKey = "";
+    if (realitySettings.realityPrivateKey) {
+      try {
+        realityPrivateKey = decrypt(realitySettings.realityPrivateKey);
+      } catch {
+        realityPrivateKey = "";
+      }
     }
+
+    // Collect Xray device UUIDs from lines where this node is entry
+    const xrayUuids: string[] = [];
+    for (const lineId of entryLineIds) {
+      const xrayDevices = db
+        .select({ xrayUuid: devices.xrayUuid })
+        .from(devices)
+        .where(eq(devices.lineId, lineId))
+        .all()
+        .filter((d) => d.xrayUuid);
+      for (const d of xrayDevices) {
+        if (d.xrayUuid && !xrayUuids.includes(d.xrayUuid)) {
+          xrayUuids.push(d.xrayUuid);
+        }
+      }
+    }
+
+    xrayConfig = {
+      enabled: true,
+      protocol: "vless",
+      port: node.xrayPort ?? 443,
+      uuids: xrayUuids,
+      realityPrivateKey,
+      realityShortId: realitySettings.realityShortId ?? "",
+      realityDest: realitySettings.realityDest ?? "www.microsoft.com:443",
+      realityServerNames: [realitySettings.realityServerName ?? "www.microsoft.com"],
+    };
   }
 
   const config = {
