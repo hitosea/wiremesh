@@ -135,7 +135,7 @@ export default function DeviceConfigPage() {
           >
             下载
           </Button>
-          <Button variant="outline" onClick={() => router.push(`/devices/${deviceId}`)}>
+          <Button variant="outline" onClick={() => router.push("/devices")}>
             返回
           </Button>
         </div>
