@@ -33,13 +33,6 @@ type TunnelConfig struct {
 	DeviceRoutes  []DeviceRoute     `json:"deviceRoutes"`
 }
 
-// DeviceRoute maps a device IP to the tunnel it should use.
-type DeviceRoute struct {
-	Destination string `json:"destination"` // e.g. "10.210.0.100/32"
-	Tunnel      string `json:"tunnel"`      // e.g. "wm-tun1"
-	Type        string `json:"type"`        // "entry" = source-based routing, "exit" = destination-based routing
-}
-
 type TunnelInterface struct {
 	Name          string `json:"name"`
 	PrivateKey    string `json:"privateKey"`
@@ -51,13 +44,28 @@ type TunnelInterface struct {
 	Role          string `json:"role"` // "from" or "to"
 }
 
+// DeviceRoute maps a device IP to the tunnel it should use.
+type DeviceRoute struct {
+	Destination string `json:"destination"` // e.g. "10.210.0.100/32"
+	Tunnel      string `json:"tunnel"`      // e.g. "wm-tun1"
+	Type        string `json:"type"`        // "entry" = source-based routing, "exit" = destination-based routing
+}
+
 type XrayConfig struct {
-	Enabled            bool     `json:"enabled"`
-	Protocol           string   `json:"protocol"`
-	Port               int      `json:"port"`
-	UUIDs              []string `json:"uuids"`
-	RealityPrivateKey  string   `json:"realityPrivateKey"`
-	RealityShortId     string   `json:"realityShortId"`
-	RealityDest        string   `json:"realityDest"`
-	RealityServerNames []string `json:"realityServerNames"`
+	Enabled            bool              `json:"enabled"`
+	Protocol           string            `json:"protocol"`
+	Port               int               `json:"port"`
+	RealityPrivateKey  string            `json:"realityPrivateKey"`
+	RealityShortId     string            `json:"realityShortId"`
+	RealityDest        string            `json:"realityDest"`
+	RealityServerNames []string          `json:"realityServerNames"`
+	Routes             []XrayLineRoute   `json:"routes"`
+}
+
+// XrayLineRoute maps UUIDs on a specific line to a tunnel via fwmark.
+type XrayLineRoute struct {
+	LineID int      `json:"lineId"`
+	UUIDs  []string `json:"uuids"`
+	Tunnel string   `json:"tunnel"` // e.g. "wm-tun1"
+	Mark   int      `json:"mark"`   // fwmark value, e.g. 201
 }

@@ -139,10 +139,21 @@ func (a *Agent) pullAndApplyConfigForce(force bool) error {
 		log.Printf("[agent] xray sync error: %v", err)
 	}
 
+	// 6. Sync Xray fwmark routing
+	if cfgData.Xray != nil && len(cfgData.Xray.Routes) > 0 {
+		if err := wg.SyncXrayRouting(cfgData.Xray.Routes); err != nil {
+			log.Printf("[agent] xray routing sync error: %v", err)
+		}
+	}
+
 	a.lastVersion = cfgData.Version
 	xrayStatus := "disabled"
 	if cfgData.Xray != nil && cfgData.Xray.Enabled {
-		xrayStatus = fmt.Sprintf("enabled (%d clients)", len(cfgData.Xray.UUIDs))
+		clientCount := 0
+		for _, r := range cfgData.Xray.Routes {
+			clientCount += len(r.UUIDs)
+		}
+		xrayStatus = fmt.Sprintf("enabled (%d clients, %d lines)", clientCount, len(cfgData.Xray.Routes))
 	}
 	log.Printf("[agent] Config applied. Tunnels: %d, iptables: %d, xray: %s",
 		len(a.activeTunnels), len(cfgData.Tunnels.IptablesRules), xrayStatus)

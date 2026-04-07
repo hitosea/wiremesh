@@ -8,7 +8,10 @@ import (
 	"github.com/wiremesh/agent/api"
 )
 
-const routeTableStart = 100
+const (
+	routeTableStart     = 100 // WG device routes: tables 101-199
+	xrayRouteTableStart = 200 // Xray fwmark routes: tables 201-299
+)
 
 // SyncRouting applies per-device routing rules based on deviceRoutes.
 // Each route has a type:
@@ -54,8 +57,43 @@ func SyncRouting(deviceRoutes []api.DeviceRoute) error {
 	return nil
 }
 
+// SyncXrayRouting applies fwmark-based routing for Xray traffic.
+// Each XrayLineRoute has a mark value — packets marked by Xray are routed
+// to the correct tunnel via policy routing.
+func SyncXrayRouting(routes []api.XrayLineRoute) error {
+	if len(routes) == 0 {
+		return nil
+	}
+
+	for _, route := range routes {
+		table := fmt.Sprintf("%d", route.Mark) // use mark value as table number (201, 202, ...)
+		markHex := fmt.Sprintf("0x%x", route.Mark)
+
+		// Add route: default via tunnel in this table
+		if _, err := Run("ip", "route", "replace", "default", "dev", route.Tunnel, "table", table); err != nil {
+			log.Printf("[routing] Error adding xray route table %s: %v", table, err)
+			continue
+		}
+
+		// Add rule: fwmark → lookup table
+		if _, err := Run("ip", "rule", "add", "fwmark", markHex, "lookup", table, "priority", table); err != nil {
+			if !strings.Contains(err.Error(), "File exists") {
+				log.Printf("[routing] Error adding fwmark rule %s: %v", markHex, err)
+				continue
+			}
+		}
+
+		log.Printf("[routing] Xray: fwmark %s → %s (wm-xray-line-%d, table %s)",
+			markHex, route.Tunnel, route.LineID, table)
+	}
+
+	log.Printf("[routing] Xray routing configured: %d lines", len(routes))
+	return nil
+}
+
 func cleanRouting() {
-	for i := routeTableStart + 1; i <= routeTableStart+100; i++ {
+	// Clean WG device routes (tables 101-199)
+	for i := routeTableStart + 1; i <= routeTableStart+99; i++ {
 		table := fmt.Sprintf("%d", i)
 		_, err := RunSilent("ip", "rule", "del", "lookup", table, "priority", table)
 		if err != nil {
@@ -63,6 +101,18 @@ func cleanRouting() {
 		}
 		RunSilent("ip", "route", "flush", "table", table)
 	}
+
+	// Clean Xray fwmark routes (tables 201-299)
+	for i := xrayRouteTableStart + 1; i <= xrayRouteTableStart+99; i++ {
+		table := fmt.Sprintf("%d", i)
+		markHex := fmt.Sprintf("0x%x", i)
+		_, err := RunSilent("ip", "rule", "del", "fwmark", markHex, "lookup", table, "priority", table)
+		if err != nil {
+			break
+		}
+		RunSilent("ip", "route", "flush", "table", table)
+	}
+
 	// Clean legacy table 100
 	RunSilent("ip", "rule", "del", "lookup", "100", "priority", "100")
 	RunSilent("ip", "route", "flush", "table", "100")

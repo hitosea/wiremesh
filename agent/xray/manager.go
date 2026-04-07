@@ -22,7 +22,7 @@ func Sync(cfg *api.XrayConfig) error {
 		return stopIfRunning()
 	}
 
-	if len(cfg.UUIDs) == 0 {
+	if len(cfg.Routes) == 0 {
 		log.Println("[xray] No clients configured, skipping")
 		return stopIfRunning()
 	}
@@ -46,7 +46,7 @@ func Sync(cfg *api.XrayConfig) error {
 	if err := os.WriteFile(XrayConfigFile, configBytes, 0644); err != nil {
 		return fmt.Errorf("write xray config: %w", err)
 	}
-	log.Printf("[xray] Config written to %s (%d clients)", XrayConfigFile, len(cfg.UUIDs))
+	log.Printf("[xray] Config written to %s (%d lines)", XrayConfigFile, len(cfg.Routes))
 
 	if isRunning() {
 		return restart()

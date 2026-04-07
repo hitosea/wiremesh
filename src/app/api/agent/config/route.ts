@@ -185,15 +185,16 @@ export async function GET(request: NextRequest) {
   }
 
   // ---- Xray config ----
+  // Build per-line Xray routes: each line gets its own outbound with fwmark
   let xrayConfig: {
     enabled: boolean;
     protocol: string;
     port: number;
-    uuids: string[];
     realityPrivateKey: string;
     realityShortId: string;
     realityDest: string;
     realityServerNames: string[];
+    routes: { lineId: number; uuids: string[]; tunnel: string; mark: number }[];
   } | null = null;
 
   if (node.xrayEnabled && node.xrayConfig) {
@@ -210,7 +211,6 @@ export async function GET(request: NextRequest) {
       console.warn(`[agent/config] Failed to parse xrayConfig for node ${nodeId}:`, e);
     }
 
-    // Decrypt Reality private key
     let realityPrivateKey = "";
     if (realitySettings.realityPrivateKey) {
       try {
@@ -220,8 +220,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Collect Xray device UUIDs from lines where this node is entry
-    const xrayUuids: string[] = [];
+    // Build per-line routes: UUID → tunnel mapping via fwmark
+    const xrayRoutes: { lineId: number; uuids: string[]; tunnel: string; mark: number }[] = [];
+    let markCounter = 201; // fwmark starts at 201 for xray
+
     for (const lineId of entryLineIds) {
       const xrayDevices = db
         .select({ xrayUuid: devices.xrayUuid })
@@ -229,22 +231,34 @@ export async function GET(request: NextRequest) {
         .where(eq(devices.lineId, lineId))
         .all()
         .filter((d) => d.xrayUuid);
-      for (const d of xrayDevices) {
-        if (d.xrayUuid && !xrayUuids.includes(d.xrayUuid)) {
-          xrayUuids.push(d.xrayUuid);
-        }
-      }
+
+      const uuids = xrayDevices
+        .map((d) => d.xrayUuid!)
+        .filter((uuid) => uuid);
+
+      if (uuids.length === 0) continue;
+
+      // Find the downstream tunnel for this line
+      const tunnel = lineToDownstreamIface.get(lineId);
+      if (!tunnel) continue;
+
+      xrayRoutes.push({
+        lineId,
+        uuids,
+        tunnel,
+        mark: markCounter++,
+      });
     }
 
     xrayConfig = {
       enabled: true,
       protocol: "vless",
       port: node.xrayPort ?? 443,
-      uuids: xrayUuids,
       realityPrivateKey,
       realityShortId: realitySettings.realityShortId ?? "",
       realityDest: realitySettings.realityDest ?? "www.microsoft.com:443",
       realityServerNames: [realitySettings.realityServerName ?? "www.microsoft.com"],
+      routes: xrayRoutes,
     };
   }
 
