@@ -159,7 +159,21 @@ PersistentKeepalive = 25
 
     const config = JSON.stringify(xrayConfig, null, 2);
     const filename = `${device.name.replace(/[^a-zA-Z0-9_-]/g, "_")}-xray.json`;
-    return success({ format: "xray", config, filename });
+
+    // Build VLESS share link (for Shadowrocket, v2rayN, etc.)
+    const vlessParams = new URLSearchParams({
+      encryption: "none",
+      flow: "xtls-rprx-vision",
+      security: "reality",
+      sni: realityServerName,
+      fp: "chrome",
+      pbk: realityPublicKey,
+      sid: realityShortId,
+      type: "tcp",
+    });
+    const shareLink = `vless://${device.xrayUuid}@${endpoint}:${xrayPort}?${vlessParams.toString()}#${encodeURIComponent(device.name)}`;
+
+    return success({ format: "xray", config, filename, shareLink });
   }
 
   return error("VALIDATION_ERROR", "不支持的协议类型");
