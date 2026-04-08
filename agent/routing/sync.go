@@ -20,6 +20,7 @@ type SourceSyncer struct {
 	mu      sync.Mutex
 	client  *http.Client
 	stopCh  chan struct{}
+	stopped bool
 }
 
 func NewSourceSyncer(manager *Manager) *SourceSyncer {
@@ -87,7 +88,7 @@ func (s *SourceSyncer) fetchAndApply(branchID int, source api.RuleSource) {
 		return
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024)) // 10MB limit
 	if err != nil {
 		log.Printf("[sync] Read failed for filter=%d: %v", source.FilterID, err)
 		return
@@ -124,7 +125,7 @@ func (s *SourceSyncer) fetchAndApply(branchID int, source api.RuleSource) {
 			newRules[d] = ipsetName
 		}
 		// Merge with existing rules (additive)
-		s.manager.dnsProxy.UpdateRules(newRules)
+		s.manager.dnsProxy.MergeRules(newRules)
 	}
 }
 
@@ -138,9 +139,13 @@ func isIPOrCIDR(s string) bool {
 
 // Stop stops all sync timers.
 func (s *SourceSyncer) Stop() {
-	close(s.stopCh)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.stopped {
+		return
+	}
+	s.stopped = true
+	close(s.stopCh)
 	for _, timer := range s.timers {
 		timer.Stop()
 	}

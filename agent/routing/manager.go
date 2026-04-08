@@ -118,17 +118,12 @@ func (m *Manager) Cleanup() {
 }
 
 func (m *Manager) cleanIPRules() {
-	// Clean branch routing tables (41001-41999)
-	for i := 41001; i <= 41999; i++ {
+	for i := 41001; i <= 41100; i++ {
 		table := fmt.Sprintf("%d", i)
 		markHex := fmt.Sprintf("0x%x", i)
-		_, err := exec.Command("ip", "rule", "del", "fwmark", markHex).CombinedOutput()
-		if err != nil {
-			break
-		}
+		exec.Command("ip", "rule", "del", "fwmark", markHex).CombinedOutput()
 		exec.Command("ip", "route", "flush", "table", table).CombinedOutput()
 	}
-	// Clean default branch rule
 	exec.Command("ip", "rule", "del", "priority", "32000").CombinedOutput()
 }
 

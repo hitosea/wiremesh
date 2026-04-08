@@ -38,6 +38,11 @@ func (p *Proxy) UpdateRules(rules map[string]string) {
 	log.Printf("[dns] Updated domain rules: %d entries", len(rules))
 }
 
+func (p *Proxy) MergeRules(rules map[string]string) {
+	p.matcher.MergeRules(rules)
+	log.Printf("[dns] Merged domain rules: %d new entries", len(rules))
+}
+
 // Start begins listening for DNS queries.
 func (p *Proxy) Start() error {
 	p.mu.Lock()

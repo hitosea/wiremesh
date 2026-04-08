@@ -26,6 +26,16 @@ func (m *DomainMatcher) SetRules(rules map[string]string) {
 	}
 }
 
+// MergeRules adds rules without removing existing ones.
+func (m *DomainMatcher) MergeRules(rules map[string]string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for domain, ipsetName := range rules {
+		d := strings.ToLower(strings.TrimPrefix(domain, "*."))
+		m.rules[d] = ipsetName
+	}
+}
+
 // Match checks if a query domain matches any rule.
 // Returns the ipset name and true if matched.
 func (m *DomainMatcher) Match(queryDomain string) (string, bool) {

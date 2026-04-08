@@ -68,7 +68,7 @@ type XrayLineRoute struct {
 	LineID int      `json:"lineId"`
 	UUIDs  []string `json:"uuids"`
 	Tunnel string   `json:"tunnel"` // e.g. "wm-tun1"
-	Mark   int      `json:"mark"`   // fwmark value, e.g. 201
+	Mark   int      `json:"mark"`   // fwmark value, e.g. 42001
 }
 
 // RoutingConfig contains the routing rules for entry nodes

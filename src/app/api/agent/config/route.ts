@@ -347,13 +347,13 @@ export async function GET(request: NextRequest) {
 
             // Parse IP rules from rules field (one per line)
             if (filter.rules) {
-              const lines = filter.rules.split("\n").map((l: string) => l.trim()).filter((l: string) => l.length > 0);
+              const lines = filter.rules.split("\n").map((l: string) => l.trim()).filter((l: string) => l.length > 0 && !l.startsWith("#"));
               ipRules.push(...lines);
             }
 
             // Parse domain rules from domainRules field (one per line)
             if (filter.domainRules) {
-              const lines = filter.domainRules.split("\n").map((l: string) => l.trim()).filter((l: string) => l.length > 0);
+              const lines = filter.domainRules.split("\n").map((l: string) => l.trim()).filter((l: string) => l.length > 0 && !l.startsWith("#"));
               domainRules.push(...lines);
             }
 

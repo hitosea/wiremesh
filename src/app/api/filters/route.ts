@@ -1,26 +1,11 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { filters, branchFilters, lineBranches, lineNodes, lines } from "@/lib/db/schema";
+import { filters, branchFilters } from "@/lib/db/schema";
 import { success, created, error, paginated } from "@/lib/api-response";
 import { parsePaginationParams, paginationOffset } from "@/lib/pagination";
 import { eq, like, count, and } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
-import { sseManager } from "@/lib/sse-manager";
-
-function notifyFilterChange(filterId: number) {
-  const branches = db.select({ branchId: branchFilters.branchId }).from(branchFilters).where(eq(branchFilters.filterId, filterId)).all();
-  const lineIds = new Set<number>();
-  for (const b of branches) {
-    const branch = db.select({ lineId: lineBranches.lineId }).from(lineBranches).where(eq(lineBranches.id, b.branchId)).get();
-    if (branch) lineIds.add(branch.lineId);
-  }
-  for (const lineId of lineIds) {
-    const entryNodes = db.select({ nodeId: lineNodes.nodeId }).from(lineNodes).where(and(eq(lineNodes.lineId, lineId), eq(lineNodes.role, "entry"))).all();
-    for (const n of entryNodes) {
-      sseManager.notifyNodeConfigUpdate(n.nodeId);
-    }
-  }
-}
+import { notifyFilterChange } from "@/lib/filter-notify";
 
 export async function GET(request: NextRequest) {
   const params = parsePaginationParams(request.nextUrl.searchParams);
