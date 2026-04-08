@@ -88,6 +88,16 @@ func listWireMeshRules() ([]string, error) {
 		}
 	}
 
+	// mangle table PREROUTING chain — prefix with "-t mangle" for correct matching
+	if output, err := exec.Command("iptables", "-t", "mangle", "-S", "PREROUTING").CombinedOutput(); err == nil {
+		for _, line := range strings.Split(string(output), "\n") {
+			line = strings.TrimSpace(line)
+			if strings.Contains(line, "wm-") && strings.HasPrefix(line, "-A ") {
+				allRules = append(allRules, "-t mangle "+line)
+			}
+		}
+	}
+
 	return allRules, nil
 }
 
