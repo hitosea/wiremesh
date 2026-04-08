@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	routeTableStart     = 100 // WG device routes: tables 101-199
-	xrayRouteTableStart = 200 // Xray fwmark routes: tables 201-299
+	routeTableStart     = 100   // WG device routes: tables 101-199
+	xrayRouteTableStart = 42001 // Xray fwmark routes: tables 42001+ (was 200)
 )
 
 // SyncRouting applies per-device routing rules based on deviceRoutes.
@@ -102,11 +102,11 @@ func cleanRouting() {
 		RunSilent("ip", "route", "flush", "table", table)
 	}
 
-	// Clean Xray fwmark routes (tables 201-299)
-	for i := xrayRouteTableStart + 1; i <= xrayRouteTableStart+99; i++ {
+	// Clean Xray fwmark routes (42001-42099)
+	for i := xrayRouteTableStart; i <= xrayRouteTableStart+99; i++ {
 		table := fmt.Sprintf("%d", i)
 		markHex := fmt.Sprintf("0x%x", i)
-		_, err := RunSilent("ip", "rule", "del", "fwmark", markHex, "lookup", table, "priority", table)
+		_, err := RunSilent("ip", "rule", "del", "fwmark", markHex, "lookup", table)
 		if err != nil {
 			break
 		}

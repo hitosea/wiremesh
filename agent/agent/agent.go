@@ -10,6 +10,7 @@ import (
 	"github.com/wiremesh/agent/collector"
 	"github.com/wiremesh/agent/config"
 	"github.com/wiremesh/agent/iptables"
+	"github.com/wiremesh/agent/routing"
 	"github.com/wiremesh/agent/wg"
 	"github.com/wiremesh/agent/xray"
 )
@@ -18,20 +19,22 @@ type Agent struct {
 	cfg           *config.Config
 	client        *api.Client
 	sse           *api.SSEClient
-	activeTunnels map[string]wg.ActiveTunnel
-	lastVersion   string
-	ctx           context.Context
-	cancel        context.CancelFunc
+	activeTunnels  map[string]wg.ActiveTunnel
+	routingManager *routing.Manager
+	lastVersion    string
+	ctx            context.Context
+	cancel         context.CancelFunc
 }
 
 func New(cfg *config.Config) *Agent {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Agent{
-		cfg:           cfg,
-		client:        api.NewClient(cfg.ServerURL, cfg.Token),
-		activeTunnels: make(map[string]wg.ActiveTunnel),
-		ctx:           ctx,
-		cancel:        cancel,
+		cfg:            cfg,
+		client:         api.NewClient(cfg.ServerURL, cfg.Token),
+		activeTunnels:  make(map[string]wg.ActiveTunnel),
+		routingManager: routing.NewManager(),
+		ctx:            ctx,
+		cancel:         cancel,
 	}
 }
 
@@ -146,6 +149,11 @@ func (a *Agent) pullAndApplyConfigForce(force bool) error {
 		}
 	}
 
+	// 7. Sync branch routing
+	if err := a.routingManager.Sync(cfgData.Routing); err != nil {
+		log.Printf("[agent] routing sync error: %v", err)
+	}
+
 	a.lastVersion = cfgData.Version
 	xrayStatus := "disabled"
 	if cfgData.Xray != nil && cfgData.Xray.Enabled {
@@ -155,8 +163,12 @@ func (a *Agent) pullAndApplyConfigForce(force bool) error {
 		}
 		xrayStatus = fmt.Sprintf("enabled (%d clients, %d lines)", clientCount, len(cfgData.Xray.Routes))
 	}
-	log.Printf("[agent] Config applied. Tunnels: %d, iptables: %d, xray: %s",
-		len(a.activeTunnels), len(cfgData.Tunnels.IptablesRules), xrayStatus)
+	routingStatus := "disabled"
+	if cfgData.Routing != nil && cfgData.Routing.Enabled {
+		routingStatus = fmt.Sprintf("enabled (%d branches)", len(cfgData.Routing.Branches))
+	}
+	log.Printf("[agent] Config applied. Tunnels: %d, iptables: %d, xray: %s, routing: %s",
+		len(a.activeTunnels), len(cfgData.Tunnels.IptablesRules), xrayStatus, routingStatus)
 	return nil
 }
 
@@ -181,6 +193,7 @@ func (a *Agent) shutdown() {
 		wg.IpLinkSetDown(name)
 		wg.IpLinkDel(name)
 	}
+	a.routingManager.Cleanup()
 	wg.CleanupRouting()
 	iptables.RemoveAllWireMeshRules()
 	log.Println("[agent] Shutdown complete")
