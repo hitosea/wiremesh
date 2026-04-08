@@ -285,7 +285,16 @@ export async function GET(request: NextRequest) {
     const dnsUpstream = dnsUpstreamSetting?.value ? dnsUpstreamSetting.value.split(",").map((s: string) => s.trim()) : ["8.8.8.8", "1.1.1.1"];
     const filterSyncInterval = filterSyncIntervalSetting?.value ? parseInt(filterSyncIntervalSetting.value, 10) : 86400;
 
-    const branches: typeof routingConfig extends null ? never : NonNullable<typeof routingConfig>["branches"] = [];
+    const branches: {
+      id: number;
+      name: string;
+      is_default: boolean;
+      tunnel: string;
+      mark: number;
+      ip_rules: string[];
+      domain_rules: string[];
+      rule_sources: { filter_id: number; url: string; sync_interval: number }[];
+    }[] = [];
     let branchMarkCounter = 41001;
 
     for (const lineId of entryLineIds) {
