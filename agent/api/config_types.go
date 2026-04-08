@@ -6,11 +6,12 @@ type ConfigResponse struct {
 }
 
 type ConfigData struct {
-	Node    NodeConfig   `json:"node"`
-	Peers   []PeerConfig `json:"peers"`
-	Tunnels TunnelConfig `json:"tunnels"`
-	Xray    *XrayConfig  `json:"xray"`
-	Version string       `json:"version"`
+	Node    NodeConfig     `json:"node"`
+	Peers   []PeerConfig   `json:"peers"`
+	Tunnels TunnelConfig   `json:"tunnels"`
+	Xray    *XrayConfig    `json:"xray"`
+	Routing *RoutingConfig `json:"routing"`
+	Version string         `json:"version"`
 }
 
 type NodeConfig struct {
@@ -68,4 +69,33 @@ type XrayLineRoute struct {
 	UUIDs  []string `json:"uuids"`
 	Tunnel string   `json:"tunnel"` // e.g. "wm-tun1"
 	Mark   int      `json:"mark"`   // fwmark value, e.g. 201
+}
+
+// RoutingConfig contains the routing rules for entry nodes
+type RoutingConfig struct {
+	Enabled  bool            `json:"enabled"`
+	DNS      DNSConfig       `json:"dns"`
+	Branches []RoutingBranch `json:"branches"`
+}
+
+type DNSConfig struct {
+	Listen   string   `json:"listen"`
+	Upstream []string `json:"upstream"`
+}
+
+type RoutingBranch struct {
+	ID          int          `json:"id"`
+	Name        string       `json:"name"`
+	IsDefault   bool         `json:"is_default"`
+	Tunnel      string       `json:"tunnel"`
+	Mark        int          `json:"mark"`
+	IPRules     []string     `json:"ip_rules"`
+	DomainRules []string     `json:"domain_rules"`
+	RuleSources []RuleSource `json:"rule_sources"`
+}
+
+type RuleSource struct {
+	FilterID     int    `json:"filter_id"`
+	URL          string `json:"url"`
+	SyncInterval int    `json:"sync_interval"` // seconds
 }
