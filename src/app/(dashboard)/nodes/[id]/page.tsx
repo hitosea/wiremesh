@@ -256,7 +256,7 @@ export default function NodeDetailPage() {
             {xrayEnabled && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="xrayPort">Xray 端口</Label>
+                  <Label htmlFor="xrayPort">Xray 起始端口</Label>
                   <Input
                     id="xrayPort"
                     type="number"
@@ -264,6 +264,9 @@ export default function NodeDetailPage() {
                     onChange={(e) => setXrayPort(e.target.value)}
                     placeholder="443"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    每条线路自动分配独立端口（如 443、444、445...），请确保防火墙放行对应端口
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="realityDest">Reality 目标网站</Label>
