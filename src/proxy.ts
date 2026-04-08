@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { users } from "@/lib/db/schema";
+import { count } from "drizzle-orm";
 
 const PUBLIC_PATHS = ["/login", "/setup", "/api/setup", "/api/auth/login"];
 
@@ -19,18 +22,16 @@ function isStaticPath(pathname: string): boolean {
   return pathname.startsWith("/_next") || pathname === "/favicon.ico";
 }
 
-async function checkInitialized(request: NextRequest): Promise<boolean> {
+async function checkInitialized(_request: NextRequest): Promise<boolean> {
   try {
-    const url = new URL("/api/setup/status", request.url);
-    const res = await fetch(url);
-    const data = await res.json();
-    return data?.data?.initialized === true;
+    const [result] = await db.select({ count: count() }).from(users);
+    return result.count > 0;
   } catch {
     return true; // If check fails, assume initialized to avoid redirect loop
   }
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (isStaticPath(pathname) || isAgentPath(pathname) || isNodeScriptPath(pathname)) {

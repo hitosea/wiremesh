@@ -34,7 +34,10 @@ export async function GET(request: NextRequest, { params }: Params) {
     return error("INTERNAL_ERROR", "解密私钥失败");
   }
 
-  const serverUrl = process.env.PUBLIC_URL || request.nextUrl.origin;
+  const host = request.headers.get("host");
+  const proto = request.headers.get("x-forwarded-proto") || request.nextUrl.protocol.replace(":", "");
+  const serverUrl =
+    process.env.PUBLIC_URL || (host ? `${proto}://${host}` : request.nextUrl.origin);
 
   const script = `#!/bin/bash
 #

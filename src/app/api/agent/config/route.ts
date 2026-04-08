@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { nodes, lineNodes, lineTunnels, devices, lineBranches, branchFilters, filters, settings } from "@/lib/db/schema";
-import { eq, or, and } from "drizzle-orm";
+import { eq, or, and, count } from "drizzle-orm";
 import { decrypt } from "@/lib/crypto";
 import { authenticateAgent } from "@/lib/agent-auth";
 
@@ -156,8 +156,23 @@ export async function GET(request: NextRequest) {
   // Exit nodes: return traffic TO this IP goes back through the upstream tunnel.
   const deviceRoutes: { destination: string; tunnel: string; type: string }[] = [];
 
+  // Determine which lines have multi-branch routing (skip old entry device routes for those)
+  const linesWithBranchRouting = new Set<number>();
+  for (const lineId of entryLineIds) {
+    const branchCount = db
+      .select({ count: count() })
+      .from(lineBranches)
+      .where(eq(lineBranches.lineId, lineId))
+      .get()?.count ?? 0;
+    if (branchCount > 1) {
+      linesWithBranchRouting.add(lineId);
+    }
+  }
+
   // Entry node routes (source-based: traffic FROM this IP)
+  // Skip for lines with branch routing — traffic routing is handled by fwmark-based branch routing instead
   for (const [lineId, ifaceName] of lineToDownstreamIface) {
+    if (linesWithBranchRouting.has(lineId)) continue;
     const lineDevices = db
       .select({ wgAddress: devices.wgAddress })
       .from(devices)
