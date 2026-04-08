@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { lines, lineNodes, lineTunnels, lineBranches, branchFilters, nodes, settings, filters } from "@/lib/db/schema";
 import { success, created, error, paginated } from "@/lib/api-response";
 import { parsePaginationParams, paginationOffset } from "@/lib/pagination";
-import { eq, like, count, and, SQL, inArray } from "drizzle-orm";
+import { eq, like, count, and, SQL } from "drizzle-orm";
 import { encrypt } from "@/lib/crypto";
 import { generateKeyPair } from "@/lib/wireguard";
 import { allocateTunnelSubnet, allocateTunnelPort } from "@/lib/ip-allocator";
