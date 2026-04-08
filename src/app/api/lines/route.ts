@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { lines, lineNodes, lineTunnels, nodes, settings, devices } from "@/lib/db/schema";
+import { lines, lineNodes, lineTunnels, lineBranches, branchFilters, nodes, settings, filters } from "@/lib/db/schema";
 import { success, created, error, paginated } from "@/lib/api-response";
 import { parsePaginationParams, paginationOffset } from "@/lib/pagination";
-import { eq, like, count, and, SQL } from "drizzle-orm";
+import { eq, like, count, and, SQL, inArray } from "drizzle-orm";
 import { encrypt } from "@/lib/crypto";
 import { generateKeyPair } from "@/lib/wireguard";
 import { allocateTunnelSubnet, allocateTunnelPort } from "@/lib/ip-allocator";
@@ -38,13 +38,21 @@ export async function GET(request: NextRequest) {
         role: lineNodes.role,
         nodeId: lineNodes.nodeId,
         nodeName: nodes.name,
+        branchId: lineNodes.branchId,
       })
       .from(lineNodes)
       .innerJoin(nodes, eq(lineNodes.nodeId, nodes.id))
       .where(eq(lineNodes.lineId, line.id))
       .orderBy(lineNodes.hopOrder)
       .all();
-    return { ...line, nodes: lineNodeRows };
+
+    const branchRows = db
+      .select()
+      .from(lineBranches)
+      .where(eq(lineBranches.lineId, line.id))
+      .all();
+
+    return { ...line, nodes: lineNodeRows, branches: branchRows };
   });
 
   return paginated(result, {
@@ -54,19 +62,69 @@ export async function GET(request: NextRequest) {
   });
 }
 
+interface BranchInput {
+  name: string;
+  isDefault: boolean;
+  nodeIds: number[];
+  filterIds?: number[];
+}
+
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { name, nodeIds, tags, remark } = body;
+  const { name, entryNodeId, branches, tags, remark } = body as {
+    name?: string;
+    entryNodeId?: number;
+    branches?: BranchInput[];
+    tags?: string;
+    remark?: string;
+  };
 
+  // --- Validation ---
   if (!name || !name.trim()) {
     return error("VALIDATION_ERROR", "name 为必填项");
   }
-  if (!nodeIds || !Array.isArray(nodeIds) || nodeIds.length < 2) {
-    return error("VALIDATION_ERROR", "nodeIds 至少需要 2 个节点");
+  if (!entryNodeId) {
+    return error("VALIDATION_ERROR", "entryNodeId 为必填项");
+  }
+  if (!branches || !Array.isArray(branches) || branches.length < 1) {
+    return error("VALIDATION_ERROR", "branches 至少需要 1 个分支");
   }
 
-  // Verify all nodes exist
-  for (const nodeId of nodeIds) {
+  // Validate exactly one default branch
+  const defaultCount = branches.filter((b) => b.isDefault).length;
+  if (defaultCount !== 1) {
+    return error("VALIDATION_ERROR", "必须恰好有一个默认分支 (isDefault: true)");
+  }
+
+  // Validate each branch has at least one nodeId
+  for (let i = 0; i < branches.length; i++) {
+    const branch = branches[i];
+    if (!branch.name || !branch.name.trim()) {
+      return error("VALIDATION_ERROR", `分支 ${i + 1} 的 name 为必填项`);
+    }
+    if (!branch.nodeIds || !Array.isArray(branch.nodeIds) || branch.nodeIds.length < 1) {
+      return error("VALIDATION_ERROR", `分支 "${branch.name}" 至少需要 1 个节点 (出口)`);
+    }
+  }
+
+  // Verify entry node exists
+  const entryNode = db
+    .select({ id: nodes.id })
+    .from(nodes)
+    .where(eq(nodes.id, entryNodeId))
+    .get();
+  if (!entryNode) {
+    return error("VALIDATION_ERROR", `入口节点 ID ${entryNodeId} 不存在`);
+  }
+
+  // Collect all nodeIds from branches and verify they exist
+  const allBranchNodeIds = new Set<number>();
+  for (const branch of branches) {
+    for (const nodeId of branch.nodeIds) {
+      allBranchNodeIds.add(nodeId);
+    }
+  }
+  for (const nodeId of allBranchNodeIds) {
     const node = db
       .select({ id: nodes.id })
       .from(nodes)
@@ -77,7 +135,27 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Read settings
+  // Collect and verify all filterIds
+  const allFilterIds = new Set<number>();
+  for (const branch of branches) {
+    if (branch.filterIds) {
+      for (const filterId of branch.filterIds) {
+        allFilterIds.add(filterId);
+      }
+    }
+  }
+  for (const filterId of allFilterIds) {
+    const filter = db
+      .select({ id: filters.id })
+      .from(filters)
+      .where(eq(filters.id, filterId))
+      .get();
+    if (!filter) {
+      return error("VALIDATION_ERROR", `分流规则 ID ${filterId} 不存在`);
+    }
+  }
+
+  // --- Read settings ---
   const settingsRows = db.select().from(settings).all();
   const settingsMap: Record<string, string> = {};
   for (const row of settingsRows) {
@@ -86,7 +164,20 @@ export async function POST(request: NextRequest) {
   const tunnelSubnet = settingsMap["tunnel_subnet"] ?? "10.211.0.0/16";
   const tunnelPortStart = parseInt(settingsMap["tunnel_port_start"] ?? "41830");
 
-  // Insert line
+  // --- Read existing tunnels for allocation ---
+  const existingTunnels = db.select().from(lineTunnels).all();
+  const usedAddresses: string[] = existingTunnels.flatMap((t) => [
+    t.fromWgAddress,
+    t.toWgAddress,
+  ]);
+  const usedPorts: number[] = existingTunnels.flatMap((t) => [
+    t.fromWgPort,
+    t.toWgPort,
+  ]);
+
+  // --- Creation flow ---
+
+  // 1. Insert line record
   const line = db
     .insert(lines)
     .values({
@@ -98,85 +189,121 @@ export async function POST(request: NextRequest) {
     .returning()
     .get();
 
-  // Insert line_nodes
-  for (let i = 0; i < nodeIds.length; i++) {
-    let role: string;
-    if (i === 0) role = "entry";
-    else if (i === nodeIds.length - 1) role = "exit";
-    else role = "relay";
+  // 2. Insert entry node (branchId: null, role: "entry", hopOrder: 0)
+  db.insert(lineNodes)
+    .values({
+      lineId: line.id,
+      nodeId: entryNodeId,
+      branchId: null,
+      hopOrder: 0,
+      role: "entry",
+    })
+    .run();
 
-    db.insert(lineNodes)
+  // Track all affected node IDs for SSE notification
+  const affectedNodeIds = new Set<number>([entryNodeId]);
+
+  // 3. For each branch
+  let globalHopIndex = 0; // tunnel hop index across all branches
+
+  for (const branch of branches) {
+    // 3a. Insert into lineBranches
+    const branchRecord = db
+      .insert(lineBranches)
       .values({
         lineId: line.id,
-        nodeId: nodeIds[i],
-        hopOrder: i,
-        role,
+        name: branch.name.trim(),
+        isDefault: branch.isDefault,
       })
-      .run();
+      .returning()
+      .get();
+
+    // 3b. Insert branch nodes into lineNodes
+    for (let i = 0; i < branch.nodeIds.length; i++) {
+      const nodeId = branch.nodeIds[i];
+      const isLast = i === branch.nodeIds.length - 1;
+      const role = isLast ? "exit" : "relay";
+      const hopOrder = i + 1; // entry is 0, branch nodes start from 1
+
+      db.insert(lineNodes)
+        .values({
+          lineId: line.id,
+          nodeId,
+          branchId: branchRecord.id,
+          hopOrder,
+          role,
+        })
+        .run();
+
+      affectedNodeIds.add(nodeId);
+    }
+
+    // 3c. Create lineTunnels for the chain: entry → first branch node, then sequential
+    const chainNodeIds = [entryNodeId, ...branch.nodeIds];
+    for (let i = 0; i < chainNodeIds.length - 1; i++) {
+      const fromNodeId = chainNodeIds[i];
+      const toNodeId = chainNodeIds[i + 1];
+
+      const { fromAddress, toAddress } = allocateTunnelSubnet(
+        usedAddresses,
+        tunnelSubnet
+      );
+      usedAddresses.push(fromAddress, toAddress);
+
+      const fromPort = allocateTunnelPort(usedPorts, tunnelPortStart);
+      usedPorts.push(fromPort);
+      const toPort = allocateTunnelPort(usedPorts, tunnelPortStart);
+      usedPorts.push(toPort);
+
+      const fromKeyPair = generateKeyPair();
+      const toKeyPair = generateKeyPair();
+
+      db.insert(lineTunnels)
+        .values({
+          lineId: line.id,
+          hopIndex: globalHopIndex,
+          fromNodeId,
+          toNodeId,
+          fromWgPrivateKey: encrypt(fromKeyPair.privateKey),
+          fromWgPublicKey: fromKeyPair.publicKey,
+          fromWgAddress: fromAddress,
+          fromWgPort: fromPort,
+          toWgPrivateKey: encrypt(toKeyPair.privateKey),
+          toWgPublicKey: toKeyPair.publicKey,
+          toWgAddress: toAddress,
+          toWgPort: toPort,
+          branchId: branchRecord.id,
+        })
+        .run();
+
+      globalHopIndex++;
+    }
+
+    // 3d. Insert branchFilters associations
+    if (branch.filterIds && branch.filterIds.length > 0) {
+      for (const filterId of branch.filterIds) {
+        db.insert(branchFilters)
+          .values({
+            branchId: branchRecord.id,
+            filterId,
+          })
+          .run();
+      }
+    }
   }
 
-  // Read already used addresses and ports from line_tunnels to avoid conflicts
-  const existingTunnels = db.select().from(lineTunnels).all();
-  const usedAddresses: string[] = existingTunnels.flatMap((t) => [
-    t.fromWgAddress,
-    t.toWgAddress,
-  ]);
-  const usedPorts: number[] = existingTunnels.flatMap((t) => [
-    t.fromWgPort,
-    t.toWgPort,
-  ]);
-
-  // Create line_tunnels for each adjacent pair
-  for (let i = 0; i < nodeIds.length - 1; i++) {
-    const fromNodeId = nodeIds[i];
-    const toNodeId = nodeIds[i + 1];
-
-    // Allocate /30 subnet
-    const { fromAddress, toAddress } = allocateTunnelSubnet(
-      usedAddresses,
-      tunnelSubnet
-    );
-
-    // Allocate ports for both ends
-    const fromPort = allocateTunnelPort(usedPorts, tunnelPortStart);
-    usedPorts.push(fromPort);
-    const toPort = allocateTunnelPort(usedPorts, tunnelPortStart);
-    usedPorts.push(toPort);
-
-    // Track allocated addresses
-    usedAddresses.push(fromAddress, toAddress);
-
-    // Generate key pairs
-    const fromKeyPair = generateKeyPair();
-    const toKeyPair = generateKeyPair();
-
-    db.insert(lineTunnels)
-      .values({
-        lineId: line.id,
-        hopIndex: i,
-        fromNodeId,
-        toNodeId,
-        fromWgPrivateKey: encrypt(fromKeyPair.privateKey),
-        fromWgPublicKey: fromKeyPair.publicKey,
-        fromWgAddress: fromAddress,
-        fromWgPort: fromPort,
-        toWgPrivateKey: encrypt(toKeyPair.privateKey),
-        toWgPublicKey: toKeyPair.publicKey,
-        toWgAddress: toAddress,
-        toWgPort: toPort,
-      })
-      .run();
-  }
-
+  // 4. Write audit log
+  const branchSummary = branches.map((b) => `${b.name}:[${b.nodeIds.join(",")}]`).join("; ");
   writeAuditLog({
     action: "create",
     targetType: "line",
     targetId: line.id,
     targetName: name.trim(),
-    detail: `nodes=${nodeIds.join(",")}`,
+    detail: `entry=${entryNodeId}, branches: ${branchSummary}`,
   });
 
-  for (const nodeId of nodeIds) {
+  // 5. SSE notify all affected nodes
+  for (const nodeId of affectedNodeIds) {
     sseManager.notifyNodeTunnelUpdate(nodeId);
   }
 
