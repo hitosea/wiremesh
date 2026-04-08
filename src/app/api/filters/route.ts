@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { filters, lineFilters } from "@/lib/db/schema";
+import { filters, branchFilters } from "@/lib/db/schema";
 import { success, created, error, paginated } from "@/lib/api-response";
 import { parsePaginationParams, paginationOffset } from "@/lib/pagination";
 import { eq, like, count, and, SQL } from "drizzle-orm";
@@ -55,11 +55,11 @@ export async function POST(request: NextRequest) {
     .returning()
     .get();
 
-  // Insert line associations
+  // Insert branch associations
   if (lineIds && Array.isArray(lineIds)) {
-    for (const lineId of lineIds) {
-      db.insert(lineFilters)
-        .values({ lineId, filterId: filter.id })
+    for (const branchId of lineIds) {
+      db.insert(branchFilters)
+        .values({ branchId, filterId: filter.id })
         .run();
     }
   }

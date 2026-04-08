@@ -71,11 +71,21 @@ export const lines = sqliteTable("lines", {
   ...timestamps,
 });
 
+// ===== line_branches =====
+export const lineBranches = sqliteTable("line_branches", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  lineId: integer("line_id").notNull().references(() => lines.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
+  ...timestamps,
+});
+
 // ===== line_nodes =====
 export const lineNodes = sqliteTable("line_nodes", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   lineId: integer("line_id").notNull().references(() => lines.id, { onDelete: "cascade" }),
   nodeId: integer("node_id").notNull().references(() => nodes.id, { onDelete: "cascade" }),
+  branchId: integer("branch_id").references(() => lineBranches.id, { onDelete: "cascade" }),
   hopOrder: integer("hop_order").notNull(),
   role: text("role").notNull(),
 });
@@ -95,6 +105,7 @@ export const lineTunnels = sqliteTable("line_tunnels", {
   toWgPublicKey: text("to_wg_public_key").notNull(),
   toWgAddress: text("to_wg_address").notNull(),
   toWgPort: integer("to_wg_port").notNull(),
+  branchId: integer("branch_id").references(() => lineBranches.id, { onDelete: "cascade" }),
 });
 
 // ===== devices =====
@@ -126,13 +137,16 @@ export const filters = sqliteTable("filters", {
   isEnabled: integer("is_enabled", { mode: "boolean" }).notNull().default(true),
   tags: text("tags"),
   remark: text("remark"),
+  domainRules: text("domain_rules"),
+  sourceUrl: text("source_url"),
+  sourceUpdatedAt: text("source_updated_at"),
   ...timestamps,
 });
 
-// ===== line_filters =====
-export const lineFilters = sqliteTable("line_filters", {
+// ===== branch_filters =====
+export const branchFilters = sqliteTable("branch_filters", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  lineId: integer("line_id").notNull().references(() => lines.id, { onDelete: "cascade" }),
+  branchId: integer("branch_id").notNull().references(() => lineBranches.id, { onDelete: "cascade" }),
   filterId: integer("filter_id").notNull().references(() => filters.id, { onDelete: "cascade" }),
 });
 

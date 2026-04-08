@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { filters, lineFilters, lines } from "@/lib/db/schema";
+import { filters, branchFilters, lineBranches } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
 import { eq } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
@@ -20,18 +20,18 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   if (!filter) return error("NOT_FOUND", "过滤规则不存在");
 
-  // Fetch associated lines
-  const associatedLines = db
+  // Fetch associated branches
+  const associatedBranches = db
     .select({
-      lineId: lineFilters.lineId,
-      lineName: lines.name,
+      branchId: branchFilters.branchId,
+      branchName: lineBranches.name,
     })
-    .from(lineFilters)
-    .innerJoin(lines, eq(lineFilters.lineId, lines.id))
-    .where(eq(lineFilters.filterId, filterId))
+    .from(branchFilters)
+    .innerJoin(lineBranches, eq(branchFilters.branchId, lineBranches.id))
+    .where(eq(branchFilters.filterId, filterId))
     .all();
 
-  return success({ ...filter, lines: associatedLines });
+  return success({ ...filter, branches: associatedBranches });
 }
 
 export async function PUT(request: NextRequest, { params }: Params) {
@@ -69,12 +69,12 @@ export async function PUT(request: NextRequest, { params }: Params) {
     .returning()
     .get();
 
-  // Update line associations if provided
+  // Update branch associations if provided
   if (lineIds !== undefined && Array.isArray(lineIds)) {
-    db.delete(lineFilters).where(eq(lineFilters.filterId, filterId)).run();
-    for (const lineId of lineIds) {
-      db.insert(lineFilters)
-        .values({ lineId, filterId })
+    db.delete(branchFilters).where(eq(branchFilters.filterId, filterId)).run();
+    for (const branchId of lineIds) {
+      db.insert(branchFilters)
+        .values({ branchId, filterId })
         .run();
     }
   }
