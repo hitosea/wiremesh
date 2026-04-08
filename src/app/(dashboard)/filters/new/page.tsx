@@ -22,33 +22,42 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-type LineOption = {
+type Branch = {
   id: number;
   name: string;
+  isDefault: boolean;
+};
+
+type LineWithBranches = {
+  id: number;
+  name: string;
+  branches?: Branch[];
 };
 
 export default function NewFilterPage() {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
-  const [lines, setLines] = useState<LineOption[]>([]);
+  const [linesWithBranches, setLinesWithBranches] = useState<LineWithBranches[]>([]);
 
   const [name, setName] = useState("");
   const [rules, setRules] = useState("");
+  const [domainRules, setDomainRules] = useState("");
+  const [sourceUrl, setSourceUrl] = useState("");
   const [mode, setMode] = useState("whitelist");
-  const [selectedLineIds, setSelectedLineIds] = useState<number[]>([]);
+  const [selectedBranchIds, setSelectedBranchIds] = useState<number[]>([]);
   const [tags, setTags] = useState("");
   const [remark, setRemark] = useState("");
 
   useEffect(() => {
     fetch("/api/lines?pageSize=100")
       .then((res) => res.json())
-      .then((json) => setLines(json.data ?? []))
+      .then((json) => setLinesWithBranches(json.data ?? []))
       .catch(() => {});
   }, []);
 
-  const toggleLine = (lineId: number) => {
-    setSelectedLineIds((prev) =>
-      prev.includes(lineId) ? prev.filter((id) => id !== lineId) : [...prev, lineId]
+  const toggleBranch = (branchId: number) => {
+    setSelectedBranchIds((prev) =>
+      prev.includes(branchId) ? prev.filter((id) => id !== branchId) : [...prev, branchId]
     );
   };
 
@@ -58,8 +67,8 @@ export default function NewFilterPage() {
       toast.error("规则名称不能为空");
       return;
     }
-    if (!rules.trim()) {
-      toast.error("规则内容不能为空");
+    if (!rules.trim() && !domainRules.trim() && !sourceUrl.trim()) {
+      toast.error("IP/CIDR 规则、域名规则至少填写一项，或设置外部规则源");
       return;
     }
     setSaving(true);
@@ -69,9 +78,11 @@ export default function NewFilterPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
-          rules: rules.trim(),
+          rules: rules.trim() || null,
+          domainRules: domainRules.trim() || null,
+          sourceUrl: sourceUrl.trim() || null,
           mode,
-          lineIds: selectedLineIds,
+          branchIds: selectedBranchIds,
           tags: tags.trim() || null,
           remark: remark.trim() || null,
         }),
@@ -134,7 +145,7 @@ export default function NewFilterPage() {
 
           <div className="space-y-2">
             <Label htmlFor="rules">
-              IP/CIDR 规则 <span className="text-destructive">*</span>
+              IP/CIDR 规则
             </Label>
             <Textarea
               id="rules"
@@ -148,24 +159,59 @@ export default function NewFilterPage() {
           </div>
 
           <div className="space-y-2">
-            <Label>关联线路</Label>
-            {lines.length === 0 ? (
+            <Label htmlFor="domainRules">域名规则</Label>
+            <Textarea
+              id="domainRules"
+              value={domainRules}
+              onChange={(e) => setDomainRules(e.target.value)}
+              rows={6}
+              placeholder={"每行一条域名，例如：\ngoogle.com\nyoutube.com\n*.netflix.com"}
+              className="font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground">匹配域名及其所有子域名</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="sourceUrl">外部规则源（可选）</Label>
+            <Input
+              id="sourceUrl"
+              value={sourceUrl}
+              onChange={(e) => setSourceUrl(e.target.value)}
+              placeholder="https://example.com/ip-list.txt"
+            />
+            <p className="text-xs text-muted-foreground">定期从该 URL 拉取规则，自动分类 IP 和域名</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>关联分支</Label>
+            {linesWithBranches.length === 0 ? (
               <p className="text-sm text-muted-foreground">暂无线路</p>
             ) : (
-              <div className="space-y-2 border rounded-md p-3">
-                {lines.map((line) => (
-                  <div key={line.id} className="flex items-center gap-2">
-                    <Checkbox
-                      id={`line-${line.id}`}
-                      checked={selectedLineIds.includes(line.id)}
-                      onCheckedChange={() => toggleLine(line.id)}
-                    />
-                    <label
-                      htmlFor={`line-${line.id}`}
-                      className="text-sm cursor-pointer"
-                    >
-                      {line.name}
-                    </label>
+              <div className="space-y-3 border rounded-md p-3">
+                {linesWithBranches.map((line) => (
+                  <div key={line.id}>
+                    <p className="text-sm font-medium mb-1">{line.name}</p>
+                    <div className="ml-4 space-y-1">
+                      {line.branches?.length ? (
+                        line.branches.map((branch) => (
+                          <div key={branch.id} className="flex items-center gap-2">
+                            <Checkbox
+                              id={`branch-${branch.id}`}
+                              checked={selectedBranchIds.includes(branch.id)}
+                              onCheckedChange={() => toggleBranch(branch.id)}
+                            />
+                            <label
+                              htmlFor={`branch-${branch.id}`}
+                              className="text-sm cursor-pointer"
+                            >
+                              {branch.name}{branch.isDefault ? "（默认）" : ""}
+                            </label>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-muted-foreground">暂无分支</p>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

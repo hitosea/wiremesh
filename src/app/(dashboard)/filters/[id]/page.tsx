@@ -22,20 +22,30 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+type Branch = {
+  id: number;
+  name: string;
+  isDefault: boolean;
+};
+
+type LineWithBranches = {
+  id: number;
+  name: string;
+  branches?: Branch[];
+};
+
 type FilterDetail = {
   id: number;
   name: string;
   rules: string;
+  domainRules: string | null;
+  sourceUrl: string | null;
+  sourceUpdatedAt: string | null;
   mode: string;
   isEnabled: boolean;
   tags: string | null;
   remark: string | null;
-  lines: { lineId: number; lineName: string }[];
-};
-
-type LineOption = {
-  id: number;
-  name: string;
+  branches: { branchId: number; branchName: string }[];
 };
 
 export default function EditFilterPage() {
@@ -46,12 +56,14 @@ export default function EditFilterPage() {
   const [filter, setFilter] = useState<FilterDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [allLines, setAllLines] = useState<LineOption[]>([]);
+  const [linesWithBranches, setLinesWithBranches] = useState<LineWithBranches[]>([]);
 
   const [name, setName] = useState("");
   const [rules, setRules] = useState("");
+  const [domainRules, setDomainRules] = useState("");
+  const [sourceUrl, setSourceUrl] = useState("");
   const [mode, setMode] = useState("whitelist");
-  const [selectedLineIds, setSelectedLineIds] = useState<number[]>([]);
+  const [selectedBranchIds, setSelectedBranchIds] = useState<number[]>([]);
   const [tags, setTags] = useState("");
   const [remark, setRemark] = useState("");
 
@@ -70,19 +82,21 @@ export default function EditFilterPage() {
         setFilter(f);
         setName(f.name ?? "");
         setRules(f.rules ?? "");
+        setDomainRules(f.domainRules ?? "");
+        setSourceUrl(f.sourceUrl ?? "");
         setMode(f.mode ?? "whitelist");
-        setSelectedLineIds(f.lines?.map((l: { lineId: number }) => l.lineId) ?? []);
+        setSelectedBranchIds(f.branches?.map((b: { branchId: number }) => b.branchId) ?? []);
         setTags(f.tags ?? "");
         setRemark(f.remark ?? "");
-        setAllLines(linesJson.data ?? []);
+        setLinesWithBranches(linesJson.data ?? []);
       })
       .catch(() => toast.error("加载失败"))
       .finally(() => setLoading(false));
   }, [filterId, router]);
 
-  const toggleLine = (lineId: number) => {
-    setSelectedLineIds((prev) =>
-      prev.includes(lineId) ? prev.filter((id) => id !== lineId) : [...prev, lineId]
+  const toggleBranch = (branchId: number) => {
+    setSelectedBranchIds((prev) =>
+      prev.includes(branchId) ? prev.filter((id) => id !== branchId) : [...prev, branchId]
     );
   };
 
@@ -91,8 +105,8 @@ export default function EditFilterPage() {
       toast.error("规则名称不能为空");
       return;
     }
-    if (!rules.trim()) {
-      toast.error("规则内容不能为空");
+    if (!rules.trim() && !domainRules.trim() && !sourceUrl.trim()) {
+      toast.error("IP/CIDR 规则、域名规则至少填写一项，或设置外部规则源");
       return;
     }
     setSaving(true);
@@ -102,9 +116,11 @@ export default function EditFilterPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
-          rules: rules.trim(),
+          rules: rules.trim() || null,
+          domainRules: domainRules.trim() || null,
+          sourceUrl: sourceUrl.trim() || null,
           mode,
-          lineIds: selectedLineIds,
+          branchIds: selectedBranchIds,
           tags: tags.trim() || null,
           remark: remark.trim() || null,
         }),
@@ -173,7 +189,7 @@ export default function EditFilterPage() {
 
           <div className="space-y-2">
             <Label htmlFor="rules">
-              IP/CIDR 规则 <span className="text-destructive">*</span>
+              IP/CIDR 规则
             </Label>
             <Textarea
               id="rules"
@@ -186,24 +202,78 @@ export default function EditFilterPage() {
           </div>
 
           <div className="space-y-2">
-            <Label>关联线路</Label>
-            {allLines.length === 0 ? (
+            <Label htmlFor="domainRules">域名规则</Label>
+            <Textarea
+              id="domainRules"
+              value={domainRules}
+              onChange={(e) => setDomainRules(e.target.value)}
+              rows={6}
+              placeholder={"每行一条域名，例如：\ngoogle.com\nyoutube.com\n*.netflix.com"}
+              className="font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground">匹配域名及其所有子域名</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="sourceUrl">外部规则源（可选）</Label>
+            <Input
+              id="sourceUrl"
+              value={sourceUrl}
+              onChange={(e) => setSourceUrl(e.target.value)}
+              placeholder="https://example.com/ip-list.txt"
+            />
+            <p className="text-xs text-muted-foreground">定期从该 URL 拉取规则，自动分类 IP 和域名</p>
+            {filter.sourceUrl && (
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-xs text-muted-foreground">
+                  上次同步：{filter.sourceUpdatedAt ?? "从未同步"}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    const res = await fetch(`/api/filters/${filterId}/sync`, { method: "POST" });
+                    if (res.ok) toast.success("同步通知已发送");
+                    else toast.error("同步失败");
+                  }}
+                >
+                  立即同步
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label>关联分支</Label>
+            {linesWithBranches.length === 0 ? (
               <p className="text-sm text-muted-foreground">暂无线路</p>
             ) : (
-              <div className="space-y-2 border rounded-md p-3">
-                {allLines.map((line) => (
-                  <div key={line.id} className="flex items-center gap-2">
-                    <Checkbox
-                      id={`line-${line.id}`}
-                      checked={selectedLineIds.includes(line.id)}
-                      onCheckedChange={() => toggleLine(line.id)}
-                    />
-                    <label
-                      htmlFor={`line-${line.id}`}
-                      className="text-sm cursor-pointer"
-                    >
-                      {line.name}
-                    </label>
+              <div className="space-y-3 border rounded-md p-3">
+                {linesWithBranches.map((line) => (
+                  <div key={line.id}>
+                    <p className="text-sm font-medium mb-1">{line.name}</p>
+                    <div className="ml-4 space-y-1">
+                      {line.branches?.length ? (
+                        line.branches.map((branch) => (
+                          <div key={branch.id} className="flex items-center gap-2">
+                            <Checkbox
+                              id={`branch-${branch.id}`}
+                              checked={selectedBranchIds.includes(branch.id)}
+                              onCheckedChange={() => toggleBranch(branch.id)}
+                            />
+                            <label
+                              htmlFor={`branch-${branch.id}`}
+                              className="text-sm cursor-pointer"
+                            >
+                              {branch.name}{branch.isDefault ? "（默认）" : ""}
+                            </label>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-muted-foreground">暂无分支</p>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

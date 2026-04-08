@@ -20,6 +20,8 @@ type Filter = {
   name: string;
   mode: string;
   isEnabled: boolean;
+  rulesCount: number;
+  branchCount: number;
   tags: string | null;
   remark: string | null;
 };
@@ -147,6 +149,16 @@ export default function FiltersPage() {
           {MODE_LABELS[row.mode] ?? row.mode}
         </Badge>
       ),
+    },
+    {
+      key: "rulesCount",
+      label: "规则数",
+      render: (row) => <span>{row.rulesCount} 条</span>,
+    },
+    {
+      key: "branchCount",
+      label: "关联分支",
+      render: (row) => <span>{row.branchCount} 个</span>,
     },
     {
       key: "isEnabled",
