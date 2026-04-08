@@ -1,9 +1,25 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { filters } from "@/lib/db/schema";
+import { filters, branchFilters, lineBranches, lineNodes } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
+import { sseManager } from "@/lib/sse-manager";
+
+function notifyFilterChange(filterId: number) {
+  const branches = db.select({ branchId: branchFilters.branchId }).from(branchFilters).where(eq(branchFilters.filterId, filterId)).all();
+  const lineIds = new Set<number>();
+  for (const b of branches) {
+    const branch = db.select({ lineId: lineBranches.lineId }).from(lineBranches).where(eq(lineBranches.id, b.branchId)).get();
+    if (branch) lineIds.add(branch.lineId);
+  }
+  for (const lineId of lineIds) {
+    const entryNodes = db.select({ nodeId: lineNodes.nodeId }).from(lineNodes).where(and(eq(lineNodes.lineId, lineId), eq(lineNodes.role, "entry"))).all();
+    for (const n of entryNodes) {
+      sseManager.notifyNodeConfigUpdate(n.nodeId);
+    }
+  }
+}
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -36,6 +52,8 @@ export async function PUT(request: NextRequest, { params }: Params) {
     targetName: existing.name,
     detail: `isEnabled=${updated.isEnabled}`,
   });
+
+  notifyFilterChange(filterId);
 
   return success(updated);
 }
