@@ -35,6 +35,7 @@ func (m *Manager) Sync(cfg *api.RoutingConfig) error {
 
 	// 2. Set up each branch
 	domainRules := make(map[string]string) // domain -> ipset name
+	nonDefaultIdx := 0
 
 	for _, branch := range cfg.Branches {
 		table := fmt.Sprintf("%d", branch.Mark)
@@ -45,7 +46,7 @@ func (m *Manager) Sync(cfg *api.RoutingConfig) error {
 		run("ip", "route", "replace", "default", "dev", branch.Tunnel, "table", table)
 
 		if branch.IsDefault {
-			// Default branch: lowest priority, match unmarked traffic
+			// Default branch: lowest priority (32000), match unmarked traffic
 			run("ip", "rule", "add", "fwmark", markHex, "lookup", table, "priority", "32000")
 			// Mark all unmarked traffic from wm-wg0
 			addMangleRule(fmt.Sprintf(
@@ -53,8 +54,10 @@ func (m *Manager) Sync(cfg *api.RoutingConfig) error {
 				markHex,
 			))
 		} else {
-			// Non-default branch: higher priority
-			run("ip", "rule", "add", "fwmark", markHex, "lookup", table, "priority", table)
+			// Non-default branch: higher priority than default (must be < 32000 to match first)
+			priority := fmt.Sprintf("%d", 30000+nonDefaultIdx)
+			nonDefaultIdx++
+			run("ip", "rule", "add", "fwmark", markHex, "lookup", table, "priority", priority)
 
 			// IP/CIDR rules: iptables mangle PREROUTING
 			for _, cidr := range branch.IPRules {

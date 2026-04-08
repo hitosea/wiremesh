@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { devices, lineNodes, nodes, settings } from "@/lib/db/schema";
+import { devices, lineNodes, nodes, settings, lineBranches } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
-import { eq, and } from "drizzle-orm";
+import { eq, and, count } from "drizzle-orm";
 import { decrypt } from "@/lib/crypto";
 
 type Params = { params: Promise<{ id: string }> };
@@ -56,7 +56,22 @@ export async function GET(request: NextRequest, { params }: Params) {
       return error("INTERNAL_ERROR", "解密设备私钥失败");
     }
 
-    const dns = db.select().from(settings).where(eq(settings.key, "wg_default_dns")).get()?.value || "1.1.1.1";
+    // For lines with branch routing (multi-branch), DNS must point to entry node's
+    // DNS proxy so domain-based routing rules can resolve IPs into ipsets
+    const branchCount = db
+      .select({ count: count() })
+      .from(lineBranches)
+      .where(eq(lineBranches.lineId, device.lineId!))
+      .get()?.count ?? 0;
+
+    const entryNodeWgIp = db
+      .select({ wgAddress: nodes.wgAddress })
+      .from(nodes)
+      .where(eq(nodes.id, entryNodeRow.nodeId))
+      .get()?.wgAddress?.split("/")[0];
+
+    const defaultDns = db.select().from(settings).where(eq(settings.key, "wg_default_dns")).get()?.value || "1.1.1.1";
+    const dns = (branchCount > 1 && entryNodeWgIp) ? entryNodeWgIp : defaultDns;
 
     const endpoint = entryNodeRow.nodeDomain ?? entryNodeRow.nodeIp;
     const config = `[Interface]
