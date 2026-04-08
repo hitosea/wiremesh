@@ -54,8 +54,8 @@ export async function POST(request: NextRequest) {
     .insert(filters)
     .values({
       name: name.trim(),
-      rules: rules ?? null,
-      domainRules: domainRules ?? null,
+      rules: rules ?? "",
+      domainRules: domainRules ?? "",
       sourceUrl: sourceUrl ?? null,
       mode,
       isEnabled: true,

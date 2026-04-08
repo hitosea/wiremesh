@@ -61,8 +61,8 @@ export async function PUT(request: NextRequest, { params }: Params) {
     updatedAt: new Date().toISOString(),
   };
   if (name !== undefined) updateData.name = name;
-  if (rules !== undefined) updateData.rules = rules;
-  if (domainRules !== undefined) updateData.domainRules = domainRules;
+  if (rules !== undefined) updateData.rules = rules ?? "";
+  if (domainRules !== undefined) updateData.domainRules = domainRules ?? "";
   if (sourceUrl !== undefined) updateData.sourceUrl = sourceUrl;
   if (mode !== undefined) updateData.mode = mode;
   if (tags !== undefined) updateData.tags = tags;
