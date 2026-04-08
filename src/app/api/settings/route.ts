@@ -18,6 +18,25 @@ export async function PUT(request: NextRequest) {
   if (typeof body !== "object" || body === null) {
     return error("VALIDATION_ERROR", "请求体必须是对象");
   }
+  // Merge incoming values with existing settings for validation
+  const existingRows = db.select().from(settings).all();
+  const merged: Record<string, string> = {};
+  for (const row of existingRows) {
+    merged[row.key] = row.value;
+  }
+  for (const [key, value] of Object.entries(body)) {
+    if (typeof value === "string") {
+      merged[key] = value;
+    }
+  }
+
+  // Validate: wg_default_port and tunnel_port_start must not overlap
+  const wgPort = parseInt(merged["wg_default_port"] ?? "41820");
+  const tunnelPortStart = parseInt(merged["tunnel_port_start"] ?? "41830");
+  if (wgPort >= tunnelPortStart) {
+    return error("VALIDATION_ERROR", `WireGuard 默认端口 (${wgPort}) 必须小于隧道端口起始值 (${tunnelPortStart})，否则会导致端口冲突`);
+  }
+
   const changes: string[] = [];
   for (const [key, value] of Object.entries(body)) {
     if (typeof value !== "string") continue;

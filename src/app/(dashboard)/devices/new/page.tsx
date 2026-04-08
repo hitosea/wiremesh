@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import Link from "next/link";
+
+type LineOption = { id: number; name: string };
 
 export default function NewDevicePage() {
   const router = useRouter();
@@ -27,8 +30,20 @@ export default function NewDevicePage() {
 
   const [name, setName] = useState("");
   const [protocol, setProtocol] = useState<"wireguard" | "xray">("wireguard");
+  const [lineId, setLineId] = useState<string>("");
   const [tags, setTags] = useState("");
   const [remark, setRemark] = useState("");
+
+  const [lineOptions, setLineOptions] = useState<LineOption[]>([]);
+  const [linesLoading, setLinesLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/lines?page=1&pageSize=100")
+      .then((res) => res.json())
+      .then((json) => setLineOptions((json.data ?? []).map((l: LineOption) => ({ id: l.id, name: l.name }))))
+      .catch(() => {})
+      .finally(() => setLinesLoading(false));
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,6 +64,7 @@ export default function NewDevicePage() {
         body: JSON.stringify({
           name: name.trim(),
           protocol,
+          lineId: lineId ? parseInt(lineId) : null,
           tags: tags.trim() || null,
           remark: remark.trim() || null,
         }),
@@ -110,6 +126,30 @@ export default function NewDevicePage() {
                   <SelectItem value="xray">Xray</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lineId">所属线路</Label>
+              {linesLoading ? (
+                <p className="text-sm text-muted-foreground">加载线路...</p>
+              ) : lineOptions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  暂无线路，请先<Link href="/lines/new" className="text-primary hover:underline">创建线路</Link>
+                </p>
+              ) : (
+                <Select value={lineId} onValueChange={setLineId}>
+                  <SelectTrigger id="lineId">
+                    <SelectValue placeholder="选择线路（可选）" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">不绑定线路</SelectItem>
+                    {lineOptions.map((l) => (
+                      <SelectItem key={l.id} value={String(l.id)}>
+                        {l.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="tags">标签（逗号分隔）</Label>

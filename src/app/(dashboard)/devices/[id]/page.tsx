@@ -14,6 +14,16 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import Link from "next/link";
+
+type LineOption = { id: number; name: string };
 
 type DeviceDetail = {
   id: number;
@@ -74,6 +84,14 @@ function DeviceDetailContent() {
   const [tags, setTags] = useState("");
   const [remark, setRemark] = useState("");
   const [lineId, setLineId] = useState("");
+  const [lineOptions, setLineOptions] = useState<LineOption[]>([]);
+
+  useEffect(() => {
+    fetch("/api/lines?page=1&pageSize=100")
+      .then((res) => res.json())
+      .then((json) => setLineOptions((json.data ?? []).map((l: LineOption) => ({ id: l.id, name: l.name }))))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetch(`/api/devices/${deviceId}`)
@@ -247,17 +265,26 @@ function DeviceDetailContent() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="lineId">线路 ID</Label>
-            <Input
-              id="lineId"
-              type="number"
-              value={lineId}
-              onChange={(e) => setLineId(e.target.value)}
-              placeholder="留空表示不绑定线路"
-            />
-            <p className="text-xs text-muted-foreground">
-              输入线路 ID 绑定到指定线路，留空取消绑定
-            </p>
+            <Label htmlFor="lineId">所属线路</Label>
+            {lineOptions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                暂无线路，请先<Link href="/lines/new" className="text-primary hover:underline">创建线路</Link>
+              </p>
+            ) : (
+              <Select value={lineId || "none"} onValueChange={(v) => setLineId(v === "none" ? "" : v)}>
+                <SelectTrigger id="lineId">
+                  <SelectValue placeholder="选择线路" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">不绑定线路</SelectItem>
+                  {lineOptions.map((l) => (
+                    <SelectItem key={l.id} value={String(l.id)}>
+                      {l.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </CardContent>
       </Card>

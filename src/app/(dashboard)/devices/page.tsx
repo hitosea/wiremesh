@@ -27,6 +27,7 @@ type Device = {
   protocol: string;
   wgAddress: string | null;
   xrayUuid: string | null;
+  lineId: number | null;
   status: string;
 };
 
@@ -138,6 +139,7 @@ function DevicesContent() {
 
   useEffect(() => {
     fetchDevices(1, "");
+    fetchLineOptions();
   }, []);
 
   const handleSearch = (q: string) => {
@@ -254,6 +256,19 @@ function DevicesContent() {
             : (row.xrayUuid ?? "—")}
         </span>
       ),
+    },
+    {
+      key: "lineId",
+      label: "所属线路",
+      render: (row) => {
+        if (!row.lineId) return <span className="text-muted-foreground text-sm">—</span>;
+        const line = lineOptions.find((l) => l.id === row.lineId);
+        return (
+          <Link href={`/lines/${row.lineId}`} className="text-primary hover:underline text-sm">
+            {line?.name ?? `线路 ${row.lineId}`}
+          </Link>
+        );
+      },
     },
     {
       key: "status",

@@ -31,7 +31,7 @@ const SETTING_GROUPS = [
     description: "以下设置仅对新建线路生效",
     fields: [
       { key: "tunnel_subnet", label: "隧道子网", hint: "节点间点对点隧道的 IP 地址池" },
-      { key: "tunnel_port_start", label: "隧道端口起始", hint: "隧道 WireGuard 端口自动分配起始值" },
+      { key: "tunnel_port_start", label: "隧道端口起始", hint: "隧道 WireGuard 端口自动分配起始值，必须大于 WireGuard 默认端口" },
     ],
   },
   {

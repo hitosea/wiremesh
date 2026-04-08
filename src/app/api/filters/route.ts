@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
   const { name, rules, domainRules, mode, branchIds, sourceUrl, tags, remark } = body;
 
   if (!name || !name.trim()) return error("VALIDATION_ERROR", "name 为必填项");
-  if (!rules && !domainRules) return error("VALIDATION_ERROR", "IP/CIDR 规则和域名规则至少填写一项");
+  if (!rules && !domainRules && !sourceUrl) return error("VALIDATION_ERROR", "IP/CIDR 规则、域名规则和外部规则源至少填写一项");
   if (!mode || !["whitelist", "blacklist"].includes(mode)) {
     return error("VALIDATION_ERROR", "mode 必须是 whitelist 或 blacklist");
   }

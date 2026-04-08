@@ -15,6 +15,17 @@ type ConfigData = {
   shareLink?: string;
 };
 
+type DeviceInfo = {
+  id: number;
+  name: string;
+  lineId: number | null;
+};
+
+type LineInfo = {
+  id: number;
+  name: string;
+};
+
 function buildShadowrocketUri(data: ConfigData): string | null {
   if (!data.shareLink) return null;
   // Shadowrocket can import standard VLESS share links directly
@@ -78,8 +89,10 @@ export default function DeviceConfigPage() {
 
   const [configData, setConfigData] = useState<ConfigData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lineName, setLineName] = useState<string | null>(null);
 
   useEffect(() => {
+    // Fetch config
     fetch(`/api/devices/${deviceId}/config`)
       .then(async (res) => {
         const json = await res.json();
@@ -89,6 +102,20 @@ export default function DeviceConfigPage() {
       .then((data) => setConfigData(data))
       .catch((err) => toast.error(err.message ?? "加载配置失败"))
       .finally(() => setLoading(false));
+
+    // Fetch device info to get lineId, then resolve line name
+    fetch(`/api/devices/${deviceId}`)
+      .then((res) => res.json())
+      .then((json) => {
+        const d = json.data as DeviceInfo | undefined;
+        if (d?.lineId) {
+          fetch(`/api/lines/${d.lineId}`)
+            .then((res) => res.json())
+            .then((lj) => setLineName((lj.data as LineInfo)?.name ?? null))
+            .catch(() => {});
+        }
+      })
+      .catch(() => {});
   }, [deviceId]);
 
   const handleCopy = (text?: string) => {
@@ -162,6 +189,13 @@ export default function DeviceConfigPage() {
         </Card>
       ) : (
         <>
+          {/* Line info */}
+          {lineName && (
+            <div className="text-sm text-muted-foreground">
+              所属线路：<span className="font-medium text-foreground">{lineName}</span>
+            </div>
+          )}
+
           {/* Config card */}
           <Card>
             <CardHeader>
