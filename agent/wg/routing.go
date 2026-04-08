@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	routeTableStart     = 100   // WG device routes: tables 101-199
-	xrayRouteTableStart = 42001 // Xray fwmark routes: tables 42001+ (was 200)
+	routeTableStart         = 100   // WG device routes: tables 101-199
+	xrayRouteTableStart     = 42001 // Xray fwmark routes: tables 42001+
+	xrayRulePriorityStart   = 31000 // ip rule priority for Xray fwmark rules (must be < 32766 main table)
 )
 
 // SyncRouting applies per-device routing rules based on deviceRoutes.
@@ -65,9 +66,10 @@ func SyncXrayRouting(routes []api.XrayLineRoute) error {
 		return nil
 	}
 
-	for _, route := range routes {
-		table := fmt.Sprintf("%d", route.Mark) // use mark value as table number (201, 202, ...)
+	for i, route := range routes {
+		table := fmt.Sprintf("%d", route.Mark) // use mark value as table number
 		markHex := fmt.Sprintf("0x%x", route.Mark)
+		priority := fmt.Sprintf("%d", xrayRulePriorityStart+i) // priority < 32766 (main table)
 
 		// Add route: default via tunnel in this table
 		if _, err := Run("ip", "route", "replace", "default", "dev", route.Tunnel, "table", table); err != nil {
@@ -75,16 +77,16 @@ func SyncXrayRouting(routes []api.XrayLineRoute) error {
 			continue
 		}
 
-		// Add rule: fwmark → lookup table
-		if _, err := Run("ip", "rule", "add", "fwmark", markHex, "lookup", table, "priority", table); err != nil {
+		// Add rule: fwmark → lookup table (priority must be < 32766 to take effect before main table)
+		if _, err := Run("ip", "rule", "add", "fwmark", markHex, "lookup", table, "priority", priority); err != nil {
 			if !strings.Contains(err.Error(), "File exists") {
 				log.Printf("[routing] Error adding fwmark rule %s: %v", markHex, err)
 				continue
 			}
 		}
 
-		log.Printf("[routing] Xray: fwmark %s → %s (wm-xray-line-%d, table %s)",
-			markHex, route.Tunnel, route.LineID, table)
+		log.Printf("[routing] Xray: fwmark %s → %s (wm-xray-line-%d, table %s, priority %s)",
+			markHex, route.Tunnel, route.LineID, table, priority)
 	}
 
 	log.Printf("[routing] Xray routing configured: %d lines", len(routes))
@@ -106,10 +108,17 @@ func cleanRouting() {
 	for i := xrayRouteTableStart; i <= xrayRouteTableStart+99; i++ {
 		table := fmt.Sprintf("%d", i)
 		markHex := fmt.Sprintf("0x%x", i)
+		// Try deleting by fwmark (works regardless of priority)
 		_, err := RunSilent("ip", "rule", "del", "fwmark", markHex, "lookup", table)
 		if err != nil {
 			break
 		}
+		RunSilent("ip", "route", "flush", "table", table)
+	}
+	// Also clean legacy rules with old priority=42001+ (from before the fix)
+	for i := xrayRouteTableStart; i <= xrayRouteTableStart+99; i++ {
+		table := fmt.Sprintf("%d", i)
+		RunSilent("ip", "rule", "del", "lookup", table, "priority", table)
 		RunSilent("ip", "route", "flush", "table", table)
 	}
 

@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { devices, lines, lineNodes } from "@/lib/db/schema";
+import { devices, lines, lineNodes, nodes } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
 import { inArray, eq, and } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
@@ -48,6 +48,7 @@ export async function POST(request: Request) {
     }
 
     for (const nodeId of affectedEntryNodeIds) {
+      db.update(nodes).set({ updatedAt: sql`(datetime('now'))` }).where(eq(nodes.id, nodeId)).run();
       sseManager.notifyNodePeerUpdate(nodeId);
     }
 
@@ -97,6 +98,7 @@ export async function POST(request: Request) {
     }
 
     for (const nodeId of affectedEntryNodeIds) {
+      db.update(nodes).set({ updatedAt: sql`(datetime('now'))` }).where(eq(nodes.id, nodeId)).run();
       sseManager.notifyNodePeerUpdate(nodeId);
     }
 

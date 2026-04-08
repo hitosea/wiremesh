@@ -66,11 +66,14 @@ func (m *Manager) Sync(cfg *api.RoutingConfig) error {
 
 			// Domain rules: create ipset + iptables match
 			if len(branch.DomainRules) > 0 {
-				ipset.Create(ipsetName)
-				addMangleRule(fmt.Sprintf(
-					"-A PREROUTING -i wm-wg0 -m set --match-set %s dst -j MARK --set-mark %s -m comment --comment wm-branch-%d-dns",
-					ipsetName, markHex, branch.ID,
-				))
+				if err := ipset.Create(ipsetName); err != nil {
+					log.Printf("[routing] Failed to create ipset %s: %v (skipping ipset-based rules for branch %d)", ipsetName, err, branch.ID)
+				} else {
+					addMangleRule(fmt.Sprintf(
+						"-A PREROUTING -i wm-wg0 -m set --match-set %s dst -j MARK --set-mark %s -m comment --comment wm-branch-%d-dns",
+						ipsetName, markHex, branch.ID,
+					))
+				}
 				for _, domain := range branch.DomainRules {
 					domainRules[domain] = ipsetName
 				}

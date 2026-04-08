@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { devices, lines, lineNodes } from "@/lib/db/schema";
+import { devices, lines, lineNodes, nodes } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
 import { sseManager } from "@/lib/sse-manager";
 
@@ -65,6 +65,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (existing.lineId && existing.lineId !== lineId) {
     const oldEntryNodeId = getEntryNodeId(existing.lineId);
     if (oldEntryNodeId !== null) {
+      db.update(nodes).set({ updatedAt: sql`(datetime('now'))` }).where(eq(nodes.id, oldEntryNodeId)).run();
       sseManager.notifyNodePeerUpdate(oldEntryNodeId);
     }
   }
@@ -72,6 +73,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (lineId) {
     const newEntryNodeId = getEntryNodeId(lineId);
     if (newEntryNodeId !== null) {
+      db.update(nodes).set({ updatedAt: sql`(datetime('now'))` }).where(eq(nodes.id, newEntryNodeId)).run();
       sseManager.notifyNodePeerUpdate(newEntryNodeId);
     }
   }

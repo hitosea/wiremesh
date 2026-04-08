@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { lines, lineNodes, lineTunnels, lineBranches, branchFilters, filters, nodes, devices } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
-import { eq, count } from "drizzle-orm";
+import { eq, count, sql, inArray } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
 import { sseManager } from "@/lib/sse-manager";
 
@@ -187,6 +187,14 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     targetId: lineId,
     targetName: existing.name,
   });
+
+  // Bump updatedAt on affected nodes
+  if (affectedNodeIds.length > 0) {
+    db.update(nodes)
+      .set({ updatedAt: sql`(datetime('now'))` })
+      .where(inArray(nodes.id, affectedNodeIds))
+      .run();
+  }
 
   for (const nodeId of affectedNodeIds) {
     sseManager.notifyNodeTunnelUpdate(nodeId);

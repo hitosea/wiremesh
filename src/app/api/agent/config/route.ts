@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     .where(eq(lineNodes.nodeId, nodeId))
     .all();
 
-  const lineIds = myLineNodes.map((ln) => ln.lineId);
+  const lineIds = [...new Set(myLineNodes.map((ln) => ln.lineId))];
 
   // ---- Peers (entry role: devices on lines where this node is entry) ----
   const entryLineIds = myLineNodes.filter((ln) => ln.role === "entry").map((ln) => ln.lineId);

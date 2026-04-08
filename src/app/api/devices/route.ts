@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { devices, settings, nodes, lineNodes } from "@/lib/db/schema";
 import { success, created, error, paginated } from "@/lib/api-response";
 import { parsePaginationParams, paginationOffset } from "@/lib/pagination";
-import { eq, or, like, count, and, gt, lte, isNull, SQL } from "drizzle-orm";
+import { eq, or, like, count, and, gt, lte, isNull, sql, SQL } from "drizzle-orm";
 import { encrypt } from "@/lib/crypto";
 import { generateKeyPair } from "@/lib/wireguard";
 import { allocateDeviceIp } from "@/lib/ip-allocator";
@@ -175,6 +175,7 @@ export async function POST(request: NextRequest) {
   if (result.lineId) {
     const entryNodeId = getEntryNodeId(result.lineId);
     if (entryNodeId !== null) {
+      db.update(nodes).set({ updatedAt: sql`(datetime('now'))` }).where(eq(nodes.id, entryNodeId)).run();
       sseManager.notifyNodePeerUpdate(entryNodeId);
     }
   }

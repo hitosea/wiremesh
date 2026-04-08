@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { lines, lineNodes, lineTunnels, lineBranches, branchFilters, nodes, settings, filters } from "@/lib/db/schema";
 import { success, created, error, paginated } from "@/lib/api-response";
 import { parsePaginationParams, paginationOffset } from "@/lib/pagination";
-import { eq, like, count, and, SQL } from "drizzle-orm";
+import { eq, like, count, and, sql, SQL, inArray } from "drizzle-orm";
 import { encrypt } from "@/lib/crypto";
 import { generateKeyPair } from "@/lib/wireguard";
 import { allocateTunnelSubnet, allocateTunnelPort } from "@/lib/ip-allocator";
@@ -302,7 +302,16 @@ export async function POST(request: NextRequest) {
     detail: `entry=${entryNodeId}, branches: ${branchSummary}`,
   });
 
-  // 5. SSE notify all affected nodes
+  // 5. Bump updatedAt on all affected nodes so agent detects config version change
+  const affectedIds = [...affectedNodeIds];
+  if (affectedIds.length > 0) {
+    db.update(nodes)
+      .set({ updatedAt: sql`(datetime('now'))` })
+      .where(inArray(nodes.id, affectedIds))
+      .run();
+  }
+
+  // 6. SSE notify all affected nodes
   for (const nodeId of affectedNodeIds) {
     sseManager.notifyNodeTunnelUpdate(nodeId);
   }

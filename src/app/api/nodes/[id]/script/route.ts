@@ -35,7 +35,9 @@ export async function GET(request: NextRequest, { params }: Params) {
   }
 
   const host = request.headers.get("host");
-  const proto = request.headers.get("x-forwarded-proto") || request.nextUrl.protocol.replace(":", "");
+  // Always use https for non-localhost deployments; internal proxies may set x-forwarded-proto: http incorrectly
+  const isLocalhost = host?.startsWith("localhost") || host?.startsWith("127.0.0.1");
+  const proto = isLocalhost ? "http" : "https";
   const serverUrl =
     process.env.PUBLIC_URL || (host ? `${proto}://${host}` : request.nextUrl.origin);
 
@@ -239,6 +241,26 @@ else
     fail "iptables installation failed"
   fi
   ok "iptables installed"
+fi
+
+# 2.3 Install ipset (required for domain-based routing rules)
+if command -v ipset &>/dev/null; then
+  ok "ipset already available"
+else
+  info "Installing ipset..."
+  if [ "$PKG_MANAGER" = "apt" ]; then
+    apt-get install -y -qq ipset
+  elif [ "$PKG_MANAGER" = "yum" ]; then
+    yum install -y -q ipset
+  elif [ "$PKG_MANAGER" = "dnf" ]; then
+    dnf install -y -q ipset
+  fi
+
+  if ! command -v ipset &>/dev/null; then
+    warn "ipset installation failed (domain-based routing may not work)"
+  else
+    ok "ipset installed"
+  fi
 fi
 
 echo ""

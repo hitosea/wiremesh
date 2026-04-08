@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { devices, lineNodes } from "@/lib/db/schema";
+import { devices, lineNodes, nodes } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
 import { sseManager } from "@/lib/sse-manager";
 import { computeDeviceStatus } from "@/lib/device-status";
@@ -122,6 +122,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   if (existing.lineId) {
     const entryNodeId = getEntryNodeId(existing.lineId);
     if (entryNodeId !== null) {
+      db.update(nodes).set({ updatedAt: sql`(datetime('now'))` }).where(eq(nodes.id, entryNodeId)).run();
       sseManager.notifyNodePeerUpdate(entryNodeId);
     }
   }
