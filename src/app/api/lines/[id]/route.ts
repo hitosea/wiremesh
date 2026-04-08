@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { lines, lineNodes, lineTunnels, nodes, devices } from "@/lib/db/schema";
+import { lines, lineNodes, lineTunnels, lineBranches, branchFilters, filters, nodes, devices } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
 import { eq, count } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
@@ -73,7 +73,43 @@ export async function GET(request: NextRequest, { params }: Params) {
       .where(eq(devices.lineId, lineId))
       .get()?.count ?? 0;
 
-  return success({ ...line, nodes: lineNodeRows, tunnels, deviceCount });
+  // Fetch branches with their nodes and filters
+  const branchRows = db
+    .select()
+    .from(lineBranches)
+    .where(eq(lineBranches.lineId, lineId))
+    .orderBy(lineBranches.id)
+    .all();
+
+  const branchesWithDetail = branchRows.map((branch) => {
+    const branchNodes = db
+      .select({
+        hopOrder: lineNodes.hopOrder,
+        role: lineNodes.role,
+        nodeId: lineNodes.nodeId,
+        nodeName: nodes.name,
+        nodeStatus: nodes.status,
+      })
+      .from(lineNodes)
+      .innerJoin(nodes, eq(lineNodes.nodeId, nodes.id))
+      .where(eq(lineNodes.branchId, branch.id))
+      .orderBy(lineNodes.hopOrder)
+      .all();
+
+    const branchFilterRows = db
+      .select({
+        filterId: branchFilters.filterId,
+        filterName: filters.name,
+      })
+      .from(branchFilters)
+      .innerJoin(filters, eq(branchFilters.filterId, filters.id))
+      .where(eq(branchFilters.branchId, branch.id))
+      .all();
+
+    return { ...branch, nodes: branchNodes, filters: branchFilterRows };
+  });
+
+  return success({ ...line, nodes: lineNodeRows, tunnels, branches: branchesWithDetail, deviceCount });
 }
 
 export async function PUT(request: NextRequest, { params }: Params) {
