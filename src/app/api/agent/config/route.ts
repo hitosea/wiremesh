@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { nodes, lineNodes, lineTunnels, devices } from "@/lib/db/schema";
-import { eq, or } from "drizzle-orm";
+import { nodes, lineNodes, lineTunnels, devices, lineBranches, branchFilters, filters, settings } from "@/lib/db/schema";
+import { eq, or, and } from "drizzle-orm";
 import { decrypt } from "@/lib/crypto";
 import { authenticateAgent } from "@/lib/agent-auth";
 
@@ -222,7 +222,7 @@ export async function GET(request: NextRequest) {
 
     // Build per-line routes: UUID → tunnel mapping via fwmark
     const xrayRoutes: { lineId: number; uuids: string[]; tunnel: string; mark: number }[] = [];
-    let markCounter = 201; // fwmark starts at 201 for xray
+    let markCounter = 42001; // fwmark starts at 42001 for xray
 
     for (const lineId of entryLineIds) {
       const xrayDevices = db
@@ -262,6 +262,126 @@ export async function GET(request: NextRequest) {
     };
   }
 
+  // ---- Routing config (entry nodes only) ----
+  let routingConfig: {
+    enabled: boolean;
+    dns: { listen: string; upstream: string[] };
+    branches: {
+      id: number;
+      name: string;
+      is_default: boolean;
+      tunnel: string;
+      mark: number;
+      ip_rules: string[];
+      domain_rules: string[];
+      rule_sources: { filter_id: number; url: string; sync_interval: number }[];
+    }[];
+  } | null = null;
+
+  if (entryLineIds.length > 0) {
+    // Read settings
+    const dnsUpstreamSetting = db.select().from(settings).where(eq(settings.key, "dns_upstream")).get();
+    const filterSyncIntervalSetting = db.select().from(settings).where(eq(settings.key, "filter_sync_interval")).get();
+    const dnsUpstream = dnsUpstreamSetting?.value ? dnsUpstreamSetting.value.split(",").map((s: string) => s.trim()) : ["8.8.8.8", "1.1.1.1"];
+    const filterSyncInterval = filterSyncIntervalSetting?.value ? parseInt(filterSyncIntervalSetting.value, 10) : 86400;
+
+    const branches: typeof routingConfig extends null ? never : NonNullable<typeof routingConfig>["branches"] = [];
+    let branchMarkCounter = 41001;
+
+    for (const lineId of entryLineIds) {
+      // Fetch branches for this line
+      const lineBranchRows = db.select().from(lineBranches).where(eq(lineBranches.lineId, lineId)).all();
+
+      for (const branch of lineBranchRows) {
+        // Find tunnel from this entry node for this branch
+        const branchTunnel = db
+          .select()
+          .from(lineTunnels)
+          .where(
+            and(
+              eq(lineTunnels.branchId, branch.id),
+              eq(lineTunnels.fromNodeId, nodeId)
+            )
+          )
+          .get();
+
+        // Match to interface name via fromWgPort
+        let tunnelIfaceName = "";
+        if (branchTunnel) {
+          const matchedIface = interfaces.find((iface) => iface.listenPort === branchTunnel.fromWgPort && iface.role === "from");
+          if (matchedIface) {
+            tunnelIfaceName = matchedIface.name;
+          }
+        }
+
+        // For default branch, rules are empty
+        let ipRules: string[] = [];
+        let domainRules: string[] = [];
+        let ruleSources: { filter_id: number; url: string; sync_interval: number }[] = [];
+
+        if (!branch.isDefault) {
+          // Fetch associated enabled filters
+          const bfRows = db
+            .select({ filterId: branchFilters.filterId })
+            .from(branchFilters)
+            .where(eq(branchFilters.branchId, branch.id))
+            .all();
+
+          for (const bf of bfRows) {
+            const filter = db
+              .select()
+              .from(filters)
+              .where(and(eq(filters.id, bf.filterId), eq(filters.isEnabled, true)))
+              .get();
+
+            if (!filter) continue;
+
+            // Parse IP rules from rules field (one per line)
+            if (filter.rules) {
+              const lines = filter.rules.split("\n").map((l: string) => l.trim()).filter((l: string) => l.length > 0);
+              ipRules.push(...lines);
+            }
+
+            // Parse domain rules from domainRules field (one per line)
+            if (filter.domainRules) {
+              const lines = filter.domainRules.split("\n").map((l: string) => l.trim()).filter((l: string) => l.length > 0);
+              domainRules.push(...lines);
+            }
+
+            // Collect rule sources (filters with sourceUrl)
+            if (filter.sourceUrl) {
+              ruleSources.push({
+                filter_id: filter.id,
+                url: filter.sourceUrl,
+                sync_interval: filterSyncInterval,
+              });
+            }
+          }
+        }
+
+        branches.push({
+          id: branch.id,
+          name: branch.name,
+          is_default: branch.isDefault,
+          tunnel: tunnelIfaceName,
+          mark: branchMarkCounter++,
+          ip_rules: ipRules,
+          domain_rules: domainRules,
+          rule_sources: ruleSources,
+        });
+      }
+    }
+
+    routingConfig = {
+      enabled: true,
+      dns: {
+        listen: node.wgAddress.split("/")[0] + ":53",
+        upstream: dnsUpstream,
+      },
+      branches,
+    };
+  }
+
   const config = {
     node: {
       id: node.id,
@@ -278,6 +398,7 @@ export async function GET(request: NextRequest) {
       deviceRoutes,
     },
     xray: xrayConfig,
+    routing: routingConfig,
     version: node.updatedAt,
   };
 
