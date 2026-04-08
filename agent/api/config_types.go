@@ -61,14 +61,24 @@ type XrayConfig struct {
 	RealityDest        string            `json:"realityDest"`
 	RealityServerNames []string          `json:"realityServerNames"`
 	Routes             []XrayLineRoute   `json:"routes"`
+	DNSProxy           string            `json:"dnsProxy,omitempty"` // agent DNS proxy IP, e.g. "10.210.0.1"
 }
 
-// XrayLineRoute maps UUIDs on a specific line to a tunnel via fwmark.
+// XrayLineRoute maps UUIDs on a specific line to branch-based tunnels.
 type XrayLineRoute struct {
-	LineID int      `json:"lineId"`
-	UUIDs  []string `json:"uuids"`
-	Tunnel string   `json:"tunnel"` // e.g. "wm-tun1"
-	Mark   int      `json:"mark"`   // fwmark value, e.g. 42001
+	LineID   int              `json:"lineId"`
+	UUIDs    []string         `json:"uuids"`
+	Tunnel   string           `json:"tunnel"`   // default branch tunnel (legacy, kept for compat)
+	Mark     int              `json:"mark"`      // default branch mark (legacy)
+	Branches []XrayBranch     `json:"branches"`  // per-branch routing for split tunneling
+}
+
+// XrayBranch defines a branch outbound for Xray domain-based routing.
+type XrayBranch struct {
+	Mark        int      `json:"mark"`         // branch fwmark (e.g. 41001)
+	Tunnel      string   `json:"tunnel"`       // tunnel interface name
+	IsDefault   bool     `json:"is_default"`
+	DomainRules []string `json:"domain_rules"` // domains routed to this branch
 }
 
 // RoutingConfig contains the routing rules for entry nodes

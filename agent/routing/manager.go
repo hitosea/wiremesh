@@ -134,17 +134,19 @@ func (m *Manager) cleanIPRules() {
 }
 
 func (m *Manager) cleanMangleRules() {
-	// List and remove all wm-branch-* mangle rules
-	out, err := exec.Command("iptables", "-t", "mangle", "-S", "PREROUTING").CombinedOutput()
-	if err != nil {
-		return
-	}
-	for _, line := range strings.Split(string(out), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.Contains(line, "wm-branch") && strings.HasPrefix(line, "-A ") {
-			deleteRule := strings.Replace(line, "-A ", "-D ", 1)
-			args := strings.Fields("-t mangle " + deleteRule)
-			exec.Command("iptables", args...).CombinedOutput()
+	// List and remove all wm-branch-* and wm-xray-* mangle rules from PREROUTING and OUTPUT
+	for _, chain := range []string{"PREROUTING", "OUTPUT"} {
+		out, err := exec.Command("iptables", "-t", "mangle", "-S", chain).CombinedOutput()
+		if err != nil {
+			continue
+		}
+		for _, line := range strings.Split(string(out), "\n") {
+			line = strings.TrimSpace(line)
+			if (strings.Contains(line, "wm-branch") || strings.Contains(line, "wm-xray")) && strings.HasPrefix(line, "-A ") {
+				deleteRule := strings.Replace(line, "-A ", "-D ", 1)
+				args := strings.Fields("-t mangle " + deleteRule)
+				exec.Command("iptables", args...).CombinedOutput()
+			}
 		}
 	}
 }

@@ -209,7 +209,8 @@ export async function GET(request: NextRequest) {
     realityShortId: string;
     realityDest: string;
     realityServerNames: string[];
-    routes: { lineId: number; uuids: string[]; tunnel: string; mark: number }[];
+    routes: { lineId: number; uuids: string[]; tunnel: string; mark: number; branches: { mark: number; tunnel: string; is_default: boolean; domain_rules: string[] }[] }[];
+    dnsProxy?: string;
   } | null = null;
 
   if (node.xrayEnabled && node.xrayConfig) {
@@ -235,9 +236,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Build per-line routes: UUID → tunnel mapping via fwmark
-    const xrayRoutes: { lineId: number; uuids: string[]; tunnel: string; mark: number }[] = [];
-    let markCounter = 42001; // fwmark starts at 42001 for xray
+    // Build per-line routes with branch info for Xray domain-based routing
+    const xrayRoutes: {
+      lineId: number; uuids: string[]; tunnel: string; mark: number;
+      branches: { mark: number; tunnel: string; is_default: boolean; domain_rules: string[] }[];
+    }[] = [];
+    let xrayBranchMarkCounter = 41001; // same counter base as routing branches
 
     for (const lineId of entryLineIds) {
       const xrayDevices = db
@@ -253,15 +257,53 @@ export async function GET(request: NextRequest) {
 
       if (uuids.length === 0) continue;
 
-      // Find the downstream tunnel for this line
+      // Find the downstream tunnel for this line (default branch)
       const tunnel = lineToDownstreamIface.get(lineId);
       if (!tunnel) continue;
+
+      // Build branch info for this line's Xray routing
+      const xrayBranches: { mark: number; tunnel: string; is_default: boolean; domain_rules: string[] }[] = [];
+      let defaultMark = 0;
+
+      const branchRows = db.select().from(lineBranches).where(eq(lineBranches.lineId, lineId)).all();
+      for (const branch of branchRows) {
+        const branchTunnel = db
+          .select()
+          .from(lineTunnels)
+          .where(and(eq(lineTunnels.branchId, branch.id), eq(lineTunnels.fromNodeId, nodeId)))
+          .get();
+
+        let tunnelIfaceName = "";
+        if (branchTunnel) {
+          const matchedIface = interfaces.find((iface) => iface.listenPort === branchTunnel.fromWgPort && iface.role === "from");
+          if (matchedIface) tunnelIfaceName = matchedIface.name;
+        }
+        if (!tunnelIfaceName) continue;
+
+        // The mark must match the routing config's branch marks (same counter)
+        const branchMark = xrayBranchMarkCounter++;
+
+        let domainRules: string[] = [];
+        if (!branch.isDefault) {
+          const bfRows = db.select({ filterId: branchFilters.filterId }).from(branchFilters).where(eq(branchFilters.branchId, branch.id)).all();
+          for (const bf of bfRows) {
+            const filter = db.select().from(filters).where(and(eq(filters.id, bf.filterId), eq(filters.isEnabled, true))).get();
+            if (filter?.domainRules) {
+              domainRules.push(...filter.domainRules.split("\n").map((l: string) => l.trim()).filter((l: string) => l.length > 0 && !l.startsWith("#")));
+            }
+          }
+        }
+
+        xrayBranches.push({ mark: branchMark, tunnel: tunnelIfaceName, is_default: branch.isDefault, domain_rules: domainRules });
+        if (branch.isDefault) defaultMark = branchMark;
+      }
 
       xrayRoutes.push({
         lineId,
         uuids,
         tunnel,
-        mark: markCounter++,
+        mark: defaultMark || 42001,
+        branches: xrayBranches,
       });
     }
 
@@ -274,6 +316,7 @@ export async function GET(request: NextRequest) {
       realityDest: realitySettings.realityDest ?? "www.microsoft.com:443",
       realityServerNames: [realitySettings.realityServerName ?? "www.microsoft.com"],
       routes: xrayRoutes,
+      dnsProxy: node.wgAddress ? node.wgAddress.split("/")[0] : "",
     };
   }
 
