@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
-import { branchFilters, lineBranches, lineNodes } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { branchFilters, lineBranches, lineNodes, nodes } from "@/lib/db/schema";
+import { eq, and, sql } from "drizzle-orm";
 import { sseManager } from "@/lib/sse-manager";
 
 export function notifyFilterChange(filterId: number) {
@@ -27,6 +27,7 @@ export function notifyFilterChange(filterId: number) {
       .where(and(eq(lineNodes.lineId, lineId), eq(lineNodes.role, "entry")))
       .all();
     for (const n of entryNodes) {
+      db.update(nodes).set({ updatedAt: sql`(datetime('now'))` }).where(eq(nodes.id, n.nodeId)).run();
       sseManager.notifyNodeConfigUpdate(n.nodeId);
     }
   }
