@@ -339,88 +339,92 @@ export default function NewLinePage() {
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6">
                 {/* Branch name + default radio */}
-                <div className="flex items-end gap-4">
-                  <div className="flex-1 space-y-2">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
                     <Label>分支名称</Label>
-                    <Input
-                      value={branch.name}
-                      onChange={(e) =>
-                        updateBranch(branchIdx, { name: e.target.value })
-                      }
-                      placeholder="分支名称"
-                    />
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="defaultBranch"
+                        checked={branch.isDefault}
+                        onChange={() => setDefaultBranch(branchIdx)}
+                        className="accent-primary"
+                      />
+                      <span className="text-sm whitespace-nowrap">默认分支</span>
+                    </label>
                   </div>
-                  <label className="flex items-center gap-2 pb-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="defaultBranch"
-                      checked={branch.isDefault}
-                      onChange={() => setDefaultBranch(branchIdx)}
-                      className="accent-primary"
-                    />
-                    <span className="text-sm whitespace-nowrap">默认分支</span>
-                  </label>
+                  <Input
+                    value={branch.name}
+                    onChange={(e) =>
+                      updateBranch(branchIdx, { name: e.target.value })
+                    }
+                    placeholder="分支名称"
+                  />
                 </div>
 
                 {/* Node chain: relay nodes + exit node */}
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <Label>节点链路</Label>
-                  {branch.nodeIds.map((nodeId, nodeIdx) => (
-                    <div key={nodeIdx} className="flex items-center gap-2">
-                      <div className="flex-1">
-                        <Select
-                          value={nodeId}
-                          onValueChange={(val) =>
-                            setBranchNodeAt(branchIdx, nodeIdx, val)
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue
-                              placeholder={`选择${getBranchNodeLabel(branch, nodeIdx)}`}
-                            />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {nodeOptions.map((n) => (
-                              <SelectItem key={n.id} value={String(n.id)}>
-                                {n.name} ({n.ip})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                  <div className="rounded-md border border-border p-3 space-y-2">
+                    {branch.nodeIds.map((nodeId, nodeIdx) => (
+                      <div key={nodeIdx} className="flex items-center gap-2">
+                        <span className="shrink-0 text-sm text-muted-foreground w-16">
+                          {getBranchNodeLabel(branch, nodeIdx)}
+                        </span>
+                        <div className="flex-1">
+                          <Select
+                            value={nodeId}
+                            onValueChange={(val) =>
+                              setBranchNodeAt(branchIdx, nodeIdx, val)
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue
+                                placeholder={`选择${getBranchNodeLabel(branch, nodeIdx)}`}
+                              />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {nodeOptions.map((n) => (
+                                <SelectItem key={n.id} value={String(n.id)}>
+                                  {n.name} ({n.ip})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {/* Only relay nodes (not the last = exit) can be removed */}
+                        {nodeIdx < branch.nodeIds.length - 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-muted-foreground hover:text-destructive"
+                            onClick={() => removeBranchRelay(branchIdx, nodeIdx)}
+                          >
+                            移除
+                          </Button>
+                        )}
                       </div>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap w-16">
-                        {getBranchNodeLabel(branch, nodeIdx)}
-                      </span>
-                      {/* Only relay nodes (not the last = exit) can be removed */}
-                      {nodeIdx < branch.nodeIds.length - 1 && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => removeBranchRelay(branchIdx, nodeIdx)}
-                        >
-                          移除
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => addBranchRelay(branchIdx)}
-                  >
-                    添加中转
-                  </Button>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-dashed"
+                      onClick={() => addBranchRelay(branchIdx)}
+                    >
+                      + 添加中转
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Filter multi-select */}
                 {availableFilters.length > 0 && (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <Label>分流规则</Label>
-                    <div className="flex flex-wrap gap-x-4 gap-y-2">
+                    <div className="flex flex-wrap gap-x-5 gap-y-2.5">
                       {availableFilters.map((f) => (
                         <label
                           key={f.id}
