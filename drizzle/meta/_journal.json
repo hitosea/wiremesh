@@ -15,6 +15,13 @@
       "when": 1775544071050,
       "tag": "0001_violet_living_mummy",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1775608446852,
+      "tag": "0002_add_branches",
+      "breakpoints": true
     }
   ]
 }

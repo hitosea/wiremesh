@@ -1,16 +1,17 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { filters, lineFilters } from "@/lib/db/schema";
+import { filters, branchFilters } from "@/lib/db/schema";
 import { success, created, error, paginated } from "@/lib/api-response";
 import { parsePaginationParams, paginationOffset } from "@/lib/pagination";
-import { eq, like, count, and, SQL } from "drizzle-orm";
+import { eq, like, count, and } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
+import { notifyFilterChange } from "@/lib/filter-notify";
 
 export async function GET(request: NextRequest) {
   const params = parsePaginationParams(request.nextUrl.searchParams);
   const search = request.nextUrl.searchParams.get("search");
 
-  const conditions: SQL[] = [];
+  const conditions: (ReturnType<typeof like>)[] = [];
   if (search) conditions.push(like(filters.name, `%${search}%`));
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -25,7 +26,14 @@ export async function GET(request: NextRequest) {
     .offset(paginationOffset(params))
     .all();
 
-  return paginated(rows, {
+  const enriched = rows.map((row) => {
+    const ipCount = row.rules ? row.rules.split("\n").filter((l) => l.trim() && !l.startsWith("#")).length : 0;
+    const domainCount = row.domainRules ? row.domainRules.split("\n").filter((l) => l.trim() && !l.startsWith("#")).length : 0;
+    const branchCount = db.select({ count: count() }).from(branchFilters).where(eq(branchFilters.filterId, row.id)).get()?.count ?? 0;
+    return { ...row, rulesCount: ipCount + domainCount, branchCount };
+  });
+
+  return paginated(enriched, {
     page: params.page,
     pageSize: params.pageSize,
     total,
@@ -34,10 +42,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { name, rules, mode, lineIds, tags, remark } = body;
+  const { name, rules, domainRules, mode, branchIds, sourceUrl, tags, remark } = body;
 
   if (!name || !name.trim()) return error("VALIDATION_ERROR", "name 为必填项");
-  if (!rules) return error("VALIDATION_ERROR", "rules 为必填项");
+  if (!rules && !domainRules) return error("VALIDATION_ERROR", "IP/CIDR 规则和域名规则至少填写一项");
   if (!mode || !["whitelist", "blacklist"].includes(mode)) {
     return error("VALIDATION_ERROR", "mode 必须是 whitelist 或 blacklist");
   }
@@ -46,7 +54,9 @@ export async function POST(request: NextRequest) {
     .insert(filters)
     .values({
       name: name.trim(),
-      rules,
+      rules: rules ?? null,
+      domainRules: domainRules ?? null,
+      sourceUrl: sourceUrl ?? null,
       mode,
       isEnabled: true,
       tags: tags ?? null,
@@ -55,11 +65,11 @@ export async function POST(request: NextRequest) {
     .returning()
     .get();
 
-  // Insert line associations
-  if (lineIds && Array.isArray(lineIds)) {
-    for (const lineId of lineIds) {
-      db.insert(lineFilters)
-        .values({ lineId, filterId: filter.id })
+  // Insert branch associations
+  if (branchIds && Array.isArray(branchIds)) {
+    for (const branchId of branchIds) {
+      db.insert(branchFilters)
+        .values({ branchId, filterId: filter.id })
         .run();
     }
   }
@@ -71,6 +81,8 @@ export async function POST(request: NextRequest) {
     targetName: name.trim(),
     detail: `mode=${mode}`,
   });
+
+  notifyFilterChange(filter.id);
 
   return created(filter);
 }

@@ -1,9 +1,10 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { filters, lineFilters, lines } from "@/lib/db/schema";
+import { filters, branchFilters, lineBranches, lines } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
+import { notifyFilterChange } from "@/lib/filter-notify";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -20,18 +21,21 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   if (!filter) return error("NOT_FOUND", "过滤规则不存在");
 
-  // Fetch associated lines
-  const associatedLines = db
+  // Fetch associated branches grouped by line
+  const associatedBranches = db
     .select({
-      lineId: lineFilters.lineId,
+      branchId: branchFilters.branchId,
+      branchName: lineBranches.name,
+      lineId: lineBranches.lineId,
       lineName: lines.name,
     })
-    .from(lineFilters)
-    .innerJoin(lines, eq(lineFilters.lineId, lines.id))
-    .where(eq(lineFilters.filterId, filterId))
+    .from(branchFilters)
+    .innerJoin(lineBranches, eq(branchFilters.branchId, lineBranches.id))
+    .innerJoin(lines, eq(lineBranches.lineId, lines.id))
+    .where(eq(branchFilters.filterId, filterId))
     .all();
 
-  return success({ ...filter, lines: associatedLines });
+  return success({ ...filter, branches: associatedBranches });
 }
 
 export async function PUT(request: NextRequest, { params }: Params) {
@@ -47,7 +51,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (!existing) return error("NOT_FOUND", "过滤规则不存在");
 
   const body = await request.json();
-  const { name, rules, mode, lineIds, tags, remark } = body;
+  const { name, rules, domainRules, mode, branchIds, sourceUrl, tags, remark } = body;
 
   if (mode && !["whitelist", "blacklist"].includes(mode)) {
     return error("VALIDATION_ERROR", "mode 必须是 whitelist 或 blacklist");
@@ -58,6 +62,8 @@ export async function PUT(request: NextRequest, { params }: Params) {
   };
   if (name !== undefined) updateData.name = name;
   if (rules !== undefined) updateData.rules = rules;
+  if (domainRules !== undefined) updateData.domainRules = domainRules;
+  if (sourceUrl !== undefined) updateData.sourceUrl = sourceUrl;
   if (mode !== undefined) updateData.mode = mode;
   if (tags !== undefined) updateData.tags = tags;
   if (remark !== undefined) updateData.remark = remark;
@@ -69,13 +75,15 @@ export async function PUT(request: NextRequest, { params }: Params) {
     .returning()
     .get();
 
-  // Update line associations if provided
-  if (lineIds !== undefined && Array.isArray(lineIds)) {
-    db.delete(lineFilters).where(eq(lineFilters.filterId, filterId)).run();
-    for (const lineId of lineIds) {
-      db.insert(lineFilters)
-        .values({ lineId, filterId })
-        .run();
+  // Update branch associations if provided
+  if (branchIds !== undefined) {
+    db.delete(branchFilters).where(eq(branchFilters.filterId, filterId)).run();
+    if (Array.isArray(branchIds)) {
+      for (const branchId of branchIds) {
+        db.insert(branchFilters)
+          .values({ branchId, filterId })
+          .run();
+      }
     }
   }
 
@@ -85,6 +93,8 @@ export async function PUT(request: NextRequest, { params }: Params) {
     targetId: filterId,
     targetName: existing.name,
   });
+
+  notifyFilterChange(filterId);
 
   return success(updated);
 }
@@ -100,6 +110,9 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     .where(eq(filters.id, filterId))
     .get();
   if (!existing) return error("NOT_FOUND", "过滤规则不存在");
+
+  // Notify before deleting so branchFilters still exist for lookup
+  notifyFilterChange(filterId);
 
   db.delete(filters).where(eq(filters.id, filterId)).run();
 

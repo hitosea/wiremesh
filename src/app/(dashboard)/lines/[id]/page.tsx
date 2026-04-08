@@ -54,6 +54,19 @@ type LineTunnel = {
   toWgPort: number;
 };
 
+type BranchFilter = {
+  filterId: number;
+  filterName: string;
+};
+
+type Branch = {
+  id: number;
+  name: string;
+  isDefault: boolean;
+  nodes: LineNode[];
+  filters: BranchFilter[];
+};
+
 type LineDetail = {
   id: number;
   name: string;
@@ -62,6 +75,7 @@ type LineDetail = {
   remark: string | null;
   nodes: LineNode[];
   tunnels: LineTunnel[];
+  branches: Branch[];
   deviceCount: number;
 };
 
@@ -190,52 +204,96 @@ export default function LineDetailPage() {
         </Button>
       </div>
 
-      {/* Node chain card */}
+      {/* Basic info card */}
+      {(() => {
+        const entryNode = line.nodes.find((n) => n.role === "entry");
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle>基本信息</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground w-20 shrink-0">名称</span>
+                <span>{line.name}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground w-20 shrink-0">入口节点</span>
+                {entryNode ? (
+                  <span className="flex items-center gap-2">
+                    <Link
+                      href={`/nodes/${entryNode.nodeId}`}
+                      className="text-primary hover:underline"
+                    >
+                      {entryNode.nodeName}
+                    </Link>
+                    <Badge
+                      variant={NODE_STATUS_VARIANTS[entryNode.nodeStatus] ?? "secondary"}
+                    >
+                      {NODE_STATUS_LABELS[entryNode.nodeStatus] ?? entryNode.nodeStatus}
+                    </Badge>
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">未设置</span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
+      {/* Branch topology */}
       <Card>
         <CardHeader>
-          <CardTitle>节点链路</CardTitle>
+          <CardTitle>分支拓扑</CardTitle>
         </CardHeader>
         <CardContent>
-          {line.nodes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">暂无节点数据</p>
+          {line.branches.length === 0 ? (
+            <p className="text-sm text-muted-foreground">暂无分支数据</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>序号</TableHead>
-                  <TableHead>节点名称</TableHead>
-                  <TableHead>角色</TableHead>
-                  <TableHead>节点状态</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {line.nodes.map((n) => (
-                  <TableRow key={n.nodeId}>
-                    <TableCell>{n.hopOrder + 1}</TableCell>
-                    <TableCell>
-                      <Link
-                        href={`/nodes/${n.nodeId}`}
-                        className="text-primary hover:underline"
-                      >
-                        {n.nodeName}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      {ROLE_LABELS[n.role] ?? n.role}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          NODE_STATUS_VARIANTS[n.nodeStatus] ?? "secondary"
-                        }
-                      >
-                        {NODE_STATUS_LABELS[n.nodeStatus] ?? n.nodeStatus}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="space-y-3">
+              {line.branches.map((branch) => {
+                const entryNode = line.nodes.find((n) => n.role === "entry");
+                const branchNodeNames = branch.nodes
+                  .sort((a, b) => a.hopOrder - b.hopOrder)
+                  .map((n) => n.nodeName);
+                const chainParts = entryNode
+                  ? [entryNode.nodeName, ...branchNodeNames]
+                  : branchNodeNames;
+                const chainStr = chainParts.join(" → ");
+
+                return (
+                  <div
+                    key={branch.id}
+                    className="border rounded-lg p-4 space-y-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{branch.name}</span>
+                      {branch.isDefault && (
+                        <Badge variant="outline">默认</Badge>
+                      )}
+                    </div>
+                    <div className="text-sm font-mono text-muted-foreground">
+                      {chainStr || "无节点"}
+                    </div>
+                    <div className="flex items-center gap-1 text-sm">
+                      <span className="text-muted-foreground">分流规则:</span>
+                      {branch.filters.length === 0 ? (
+                        <span className="text-muted-foreground">(无)</span>
+                      ) : (
+                        <span className="flex flex-wrap gap-1">
+                          {branch.filters.map((f) => (
+                            <Badge key={f.filterId} variant="secondary">
+                              {f.filterName}
+                            </Badge>
+                          ))}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </CardContent>
       </Card>

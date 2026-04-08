@@ -4,6 +4,7 @@ import { filters } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
 import { eq } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
+import { notifyFilterChange } from "@/lib/filter-notify";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -36,6 +37,8 @@ export async function PUT(request: NextRequest, { params }: Params) {
     targetName: existing.name,
     detail: `isEnabled=${updated.isEnabled}`,
   });
+
+  notifyFilterChange(filterId);
 
   return success(updated);
 }
