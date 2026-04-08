@@ -34,6 +34,14 @@ const SETTING_GROUPS = [
       { key: "tunnel_port_start", label: "隧道端口起始", hint: "隧道 WireGuard 端口自动分配起始值" },
     ],
   },
+  {
+    title: "分流与 DNS",
+    description: "外部规则源同步和 DNS 代理相关设置",
+    fields: [
+      { key: "filter_sync_interval", label: "外部规则源同步间隔（秒）", hint: "Agent 定时拉取外部分流规则源的间隔，默认 86400（24 小时）" },
+      { key: "dns_upstream", label: "DNS 上游服务器（逗号分隔）", hint: "Agent DNS 代理使用的上游服务器，默认 8.8.8.8,1.1.1.1" },
+    ],
+  },
 ];
 
 export default function SettingsPage() {
