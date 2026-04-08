@@ -23,7 +23,9 @@ func NewManager() *Manager {
 }
 
 // Sync applies the routing configuration from the management platform.
-func (m *Manager) Sync(cfg *api.RoutingConfig) error {
+// xrayRoutes is optional — when provided, OUTPUT chain rules are generated
+// per-line so Xray traffic gets branch-based split tunneling via iptables.
+func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes ...[]api.XrayLineRoute) error {
 	if cfg == nil || !cfg.Enabled || len(cfg.Branches) == 0 {
 		m.Cleanup()
 		return nil
@@ -84,6 +86,55 @@ func (m *Manager) Sync(cfg *api.RoutingConfig) error {
 		}
 	}
 
+	// 2b. OUTPUT chain rules for Xray split tunneling
+	// Each Xray line has its own default mark. For lines with branch routing,
+	// OUTPUT rules remark the default mark to branch marks based on ipset matching.
+	// This works because Xray uses UseIP + DNS proxy, so ipsets are populated.
+	if len(xrayRoutes) > 0 && len(xrayRoutes[0]) > 0 {
+		// Build mark → ipset name mapping from routing config branches
+		markToIpset := make(map[int]string)
+		for _, b := range cfg.Branches {
+			if !b.IsDefault && len(b.DomainRules) > 0 {
+				markToIpset[b.Mark] = fmt.Sprintf("wm-branch-%d", b.ID)
+			}
+		}
+
+		for _, route := range xrayRoutes[0] {
+			if len(route.Branches) <= 1 {
+				continue // no split tunneling for single-branch lines
+			}
+			// Find this line's default branch mark
+			var defaultMarkHex string
+			for _, branch := range route.Branches {
+				if branch.IsDefault {
+					defaultMarkHex = fmt.Sprintf("0x%x", branch.Mark)
+					break
+				}
+			}
+			if defaultMarkHex == "" {
+				continue
+			}
+
+			// Non-default branches: remark from default mark to branch mark
+			for _, branch := range route.Branches {
+				if branch.IsDefault {
+					continue
+				}
+				if ipsetName, ok := markToIpset[branch.Mark]; ok {
+					branchMarkHex := fmt.Sprintf("0x%x", branch.Mark)
+					addMangleRule(fmt.Sprintf(
+						"-A OUTPUT -m mark --mark %s -m set --match-set %s dst -j MARK --set-mark %s -m comment --comment wm-xray-line-%d",
+						defaultMarkHex, ipsetName, branchMarkHex, route.LineID,
+					))
+				}
+			}
+		}
+
+		// MASQUERADE for Xray traffic going through tunnels
+		// (Xray packets have eth0 source IP; needs conversion to tunnel IP)
+		addNatRule("-A POSTROUTING -o wm-tun+ -j MASQUERADE -m comment --comment wm-xray-masq")
+	}
+
 	// 3. Start/update DNS proxy
 	if len(domainRules) > 0 {
 		if m.dnsProxy == nil {
@@ -111,6 +162,7 @@ func (m *Manager) Sync(cfg *api.RoutingConfig) error {
 func (m *Manager) Cleanup() {
 	m.cleanIPRules()
 	m.cleanMangleRules()
+	m.cleanNatRules()
 	ipset.DestroyAllWireMesh()
 	if m.dnsProxy != nil {
 		m.dnsProxy.Stop()
@@ -178,6 +230,29 @@ func addMangleRule(rule string) {
 	out, err := exec.Command("iptables", args...).CombinedOutput()
 	if err != nil {
 		log.Printf("[routing] Error adding mangle rule: %s: %v: %s", rule, err, string(out))
+	}
+}
+
+func addNatRule(rule string) {
+	args := strings.Fields("-t nat " + rule)
+	out, err := exec.Command("iptables", args...).CombinedOutput()
+	if err != nil && !strings.Contains(string(out), "already exists") {
+		log.Printf("[routing] Error adding nat rule: %s: %v: %s", rule, err, string(out))
+	}
+}
+
+func (m *Manager) cleanNatRules() {
+	out, err := exec.Command("iptables", "-t", "nat", "-S", "POSTROUTING").CombinedOutput()
+	if err != nil {
+		return
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, "wm-xray") && strings.HasPrefix(line, "-A ") {
+			deleteRule := strings.Replace(line, "-A ", "-D ", 1)
+			args := strings.Fields("-t nat " + deleteRule)
+			exec.Command("iptables", args...).CombinedOutput()
+		}
 	}
 }
 

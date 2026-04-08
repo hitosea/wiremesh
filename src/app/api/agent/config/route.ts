@@ -209,7 +209,7 @@ export async function GET(request: NextRequest) {
     realityShortId: string;
     realityDest: string;
     realityServerNames: string[];
-    routes: { lineId: number; uuids: string[]; tunnel: string; mark: number; branches: { mark: number; tunnel: string; is_default: boolean; domain_rules: string[] }[] }[];
+    routes: { lineId: number; uuids: string[]; port: number; tunnel: string; mark: number; branches: { mark: number; tunnel: string; is_default: boolean; domain_rules: string[] }[] }[];
     dnsProxy?: string;
   } | null = null;
 
@@ -236,12 +236,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Build per-line routes with branch info for Xray domain-based routing
+    // Build per-line routes — each line gets a dedicated Xray inbound port
+    const xrayBasePort = node.xrayPort ?? 443;
     const xrayRoutes: {
-      lineId: number; uuids: string[]; tunnel: string; mark: number;
+      lineId: number; uuids: string[]; port: number; tunnel: string; mark: number;
       branches: { mark: number; tunnel: string; is_default: boolean; domain_rules: string[] }[];
     }[] = [];
     let xrayBranchMarkCounter = 41001; // same counter base as routing branches
+    let xrayLineIndex = 0;
 
     for (const lineId of entryLineIds) {
       const xrayDevices = db
@@ -301,10 +303,12 @@ export async function GET(request: NextRequest) {
       xrayRoutes.push({
         lineId,
         uuids,
+        port: xrayBasePort + xrayLineIndex,
         tunnel,
         mark: defaultMark || 42001,
         branches: xrayBranches,
       });
+      xrayLineIndex++;
     }
 
     xrayConfig = {

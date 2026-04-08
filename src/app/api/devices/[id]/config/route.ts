@@ -99,7 +99,32 @@ PersistentKeepalive = 25
     }
 
     const endpoint = entryNodeRow.nodeDomain ?? entryNodeRow.nodeIp;
-    const xrayPort = entryNodeRow.nodeXrayPort ?? 443;
+    const xrayBasePort = entryNodeRow.nodeXrayPort ?? 443;
+
+    // Compute per-line Xray port: base + index among entry lines that have Xray devices
+    // Must match the same iteration order as GET /api/agent/config
+    const entryLineIdsForXray = db
+      .select({ lineId: lineNodes.lineId })
+      .from(lineNodes)
+      .where(and(eq(lineNodes.nodeId, entryNodeRow.nodeId), eq(lineNodes.hopOrder, 0)))
+      .all()
+      .map((r) => r.lineId);
+
+    let xrayPort = xrayBasePort;
+    let xrayLineIdx = 0;
+    for (const lid of entryLineIdsForXray) {
+      const hasXrayDevice = db
+        .select({ id: devices.id })
+        .from(devices)
+        .where(and(eq(devices.lineId, lid), eq(devices.protocol, "xray")))
+        .get();
+      if (!hasXrayDevice) continue;
+      if (lid === device.lineId) {
+        xrayPort = xrayBasePort + xrayLineIdx;
+        break;
+      }
+      xrayLineIdx++;
+    }
 
     // Parse Reality settings from node's xrayConfig
     let realityPublicKey = "";

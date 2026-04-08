@@ -64,12 +64,13 @@ type XrayConfig struct {
 	DNSProxy           string            `json:"dnsProxy,omitempty"` // agent DNS proxy IP, e.g. "10.210.0.1"
 }
 
-// XrayLineRoute maps UUIDs on a specific line to branch-based tunnels.
+// XrayLineRoute maps UUIDs on a specific line to a dedicated inbound+outbound pair.
 type XrayLineRoute struct {
 	LineID   int              `json:"lineId"`
 	UUIDs    []string         `json:"uuids"`
-	Tunnel   string           `json:"tunnel"`   // default branch tunnel (legacy, kept for compat)
-	Mark     int              `json:"mark"`      // default branch mark (legacy)
+	Port     int              `json:"port"`      // dedicated Xray inbound port for this line
+	Tunnel   string           `json:"tunnel"`    // default branch tunnel
+	Mark     int              `json:"mark"`      // fwmark for this line's outbound
 	Branches []XrayBranch     `json:"branches"`  // per-branch routing for split tunneling
 }
 

@@ -149,8 +149,12 @@ func (a *Agent) pullAndApplyConfigForce(force bool) error {
 		}
 	}
 
-	// 7. Sync branch routing
-	if err := a.routingManager.Sync(cfgData.Routing); err != nil {
+	// 7. Sync branch routing (with Xray routes for OUTPUT chain split tunneling)
+	var xrayRoutes []api.XrayLineRoute
+	if cfgData.Xray != nil {
+		xrayRoutes = cfgData.Xray.Routes
+	}
+	if err := a.routingManager.Sync(cfgData.Routing, xrayRoutes); err != nil {
 		log.Printf("[agent] routing sync error: %v", err)
 	}
 
