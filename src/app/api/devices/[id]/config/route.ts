@@ -4,6 +4,7 @@ import { devices, lineNodes, nodes, settings, lineBranches } from "@/lib/db/sche
 import { success, error } from "@/lib/api-response";
 import { eq, and, count } from "drizzle-orm";
 import { decrypt } from "@/lib/crypto";
+import { getXrayPortForLine } from "@/lib/xray-port";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -100,31 +101,7 @@ PersistentKeepalive = 25
 
     const endpoint = entryNodeRow.nodeDomain ?? entryNodeRow.nodeIp;
     const xrayBasePort = entryNodeRow.nodeXrayPort ?? 443;
-
-    // Compute per-line Xray port: base + index among entry lines that have Xray devices
-    // Must match the same iteration order as GET /api/agent/config
-    const entryLineIdsForXray = db
-      .select({ lineId: lineNodes.lineId })
-      .from(lineNodes)
-      .where(and(eq(lineNodes.nodeId, entryNodeRow.nodeId), eq(lineNodes.hopOrder, 0)))
-      .all()
-      .map((r) => r.lineId);
-
-    let xrayPort = xrayBasePort;
-    let xrayLineIdx = 0;
-    for (const lid of entryLineIdsForXray) {
-      const hasXrayDevice = db
-        .select({ id: devices.id })
-        .from(devices)
-        .where(and(eq(devices.lineId, lid), eq(devices.protocol, "xray")))
-        .get();
-      if (!hasXrayDevice) continue;
-      if (lid === device.lineId) {
-        xrayPort = xrayBasePort + xrayLineIdx;
-        break;
-      }
-      xrayLineIdx++;
-    }
+    const xrayPort = getXrayPortForLine(entryNodeRow.nodeId, device.lineId!, xrayBasePort);
 
     // Parse Reality settings from node's xrayConfig
     let realityPublicKey = "";

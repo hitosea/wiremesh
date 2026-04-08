@@ -23,9 +23,9 @@ func NewManager() *Manager {
 }
 
 // Sync applies the routing configuration from the management platform.
-// xrayRoutes is optional — when provided, OUTPUT chain rules are generated
-// per-line so Xray traffic gets branch-based split tunneling via iptables.
-func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes ...[]api.XrayLineRoute) error {
+// xrayRoutes, when non-empty, generates OUTPUT chain rules per-line
+// so Xray traffic gets branch-based split tunneling via iptables.
+func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes []api.XrayLineRoute) error {
 	if cfg == nil || !cfg.Enabled || len(cfg.Branches) == 0 {
 		m.Cleanup()
 		return nil
@@ -41,7 +41,7 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes ...[]api.XrayLineRoute
 
 	for _, branch := range cfg.Branches {
 		table := fmt.Sprintf("%d", branch.Mark)
-		markHex := fmt.Sprintf("0x%x", branch.Mark)
+		markHex := markHex(branch.Mark)
 		ipsetName := fmt.Sprintf("wm-branch-%d", branch.ID)
 
 		// Create routing table and ip rule
@@ -90,7 +90,7 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes ...[]api.XrayLineRoute
 	// Each Xray line has its own default mark. For lines with branch routing,
 	// OUTPUT rules remark the default mark to branch marks based on ipset matching.
 	// This works because Xray uses UseIP + DNS proxy, so ipsets are populated.
-	if len(xrayRoutes) > 0 && len(xrayRoutes[0]) > 0 {
+	if len(xrayRoutes) > 0 {
 		// Build mark → ipset name mapping from routing config branches
 		markToIpset := make(map[int]string)
 		for _, b := range cfg.Branches {
@@ -99,7 +99,7 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes ...[]api.XrayLineRoute
 			}
 		}
 
-		for _, route := range xrayRoutes[0] {
+		for _, route := range xrayRoutes {
 			if len(route.Branches) <= 1 {
 				continue // no split tunneling for single-branch lines
 			}
@@ -107,7 +107,7 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes ...[]api.XrayLineRoute
 			var defaultMarkHex string
 			for _, branch := range route.Branches {
 				if branch.IsDefault {
-					defaultMarkHex = fmt.Sprintf("0x%x", branch.Mark)
+					defaultMarkHex = markHex(branch.Mark)
 					break
 				}
 			}
@@ -121,7 +121,7 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes ...[]api.XrayLineRoute
 					continue
 				}
 				if ipsetName, ok := markToIpset[branch.Mark]; ok {
-					branchMarkHex := fmt.Sprintf("0x%x", branch.Mark)
+					branchMarkHex := markHex(branch.Mark)
 					addMangleRule(fmt.Sprintf(
 						"-A OUTPUT -m mark --mark %s -m set --match-set %s dst -j MARK --set-mark %s -m comment --comment wm-xray-line-%d",
 						defaultMarkHex, ipsetName, branchMarkHex, route.LineID,
@@ -186,21 +186,7 @@ func (m *Manager) cleanIPRules() {
 }
 
 func (m *Manager) cleanMangleRules() {
-	// List and remove all wm-branch-* and wm-xray-* mangle rules from PREROUTING and OUTPUT
-	for _, chain := range []string{"PREROUTING", "OUTPUT"} {
-		out, err := exec.Command("iptables", "-t", "mangle", "-S", chain).CombinedOutput()
-		if err != nil {
-			continue
-		}
-		for _, line := range strings.Split(string(out), "\n") {
-			line = strings.TrimSpace(line)
-			if (strings.Contains(line, "wm-branch") || strings.Contains(line, "wm-xray")) && strings.HasPrefix(line, "-A ") {
-				deleteRule := strings.Replace(line, "-A ", "-D ", 1)
-				args := strings.Fields("-t mangle " + deleteRule)
-				exec.Command("iptables", args...).CombinedOutput()
-			}
-		}
-	}
+	cleanIptablesRules("mangle", []string{"PREROUTING", "OUTPUT"}, "wm-branch", "wm-xray")
 }
 
 // ReapplyIPRules re-applies IP rules for a branch after external source sync.
@@ -210,7 +196,7 @@ func (m *Manager) ReapplyIPRules(branchID int, ipRules []string) {
 	}
 	for _, branch := range m.lastConfig.Branches {
 		if branch.ID == branchID && !branch.IsDefault {
-			markHex := fmt.Sprintf("0x%x", branch.Mark)
+			markHex := markHex(branch.Mark)
 			// Remove old rules for this branch
 			removeMangleRulesByComment(fmt.Sprintf("wm-branch-%d", branchID))
 			// Re-add with new IP list
@@ -225,33 +211,44 @@ func (m *Manager) ReapplyIPRules(branchID int, ipRules []string) {
 	}
 }
 
-func addMangleRule(rule string) {
-	args := strings.Fields("-t mangle " + rule)
-	out, err := exec.Command("iptables", args...).CombinedOutput()
-	if err != nil {
-		log.Printf("[routing] Error adding mangle rule: %s: %v: %s", rule, err, string(out))
-	}
-}
+func markHex(mark int) string { return fmt.Sprintf("0x%x", mark) }
 
-func addNatRule(rule string) {
-	args := strings.Fields("-t nat " + rule)
+func addIptablesRule(table, rule string) {
+	args := strings.Fields("-t " + table + " " + rule)
 	out, err := exec.Command("iptables", args...).CombinedOutput()
 	if err != nil && !strings.Contains(string(out), "already exists") {
-		log.Printf("[routing] Error adding nat rule: %s: %v: %s", rule, err, string(out))
+		log.Printf("[routing] Error adding %s rule: %s: %v: %s", table, rule, err, string(out))
 	}
 }
 
+func addMangleRule(rule string) { addIptablesRule("mangle", rule) }
+func addNatRule(rule string)    { addIptablesRule("nat", rule) }
+
 func (m *Manager) cleanNatRules() {
-	out, err := exec.Command("iptables", "-t", "nat", "-S", "POSTROUTING").CombinedOutput()
-	if err != nil {
-		return
-	}
-	for _, line := range strings.Split(string(out), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.Contains(line, "wm-xray") && strings.HasPrefix(line, "-A ") {
-			deleteRule := strings.Replace(line, "-A ", "-D ", 1)
-			args := strings.Fields("-t nat " + deleteRule)
-			exec.Command("iptables", args...).CombinedOutput()
+	cleanIptablesRules("nat", []string{"POSTROUTING"}, "wm-xray")
+}
+
+// cleanIptablesRules removes rules containing any of the given comment
+// prefixes from the specified table and chains.
+func cleanIptablesRules(table string, chains []string, commentPrefixes ...string) {
+	for _, chain := range chains {
+		out, err := exec.Command("iptables", "-t", table, "-S", chain).CombinedOutput()
+		if err != nil {
+			continue
+		}
+		for _, line := range strings.Split(string(out), "\n") {
+			line = strings.TrimSpace(line)
+			if !strings.HasPrefix(line, "-A ") {
+				continue
+			}
+			for _, prefix := range commentPrefixes {
+				if strings.Contains(line, prefix) {
+					deleteRule := strings.Replace(line, "-A ", "-D ", 1)
+					args := strings.Fields("-t " + table + " " + deleteRule)
+					exec.Command("iptables", args...).CombinedOutput()
+					break
+				}
+			}
 		}
 	}
 }

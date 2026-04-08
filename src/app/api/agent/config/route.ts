@@ -4,6 +4,7 @@ import { nodes, lineNodes, lineTunnels, devices, lineBranches, branchFilters, fi
 import { eq, or, and, count } from "drizzle-orm";
 import { decrypt } from "@/lib/crypto";
 import { authenticateAgent } from "@/lib/agent-auth";
+import { getXrayPortForLine } from "@/lib/xray-port";
 
 function getNodePublicHost(nodeId: number): string {
   const n = db.select({ ip: nodes.ip, domain: nodes.domain }).from(nodes).where(eq(nodes.id, nodeId)).get();
@@ -243,7 +244,6 @@ export async function GET(request: NextRequest) {
       branches: { mark: number; tunnel: string; is_default: boolean; domain_rules: string[] }[];
     }[] = [];
     let xrayBranchMarkCounter = 41001; // same counter base as routing branches
-    let xrayLineIndex = 0;
 
     for (const lineId of entryLineIds) {
       const xrayDevices = db
@@ -303,12 +303,11 @@ export async function GET(request: NextRequest) {
       xrayRoutes.push({
         lineId,
         uuids,
-        port: xrayBasePort + xrayLineIndex,
+        port: getXrayPortForLine(nodeId, lineId, xrayBasePort),
         tunnel,
         mark: defaultMark || 42001,
         branches: xrayBranches,
       });
-      xrayLineIndex++;
     }
 
     xrayConfig = {
