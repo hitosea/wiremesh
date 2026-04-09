@@ -151,24 +151,9 @@ export default function DeviceConfigPage() {
     <div className="space-y-6 w-full max-w-3xl">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">客户端配置</h1>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Button onClick={() => handleCopy()} disabled={loading || !configData}>
-            复制
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleDownload}
-            disabled={loading || !configData}
-          >
-            下载
-          </Button>
-          <Button variant="outline" onClick={() => router.push(`/devices/${deviceId}?from=config`)}>
-            编辑
-          </Button>
-          <Button variant="outline" onClick={() => router.push("/devices")}>
-            返回
-          </Button>
-        </div>
+        <Button variant="outline" onClick={() => router.push("/devices")}>
+          返回
+        </Button>
       </div>
 
       {loading ? (
@@ -198,10 +183,21 @@ export default function DeviceConfigPage() {
 
           {/* Config card */}
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle>
                 {formatLabel[configData.format] ?? configData.format} 配置
               </CardTitle>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => handleCopy()}>
+                  复制
+                </Button>
+                <Button size="sm" variant="outline" onClick={handleDownload}>
+                  下载
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => router.push(`/devices/${deviceId}?from=config`)}>
+                  编辑
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
               <pre className="code-block p-4 rounded-lg text-xs w-full overflow-x-auto max-h-[500px] whitespace-pre-wrap break-all">
