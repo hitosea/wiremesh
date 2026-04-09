@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
+import { translateError } from "@/lib/translate-error";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -142,7 +143,7 @@ export default function LineDetailPage() {
         toast.success(t("saved"));
         setLine((prev) => (prev ? { ...prev, ...json.data } : prev));
       } else {
-        toast.error(json.error?.message ? te(json.error.message, json.error.params) : tc("saveFailed"));
+        toast.error(translateError(json.error, te, tc("saveFailed")));
       }
     } catch {
       toast.error(tc("saveFailedRetry"));

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { translateError } from "@/lib/translate-error";
 import { useTranslations } from "next-intl";
 
 type SettingsData = Record<string, string>;
@@ -127,7 +128,7 @@ export default function SettingsPage() {
         setConfirmPassword("");
       } else {
         const json = await res.json();
-        toast.error(json.error?.message ? te(json.error.message, json.error.params) : t("changePasswordFailed"));
+        toast.error(translateError(json.error, te, t("changePasswordFailed")));
       }
     } catch {
       toast.error(t("changePasswordFailedRetry"));

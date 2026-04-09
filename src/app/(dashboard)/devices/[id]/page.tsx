@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { translateError } from "@/lib/translate-error";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -118,7 +119,7 @@ function DeviceDetailContent() {
       });
       const json = await res.json();
       if (!res.ok) {
-        toast.error(json.error?.message ? te(json.error.message, json.error.params) : tc("saveFailed"));
+        toast.error(translateError(json.error, te, tc("saveFailed")));
         return;
       }
 
@@ -132,7 +133,7 @@ function DeviceDetailContent() {
         });
         const lineJson = await lineRes.json();
         if (!lineRes.ok) {
-          toast.error(lineJson.error?.message ? te(lineJson.error.message, lineJson.error.params) : t("updateLineFailed"));
+          toast.error(translateError(lineJson.error, te, t("updateLineFailed")));
           return;
         }
       }

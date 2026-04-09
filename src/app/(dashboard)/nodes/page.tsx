@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { translateError } from "@/lib/translate-error";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { StatusDot } from "@/components/status-dot";
@@ -93,7 +94,7 @@ export default function NodesPage() {
         fetchNodes(pagination.page);
       } else {
         const json = await res.json();
-        toast.error(json.error?.message ? te(json.error.message, json.error.params) : tc("deleteFailed"));
+        toast.error(translateError(json.error, te, tc("deleteFailed")));
       }
     } catch {
       toast.error(tc("deleteFailedRetry"));
@@ -117,7 +118,7 @@ export default function NodesPage() {
         setShowBatchDelete(false);
         fetchNodes(pagination.page);
       } else {
-        toast.error(json.error?.message ? te(json.error.message, json.error.params) : t("batchDeleteFailed"));
+        toast.error(translateError(json.error, te, t("batchDeleteFailed")));
       }
     } catch {
       toast.error(t("batchDeleteFailedRetry"));
@@ -142,7 +143,7 @@ export default function NodesPage() {
         setBatchTags("");
         fetchNodes(pagination.page);
       } else {
-        toast.error(json.error?.message ? te(json.error.message, json.error.params) : t("batchUpdateFailed"));
+        toast.error(translateError(json.error, te, t("batchUpdateFailed")));
       }
     } catch {
       toast.error(t("batchUpdateFailedRetry"));

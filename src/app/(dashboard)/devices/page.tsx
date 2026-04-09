@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { translateError } from "@/lib/translate-error";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -149,7 +150,7 @@ function DevicesContent() {
         fetchDevices(pagination.page);
       } else {
         const json = await res.json();
-        toast.error(json.error?.message ? te(json.error.message, json.error.params) : tc("deleteFailed"));
+        toast.error(translateError(json.error, te, tc("deleteFailed")));
       }
     } catch {
       toast.error(tc("deleteFailedRetry"));
@@ -173,7 +174,7 @@ function DevicesContent() {
         setShowBatchDelete(false);
         fetchDevices(pagination.page);
       } else {
-        toast.error(json.error?.message ? te(json.error.message, json.error.params) : t("batchDeleteFailed"));
+        toast.error(translateError(json.error, te, t("batchDeleteFailed")));
       }
     } catch {
       toast.error(t("batchDeleteFailedRetry"));
@@ -199,7 +200,7 @@ function DevicesContent() {
         setBatchLineId("");
         fetchDevices(pagination.page);
       } else {
-        toast.error(json.error?.message ? te(json.error.message, json.error.params) : t("batchSwitchFailed"));
+        toast.error(translateError(json.error, te, t("batchSwitchFailed")));
       }
     } catch {
       toast.error(t("batchSwitchFailedRetry"));

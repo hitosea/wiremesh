@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { translateError } from "@/lib/translate-error";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,7 +39,7 @@ export default function NodeScriptPage() {
       .then(async (res) => {
         if (!res.ok) {
           const json = await res.json().catch(() => ({}));
-          throw new Error(json.error?.message ? te(json.error.message, json.error.params) : t("loadScriptFailed"));
+          throw new Error(translateError(json.error, te, t("loadScriptFailed")));
         }
         return res.text();
       })

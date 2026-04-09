@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { translateError } from "@/lib/translate-error";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -237,7 +238,7 @@ export default function NewLinePage() {
         toast.success(t("created"));
         router.push("/lines");
       } else {
-        toast.error(json.error?.message ? te(json.error.message, json.error.params) : tc("createFailed"));
+        toast.error(translateError(json.error, te, tc("createFailed")));
       }
     } catch {
       toast.error(tc("createFailedRetry"));

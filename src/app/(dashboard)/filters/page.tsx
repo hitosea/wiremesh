@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { translateError } from "@/lib/translate-error";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -98,7 +99,7 @@ export default function FiltersPage() {
         );
         toast.success(json.data.isEnabled ? t("enabled") : t("disabled"));
       } else {
-        toast.error(json.error?.message ? te(json.error.message, json.error.params) : t("toggleFailed"));
+        toast.error(translateError(json.error, te, t("toggleFailed")));
       }
     } catch {
       toast.error(t("toggleFailedRetry"));
@@ -118,7 +119,7 @@ export default function FiltersPage() {
         fetchFilters(pagination.page);
       } else {
         const json = await res.json();
-        toast.error(json.error?.message ? te(json.error.message, json.error.params) : tc("deleteFailed"));
+        toast.error(translateError(json.error, te, tc("deleteFailed")));
       }
     } catch {
       toast.error(tc("deleteFailedRetry"));

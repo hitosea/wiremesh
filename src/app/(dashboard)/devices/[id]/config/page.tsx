@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { translateError } from "@/lib/translate-error";
 import { useTranslations } from "next-intl";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
@@ -100,7 +101,7 @@ export default function DeviceConfigPage() {
     fetch(`/api/devices/${deviceId}/config`)
       .then(async (res) => {
         const json = await res.json();
-        if (!res.ok) throw new Error(json.error?.message ? te(json.error.message, json.error.params) : t("loadFailed"));
+        if (!res.ok) throw new Error(translateError(json.error, te, t("loadFailed")));
         return json.data as ConfigData;
       })
       .then((data) => setConfigData(data))

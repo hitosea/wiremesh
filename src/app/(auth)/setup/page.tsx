@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
+import { translateError } from "@/lib/translate-error";
 import {
   Card,
   CardContent,
@@ -68,7 +69,7 @@ export default function SetupPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data?.error?.message ? te(data.error.message, data.error.params) : t("initFailed"));
+        toast.error(translateError(data?.error, te, t("initFailed")));
         return;
       }
       toast.success(t("initSuccess"));
