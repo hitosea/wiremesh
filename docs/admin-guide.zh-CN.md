@@ -74,6 +74,16 @@ curl -fsSL 'https://your-platform/api/nodes/{id}/script?token=...' | bash
 
 也可在此页面编辑节点的名称、IP、域名、WG 端口、Xray 设置、标签和备注。
 
+### 卸载 Agent
+
+如需从服务器上彻底移除 Agent，执行卸载脚本：
+
+```
+curl -fsSL 'https://your-platform/api/uninstall-script' | bash
+```
+
+这是一个通用脚本，适用于任何节点，无需认证。脚本会停止并移除 `wiremesh-agent` 和 `wiremesh-xray` 服务，拆除所有 WireGuard 接口（`wm-wg0`、`wm-tun*`），清理 iptables 规则、ip 策略路由表、ipset，并删除 `/etc/wiremesh/` 目录和 Agent 二进制文件。系统级软件包（wireguard、iptables、ipset）不会被移除，因为它们可能被其他程序使用。
+
 ### 删除节点
 
 在列表页通过删除按钮删除单个节点，或勾选多个节点使用「批量删除」。删除前会弹出确认对话框。还支持批量修改标签。

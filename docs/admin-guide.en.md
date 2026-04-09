@@ -74,6 +74,16 @@ Click a node row to open its detail page. You can see:
 
 You can also edit the node's name, IP, domain, WG port, Xray settings, tags, and notes from this page.
 
+### Uninstalling the Agent
+
+To cleanly remove the Agent from a server, run the uninstall script:
+
+```
+curl -fsSL 'https://your-platform/api/uninstall-script' | bash
+```
+
+This is a generic script that works on any node without requiring authentication. It stops and removes the `wiremesh-agent` and `wiremesh-xray` services, tears down all WireGuard interfaces (`wm-wg0`, `wm-tun*`), cleans up iptables rules, ip rules, routing tables, ipsets, and deletes the `/etc/wiremesh/` directory and agent binaries. System packages (wireguard, iptables, ipset) are not removed as they may be used by other software.
+
 ### Deleting a Node
 
 Delete a single node from the list page via the delete button, or select multiple nodes and use **Batch Delete**. A confirmation dialog is shown before deletion. You can also batch-update tags for selected nodes.
