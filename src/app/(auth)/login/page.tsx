@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import {
   Card,
@@ -16,6 +17,8 @@ import { Label } from "@/components/ui/label";
 
 export default function LoginPage() {
   const router = useRouter();
+  const t = useTranslations("auth");
+  const tc = useTranslations("common");
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ username: "", password: "" });
 
@@ -30,12 +33,12 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data?.error?.message || "登录失败");
+        toast.error(data?.error?.message || t("loginFailed"));
         return;
       }
       router.push("/dashboard");
     } catch {
-      toast.error("网络错误，请重试");
+      toast.error(tc("networkError"));
     } finally {
       setLoading(false);
     }
@@ -44,34 +47,34 @@ export default function LoginPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>登录</CardTitle>
-        <CardDescription>登录 WireMesh 管理平台</CardDescription>
+        <CardTitle>{t("loginTitle")}</CardTitle>
+        <CardDescription>{t("loginDescription")}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="username">用户名</Label>
+            <Label htmlFor="username">{t("username")}</Label>
             <Input
               id="username"
               value={form.username}
               onChange={(e) => setForm({ ...form, username: e.target.value })}
-              placeholder="请输入用户名"
+              placeholder={t("usernamePlaceholder")}
               required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">密码</Label>
+            <Label htmlFor="password">{t("password")}</Label>
             <Input
               id="password"
               type="password"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
-              placeholder="请输入密码"
+              placeholder={t("passwordPlaceholder")}
               required
             />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "登录中..." : "登录"}
+            {loading ? t("loggingIn") : t("login")}
           </Button>
         </form>
       </CardContent>

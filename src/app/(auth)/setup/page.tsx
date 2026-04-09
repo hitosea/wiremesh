@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import {
   Card,
@@ -16,6 +17,9 @@ import { Label } from "@/components/ui/label";
 
 export default function SetupPage() {
   const router = useRouter();
+  const t = useTranslations("setup");
+  const ta = useTranslations("auth");
+  const tc = useTranslations("common");
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const [form, setForm] = useState({
@@ -42,11 +46,11 @@ export default function SetupPage() {
     e.preventDefault();
 
     if (form.password !== form.confirmPassword) {
-      toast.error("两次输入的密码不一致");
+      toast.error(t("passwordMismatch"));
       return;
     }
     if (form.password.length < 6) {
-      toast.error("密码至少需要 6 位字符");
+      toast.error(t("passwordTooShort"));
       return;
     }
 
@@ -63,13 +67,13 @@ export default function SetupPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data?.error?.message || "初始化失败");
+        toast.error(data?.error?.message || t("initFailed"));
         return;
       }
-      toast.success("系统初始化成功，请登录");
+      toast.success(t("initSuccess"));
       router.push("/login");
     } catch {
-      toast.error("网络错误，请重试");
+      toast.error(tc("networkError"));
     } finally {
       setLoading(false);
     }
@@ -82,45 +86,45 @@ export default function SetupPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>初始化系统</CardTitle>
-        <CardDescription>创建管理员账号以开始使用 WireMesh</CardDescription>
+        <CardTitle>{t("title")}</CardTitle>
+        <CardDescription>{t("description")}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="username">用户名</Label>
+            <Label htmlFor="username">{ta("username")}</Label>
             <Input
               id="username"
               value={form.username}
               onChange={(e) => setForm({ ...form, username: e.target.value })}
-              placeholder="请输入用户名"
+              placeholder={ta("usernamePlaceholder")}
               required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">密码</Label>
+            <Label htmlFor="password">{ta("password")}</Label>
             <Input
               id="password"
               type="password"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
-              placeholder="至少 6 位字符"
+              placeholder={t("passwordMinLength")}
               required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword">确认密码</Label>
+            <Label htmlFor="confirmPassword">{t("confirmPassword")}</Label>
             <Input
               id="confirmPassword"
               type="password"
               value={form.confirmPassword}
               onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
-              placeholder="再次输入密码"
+              placeholder={t("confirmPasswordPlaceholder")}
               required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="wgDefaultSubnet">WireGuard 默认子网（可选）</Label>
+            <Label htmlFor="wgDefaultSubnet">{t("defaultSubnet")}</Label>
             <Input
               id="wgDefaultSubnet"
               value={form.wgDefaultSubnet}
@@ -129,7 +133,7 @@ export default function SetupPage() {
             />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "初始化中..." : "初始化系统"}
+            {loading ? t("initializing") : t("initializeSystem")}
           </Button>
         </form>
       </CardContent>
