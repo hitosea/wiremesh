@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { StatusDot } from "@/components/status-dot";
 import {
@@ -68,22 +69,10 @@ function formatBytes(bytes: number): string {
   return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${units[i]}`;
 }
 
-const NODE_STATUS_LABELS: Record<string, string> = {
-  online: "在线",
-  offline: "离线",
-  installing: "安装中",
-  error: "异常",
-};
-
-
-const DEVICE_STATUS_LABELS: Record<string, string> = {
-  online: "在线",
-  offline: "离线",
-  error: "异常",
-  "-": "-",
-};
 
 export default function DashboardPage() {
+  const t = useTranslations("dashboard");
+  const tc = useTranslations("common");
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -91,14 +80,14 @@ export default function DashboardPage() {
     fetch("/api/dashboard")
       .then((res) => res.json())
       .then((json) => setData(json.data))
-      .catch(() => toast.error("加载仪表盘数据失败"))
+      .catch(() => toast.error(t("loadFailed")))
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-48 text-muted-foreground">
-        加载中...
+        {tc("loading")}
       </div>
     );
   }
@@ -106,7 +95,7 @@ export default function DashboardPage() {
   if (!data) {
     return (
       <div>
-        <p className="text-muted-foreground">加载数据失败</p>
+        <p className="text-muted-foreground">{t("loadError")}</p>
       </div>
     );
   }
@@ -117,15 +106,15 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">节点</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{t("nodes")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{data.nodes.total}</div>
             <div className="text-sm text-muted-foreground mt-1 space-x-3">
-              <span className="text-emerald-500 dark:text-emerald-400">在线 {data.nodes.online}</span>
-              <span>离线 {data.nodes.offline}</span>
+              <span className="text-emerald-500 dark:text-emerald-400">{t("online")} {data.nodes.online}</span>
+              <span>{t("offline")} {data.nodes.offline}</span>
               {data.nodes.error > 0 && (
-                <span className="text-destructive">异常 {data.nodes.error}</span>
+                <span className="text-destructive">{t("error")} {data.nodes.error}</span>
               )}
             </div>
           </CardContent>
@@ -133,26 +122,26 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">设备</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{t("devices")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{data.devices.total}</div>
             <div className="text-sm text-muted-foreground mt-1 space-x-3">
-              <span className="text-emerald-500 dark:text-emerald-400">在线 {data.devices.online}</span>
-              <span>离线 {data.devices.offline}</span>
+              <span className="text-emerald-500 dark:text-emerald-400">{t("online")} {data.devices.online}</span>
+              <span>{t("offline")} {data.devices.offline}</span>
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">线路</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{t("lines")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{data.lines.total}</div>
             <div className="text-sm text-muted-foreground mt-1 space-x-3">
-              <span className="text-emerald-500 dark:text-emerald-400">活跃 {data.lines.active}</span>
-              <span>停用 {data.lines.inactive}</span>
+              <span className="text-emerald-500 dark:text-emerald-400">{t("active")} {data.lines.active}</span>
+              <span>{t("disabled")} {data.lines.inactive}</span>
             </div>
           </CardContent>
         </Card>
@@ -163,22 +152,22 @@ export default function DashboardPage() {
         {/* Recent Nodes */}
         <Card>
           <CardHeader>
-            <CardTitle>节点状态</CardTitle>
+            <CardTitle>{t("nodeStatus")}</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>名称</TableHead>
-                  <TableHead>IP</TableHead>
-                  <TableHead>状态</TableHead>
+                  <TableHead>{t("name")}</TableHead>
+                  <TableHead>{t("ip")}</TableHead>
+                  <TableHead>{t("status")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {data.recentNodes.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={3} className="text-center text-muted-foreground">
-                      暂无节点
+                      {t("noNodes")}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -196,7 +185,7 @@ export default function DashboardPage() {
                         {node.ip}
                       </TableCell>
                       <TableCell>
-                        <StatusDot status={node.status} label={NODE_STATUS_LABELS[node.status] ?? node.status} />
+                        <StatusDot status={node.status} label={t(node.status as "online" | "offline" | "error" | "installing")} />
                       </TableCell>
                     </TableRow>
                   ))
@@ -209,22 +198,22 @@ export default function DashboardPage() {
         {/* Recent Devices */}
         <Card>
           <CardHeader>
-            <CardTitle>设备状态</CardTitle>
+            <CardTitle>{t("deviceStatus")}</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>名称</TableHead>
-                  <TableHead>协议</TableHead>
-                  <TableHead>状态</TableHead>
+                  <TableHead>{t("name")}</TableHead>
+                  <TableHead>{t("protocol")}</TableHead>
+                  <TableHead>{t("status")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {data.recentDevices.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={3} className="text-center text-muted-foreground">
-                      暂无设备
+                      {t("noDevices")}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -245,7 +234,7 @@ export default function DashboardPage() {
                         {device.status === "-" ? (
                           <span className="text-muted-foreground text-sm">-</span>
                         ) : (
-                          <StatusDot status={device.status} label={DEVICE_STATUS_LABELS[device.status] ?? device.status} />
+                          <StatusDot status={device.status} label={t(device.status as "online" | "offline" | "error")} />
                         )}
                       </TableCell>
                     </TableRow>
@@ -261,42 +250,42 @@ export default function DashboardPage() {
       {data.traffic.nodes.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>节点流量</CardTitle>
+            <CardTitle>{t("nodeTraffic")}</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>节点</TableHead>
-                  <TableHead>IP</TableHead>
-                  <TableHead>上传</TableHead>
-                  <TableHead>下载</TableHead>
+                  <TableHead>{t("nodes")}</TableHead>
+                  <TableHead>{t("ip")}</TableHead>
+                  <TableHead>{t("upload")}</TableHead>
+                  <TableHead>{t("download")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.traffic.nodes.map((t) => (
-                  <TableRow key={t.nodeId}>
+                {data.traffic.nodes.map((tn) => (
+                  <TableRow key={tn.nodeId}>
                     <TableCell>
                       <Link
-                        href={`/nodes/${t.nodeId}`}
+                        href={`/nodes/${tn.nodeId}`}
                         className="text-primary hover:underline font-medium"
                       >
-                        {t.nodeName}
+                        {tn.nodeName}
                       </Link>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {t.nodeIp}
+                      {tn.nodeIp}
                     </TableCell>
                     <TableCell className="text-sm">
-                      {formatBytes(t.uploadBytes)}
+                      {formatBytes(tn.uploadBytes)}
                     </TableCell>
                     <TableCell className="text-sm">
-                      {formatBytes(t.downloadBytes)}
+                      {formatBytes(tn.downloadBytes)}
                     </TableCell>
                   </TableRow>
                 ))}
                 <TableRow className="font-medium bg-muted/50">
-                  <TableCell colSpan={2}>合计</TableCell>
+                  <TableCell colSpan={2}>{t("total")}</TableCell>
                   <TableCell>{formatBytes(data.traffic.totalUploadBytes)}</TableCell>
                   <TableCell>{formatBytes(data.traffic.totalDownloadBytes)}</TableCell>
                 </TableRow>
