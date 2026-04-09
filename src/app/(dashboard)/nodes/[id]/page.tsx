@@ -262,10 +262,10 @@ export default function NodeDetailPage() {
                     type="number"
                     value={xrayPort}
                     onChange={(e) => setXrayPort(e.target.value)}
-                    placeholder="443"
+                    placeholder="41443"
                   />
                   <p className="text-xs text-muted-foreground">
-                    每条线路自动分配独立端口（如 443、444、445...），请确保防火墙放行对应端口
+                    每条线路自动分配独立端口（如 41443、41444、41445...），请确保防火墙放行对应端口
                   </p>
                 </div>
                 <div className="space-y-2">

@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     { key: "wg_device_ip_start", value: "100" },
     { key: "xray_default_protocol", value: "vless" },
     { key: "xray_default_transport", value: "ws" },
-    { key: "xray_default_port", value: "443" },
+    { key: "xray_default_port", value: "41443" },
     { key: "tunnel_subnet", value: "10.211.0.0/16" },
     { key: "tunnel_port_start", value: "41830" },
     { key: "node_check_interval", value: "5" },

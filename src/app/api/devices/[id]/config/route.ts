@@ -4,7 +4,7 @@ import { devices, lineNodes, nodes, settings, lineBranches } from "@/lib/db/sche
 import { success, error } from "@/lib/api-response";
 import { eq, and, count } from "drizzle-orm";
 import { decrypt } from "@/lib/crypto";
-import { getXrayPortForLine } from "@/lib/xray-port";
+import { getXrayPortForLine, DEFAULT_XRAY_PORT } from "@/lib/xray-port";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -100,7 +100,7 @@ PersistentKeepalive = 25
     }
 
     const endpoint = entryNodeRow.nodeDomain ?? entryNodeRow.nodeIp;
-    const xrayBasePort = entryNodeRow.nodeXrayPort ?? 443;
+    const xrayBasePort = entryNodeRow.nodeXrayPort ?? DEFAULT_XRAY_PORT;
     const xrayPort = getXrayPortForLine(entryNodeRow.nodeId, device.lineId!, xrayBasePort);
 
     // Parse Reality settings from node's xrayConfig

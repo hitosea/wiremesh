@@ -4,7 +4,7 @@ import { nodes, lineNodes, lineTunnels, devices, lineBranches, branchFilters, fi
 import { eq, or, and, count } from "drizzle-orm";
 import { decrypt } from "@/lib/crypto";
 import { authenticateAgent } from "@/lib/agent-auth";
-import { getXrayPortForLine } from "@/lib/xray-port";
+import { getXrayPortForLine, DEFAULT_XRAY_PORT } from "@/lib/xray-port";
 
 function getNodePublicHost(nodeId: number): string {
   const n = db.select({ ip: nodes.ip, domain: nodes.domain }).from(nodes).where(eq(nodes.id, nodeId)).get();
@@ -253,7 +253,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Build per-line routes — each line gets a dedicated Xray inbound port
-    const xrayBasePort = node.xrayPort ?? 443;
+    const xrayBasePort = node.xrayPort ?? DEFAULT_XRAY_PORT;
     const xrayRoutes: {
       lineId: number; uuids: string[]; port: number; tunnel: string; mark: number;
       branches: { mark: number; tunnel: string; is_default: boolean; domain_rules: string[] }[];
@@ -328,7 +328,7 @@ export async function GET(request: NextRequest) {
     xrayConfig = {
       enabled: true,
       protocol: "vless",
-      port: node.xrayPort ?? 443,
+      port: node.xrayPort ?? DEFAULT_XRAY_PORT,
       realityPrivateKey,
       realityShortId: realitySettings.realityShortId ?? "",
       realityDest: realitySettings.realityDest ?? "www.microsoft.com:443",
