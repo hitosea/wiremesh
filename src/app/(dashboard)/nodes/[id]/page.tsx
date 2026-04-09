@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,18 +38,15 @@ type NodeDetail = {
   remark: string | null;
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  online: "在线",
-  offline: "离线",
-  installing: "安装中",
-  error: "异常",
-};
-
 
 export default function NodeDetailPage() {
   const router = useRouter();
   const params = useParams();
   const nodeId = params.id as string;
+  const t = useTranslations("nodeDetail");
+  const tn = useTranslations("nodeNew");
+  const ts = useTranslations("nodes");
+  const tc = useTranslations("common");
 
   const [node, setNode] = useState<NodeDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,7 +70,7 @@ export default function NodeDetailPage() {
       .then((json) => {
         const n = json.data;
         if (!n) {
-          toast.error("节点不存在");
+          toast.error(ts("notFound"));
           router.push("/nodes");
           return;
         }
@@ -94,13 +92,13 @@ export default function NodeDetailPage() {
           } catch {}
         }
       })
-      .catch(() => toast.error("加载节点失败"))
+      .catch(() => toast.error(ts("loadNodeFailed")))
       .finally(() => setLoading(false));
   }, [nodeId, router]);
 
   const handleSave = async () => {
     if (!name.trim()) {
-      toast.error("节点名称不能为空");
+      toast.error(tn("nameRequired"));
       return;
     }
     setSaving(true);
@@ -124,13 +122,13 @@ export default function NodeDetailPage() {
       });
       const json = await res.json();
       if (res.ok) {
-        toast.success("节点已保存");
+        toast.success(tc("save"));
         setNode(json.data);
       } else {
-        toast.error(json.error?.message ?? "保存失败");
+        toast.error(json.error?.message ?? tc("saveFailed"));
       }
     } catch {
-      toast.error("保存失败，请重试");
+      toast.error(tc("saveFailedRetry"));
     } finally {
       setSaving(false);
     }
@@ -139,7 +137,7 @@ export default function NodeDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-48 text-muted-foreground">
-        加载中...
+        {tc("loading")}
       </div>
     );
   }
@@ -152,37 +150,37 @@ export default function NodeDetailPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold">{node.name}</h1>
-          <StatusDot status={node.status} label={STATUS_LABELS[node.status] ?? node.status} />
+          <StatusDot status={node.status} label={ts(`status.${node.status}`)} />
         </div>
         <Button variant="outline" onClick={() => router.push("/nodes")}>
-          返回
+          {tc("back")}
         </Button>
       </div>
       {/* Read-only info */}
       <Card>
         <CardHeader>
-          <CardTitle>节点信息</CardTitle>
+          <CardTitle>{t("nodeInfo")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>WireGuard 内网地址</Label>
+            <Label>{t("wgInternalAddress")}</Label>
             <p className="text-sm font-medium">{node.wgAddress}</p>
           </div>
           <div className="space-y-2">
-            <Label>WireGuard 公钥</Label>
+            <Label>{t("wgPublicKey")}</Label>
             <code className="block text-xs bg-muted px-3 py-2 rounded break-all">
               {node.wgPublicKey}
             </code>
           </div>
           <div className="space-y-2">
-            <Label>Agent Token</Label>
+            <Label>{t("agentToken")}</Label>
             <code className="block text-xs bg-muted px-3 py-2 rounded break-all">
               {node.agentToken}
             </code>
           </div>
           {node.errorMessage && (
             <div className="space-y-2">
-              <Label className="text-destructive">错误信息</Label>
+              <Label className="text-destructive">{t("errorMessage")}</Label>
               <p className="text-sm text-destructive">{node.errorMessage}</p>
             </div>
           )}
@@ -192,12 +190,12 @@ export default function NodeDetailPage() {
       {/* Edit form */}
       <Card>
         <CardHeader>
-          <CardTitle>编辑节点</CardTitle>
+          <CardTitle>{t("editNode")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">
-              节点名称 <span className="text-destructive">*</span>
+              {tn("nodeName")} <span className="text-destructive">*</span>
             </Label>
             <Input
               id="name"
@@ -206,7 +204,7 @@ export default function NodeDetailPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="ip">IP 地址</Label>
+            <Label htmlFor="ip">{tn("ipAddress")}</Label>
             <Input
               id="ip"
               value={ip}
@@ -214,16 +212,16 @@ export default function NodeDetailPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="domain">域名</Label>
+            <Label htmlFor="domain">{tn("domain")}</Label>
             <Input
               id="domain"
               value={domain}
               onChange={(e) => setDomain(e.target.value)}
-              placeholder="例如：node1.example.com"
+              placeholder={tn("domainPlaceholder")}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="port">WireGuard 端口</Label>
+            <Label htmlFor="port">{tn("wgPort")}</Label>
             <Input
               id="port"
               type="number"
@@ -240,12 +238,12 @@ export default function NodeDetailPage() {
                 checked={xrayEnabled}
                 onCheckedChange={setXrayEnabled}
               />
-              <Label htmlFor="xrayEnabled">启用 Xray 入口代理</Label>
+              <Label htmlFor="xrayEnabled">{tn("enableXray")}</Label>
             </div>
             {xrayEnabled && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="xrayPort">Xray 起始端口</Label>
+                  <Label htmlFor="xrayPort">{tn("xrayStartPort")}</Label>
                   <Input
                     id="xrayPort"
                     type="number"
@@ -254,11 +252,11 @@ export default function NodeDetailPage() {
                     placeholder="41443"
                   />
                   <p className="text-xs text-muted-foreground">
-                    每条线路自动分配独立端口（如 41443、41444、41445...），请确保防火墙放行对应端口
+                    {tn("xrayPortHint")}
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="realityDest">Reality 目标网站</Label>
+                  <Label htmlFor="realityDest">{tn("realityTarget")}</Label>
                   <Input
                     id="realityDest"
                     value={realityDest}
@@ -266,7 +264,7 @@ export default function NodeDetailPage() {
                     placeholder="www.microsoft.com:443"
                   />
                   <p className="text-xs text-muted-foreground">
-                    伪装目标，需支持 TLS 1.3，如 www.microsoft.com:443
+                    {tn("realityTargetHint")}
                   </p>
                 </div>
                 {realityPublicKey && (
@@ -290,16 +288,16 @@ export default function NodeDetailPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="tags">标签（逗号分隔）</Label>
+            <Label htmlFor="tags">{tn("tagsComma")}</Label>
             <Input
               id="tags"
               value={tags}
               onChange={(e) => setTags(e.target.value)}
-              placeholder="例如：香港,高速"
+              placeholder={tn("tagsPlaceholder")}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="remark">备注</Label>
+            <Label htmlFor="remark">{tn("notes")}</Label>
             <Textarea
               id="remark"
               value={remark}
@@ -312,10 +310,10 @@ export default function NodeDetailPage() {
 
       <div className="flex flex-col sm:flex-row gap-2">
         <Button onClick={handleSave} disabled={saving}>
-          {saving ? "保存中..." : "保存"}
+          {saving ? tc("saving") : tc("save")}
         </Button>
         <Button variant="outline" onClick={() => router.push("/nodes")}>
-          返回
+          {tc("back")}
         </Button>
       </div>
       </div>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +19,8 @@ import { DEFAULT_REALITY_DEST } from "@/lib/reality-dest";
 
 export default function NewNodePage() {
   const router = useRouter();
+  const t = useTranslations("nodeNew");
+  const tc = useTranslations("common");
   const [submitting, setSubmitting] = useState(false);
 
   const [name, setName] = useState("");
@@ -33,11 +36,11 @@ export default function NewNodePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      toast.error("节点名称不能为空");
+      toast.error(t("nameRequired"));
       return;
     }
     if (!ip.trim()) {
-      toast.error("IP 地址不能为空");
+      toast.error(t("ipRequired"));
       return;
     }
 
@@ -65,13 +68,13 @@ export default function NewNodePage() {
 
       const json = await res.json();
       if (res.ok) {
-        toast.success("节点创建成功");
+        toast.success(t("created"));
         router.push("/nodes");
       } else {
-        toast.error(json.error?.message ?? "创建失败");
+        toast.error(json.error?.message ?? tc("createFailed"));
       }
     } catch {
-      toast.error("创建失败，请重试");
+      toast.error(tc("createFailedRetry"));
     } finally {
       setSubmitting(false);
     }
@@ -80,51 +83,51 @@ export default function NewNodePage() {
   return (
     <div className="space-y-6 w-full max-w-2xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">新增节点</h1>
+        <h1 className="text-2xl font-semibold">{t("title")}</h1>
         <Button variant="outline" onClick={() => router.back()}>
-          返回
+          {tc("back")}
         </Button>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>基本信息</CardTitle>
+            <CardTitle>{t("basicInfo")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">
-                节点名称 <span className="text-destructive">*</span>
+                {t("nodeName")} <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="例如：香港节点01"
+                placeholder={t("nodeNamePlaceholder")}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="ip">
-                IP 地址 <span className="text-destructive">*</span>
+                {t("ipAddress")} <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="ip"
                 value={ip}
                 onChange={(e) => setIp(e.target.value)}
-                placeholder="例如：1.2.3.4"
+                placeholder={t("ipPlaceholder")}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="domain">域名</Label>
+              <Label htmlFor="domain">{t("domain")}</Label>
               <Input
                 id="domain"
                 value={domain}
                 onChange={(e) => setDomain(e.target.value)}
-                placeholder="例如：node1.example.com"
+                placeholder={t("domainPlaceholder")}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="port">WireGuard 端口</Label>
+              <Label htmlFor="port">{t("wgPort")}</Label>
               <Input
                 id="port"
                 type="number"
@@ -134,21 +137,21 @@ export default function NewNodePage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="tags">标签（逗号分隔）</Label>
+              <Label htmlFor="tags">{t("tagsComma")}</Label>
               <Input
                 id="tags"
                 value={tags}
                 onChange={(e) => setTags(e.target.value)}
-                placeholder="例如：香港,高速"
+                placeholder={t("tagsPlaceholder")}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="remark">备注</Label>
+              <Label htmlFor="remark">{t("notes")}</Label>
               <Textarea
                 id="remark"
                 value={remark}
                 onChange={(e) => setRemark(e.target.value)}
-                placeholder="备注信息"
+                placeholder={t("notesPlaceholder")}
                 rows={3}
               />
             </div>
@@ -157,7 +160,7 @@ export default function NewNodePage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Xray 设置</CardTitle>
+            <CardTitle>{t("xraySettings")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
@@ -166,12 +169,12 @@ export default function NewNodePage() {
                 checked={xrayEnabled}
                 onCheckedChange={setXrayEnabled}
               />
-              <Label htmlFor="xrayEnabled">启用 Xray 入口代理</Label>
+              <Label htmlFor="xrayEnabled">{t("enableXray")}</Label>
             </div>
             {xrayEnabled && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="xrayPort">Xray 起始端口</Label>
+                  <Label htmlFor="xrayPort">{t("xrayStartPort")}</Label>
                   <Input
                     id="xrayPort"
                     type="number"
@@ -180,11 +183,11 @@ export default function NewNodePage() {
                     placeholder="41443"
                   />
                   <p className="text-xs text-muted-foreground">
-                    每条线路自动分配独立端口（如 41443、41444、41445...），请确保防火墙放行对应端口
+                    {t("xrayPortHint")}
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="realityDest">Reality 目标网站</Label>
+                  <Label htmlFor="realityDest">{t("realityTarget")}</Label>
                   <Input
                     id="realityDest"
                     value={realityDest}
@@ -192,7 +195,7 @@ export default function NewNodePage() {
                     placeholder="www.microsoft.com:443"
                   />
                   <p className="text-xs text-muted-foreground">
-                    伪装目标，需支持 TLS 1.3，如 www.microsoft.com:443
+                    {t("realityTargetHint")}
                   </p>
                 </div>
               </>
@@ -202,14 +205,14 @@ export default function NewNodePage() {
 
         <div className="flex flex-col sm:flex-row gap-2">
           <Button type="submit" disabled={submitting}>
-            {submitting ? "创建中..." : "创建节点"}
+            {submitting ? tc("creating") : t("createNode")}
           </Button>
           <Button
             type="button"
             variant="outline"
             onClick={() => router.back()}
           >
-            取消
+            {tc("cancel")}
           </Button>
         </div>
       </form>
