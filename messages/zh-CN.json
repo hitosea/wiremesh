@@ -44,7 +44,8 @@
     "lines": "线路管理",
     "filters": "分流规则",
     "settings": "系统设置",
-    "auditLogs": "审计日志"
+    "auditLogs": "审计日志",
+    "help": "帮助"
   },
   "theme": {
     "light": "浅色",
@@ -526,6 +527,11 @@
   "locale": {
     "zh-CN": "简体中文",
     "en": "English"
+  },
+  "help": {
+    "title": "管理员指南",
+    "description": "平台管理员操作指南",
+    "toc": "目录"
   },
   "errors": {
     "system": {

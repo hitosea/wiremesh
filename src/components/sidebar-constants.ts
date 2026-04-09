@@ -5,6 +5,7 @@ import {
   Cable,
   Split,
   Settings,
+  CircleHelp,
 } from "lucide-react";
 
 export type NavItem = {
@@ -33,6 +34,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/filters", labelKey: "nav.filters", icon: Split },
       { href: "/settings", labelKey: "nav.settings", icon: Settings },
+      { href: "/help", labelKey: "nav.help", icon: CircleHelp },
     ],
   },
 ];

@@ -44,7 +44,8 @@
     "lines": "Lines",
     "filters": "Filter Rules",
     "settings": "Settings",
-    "auditLogs": "Audit Logs"
+    "auditLogs": "Audit Logs",
+    "help": "Help"
   },
   "theme": {
     "light": "Light",
@@ -526,6 +527,11 @@
   "locale": {
     "zh-CN": "简体中文",
     "en": "English"
+  },
+  "help": {
+    "title": "Admin Guide",
+    "description": "Platform administrator operation guide",
+    "toc": "Table of Contents"
   },
   "errors": {
     "system": {
