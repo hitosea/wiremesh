@@ -3,28 +3,25 @@ import path from "node:path";
 import { compileMDX } from "next-mdx-remote/rsc";
 import { getLocale, getTranslations } from "next-intl/server";
 import { HelpToc } from "@/components/help-toc";
-
-type Heading = {
-  id: string;
-  text: string;
-  level: number;
-};
+import { type Heading } from "@/types/help";
 
 function extractHeadings(markdown: string): Heading[] {
   const headingRegex = /^(#{2,3})\s+(.+)$/gm;
   const headings: Heading[] = [];
+  const idCounts = new Map<string, number>();
   let match;
   while ((match = headingRegex.exec(markdown)) !== null) {
     const text = match[2].trim();
-    const id = text
+    let id = text
       .toLowerCase()
       .replace(/[^a-z0-9\u4e00-\u9fff]+/g, "-")
       .replace(/(^-|-$)/g, "");
-    headings.push({
-      id,
-      text,
-      level: match[1].length,
-    });
+    const count = idCounts.get(id) ?? 0;
+    idCounts.set(id, count + 1);
+    if (count > 0) {
+      id = `${id}-${count}`;
+    }
+    headings.push({ id, text, level: match[1].length });
   }
   return headings;
 }
@@ -78,11 +75,14 @@ export default async function HelpPage() {
   try {
     markdown = await fs.readFile(filePath, "utf-8");
   } catch {
-    // Fallback to English if locale file doesn't exist
-    markdown = await fs.readFile(
-      path.join(process.cwd(), "docs/admin-guide.en.md"),
-      "utf-8"
-    );
+    try {
+      markdown = await fs.readFile(
+        path.join(process.cwd(), "docs/admin-guide.en.md"),
+        "utf-8"
+      );
+    } catch {
+      markdown = "## No Content\n\nAdmin guide not found.";
+    }
   }
 
   const headings = extractHeadings(markdown);

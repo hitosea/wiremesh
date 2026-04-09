@@ -3,12 +3,7 @@
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
-
-type Heading = {
-  id: string;
-  text: string;
-  level: number;
-};
+import { type Heading } from "@/types/help";
 
 export function HelpToc({
   headings,
