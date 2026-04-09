@@ -68,7 +68,7 @@ Open the node detail page and click **Delete**. If the node is used in any line,
 4. Choose a protocol:
    - **WireGuard** — standard WireGuard config; works on most clients.
    - **Xray VLESS Reality** — obfuscated transport; harder to detect/block.
-5. Click **Save**. WireMesh auto-assigns an IP from the device subnet (10.210.0.0/24, starting at .100) and generates keys.
+5. Click **Save**. WireMesh auto-assigns an IP from the device subnet (10.210.0.0/24, starting at .100), generates WireGuard key pairs, and configures the device as a peer on the entry node's `wm-wg0` interface.
 
 ### Deploying the Config
 
@@ -148,7 +148,7 @@ Go to **Settings** to adjust global network parameters.
 
 | Setting | Default | Notes |
 |---------|---------|-------|
-| WireGuard port | 41820/UDP | Device-facing port on entry nodes |
+| WireGuard port | 41820/UDP | Device-facing port (wm-wg0 interface) on entry nodes |
 | Tunnel port start | 41830/UDP | First port used for node-to-node tunnels; increments per line |
 | Xray port start | 41443/TCP | First port used for Xray listeners; increments per line |
 
