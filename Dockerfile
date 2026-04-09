@@ -1,13 +1,27 @@
 FROM node:20-alpine AS base
 
+# Download Xray binaries from GitHub
+FROM alpine:latest AS xray-downloader
+ARG XRAY_VERSION=v26.3.27
+RUN apk add --no-cache curl unzip && \
+    mkdir -p /out && \
+    curl -fsSL "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/Xray-linux-64.zip" -o /tmp/xray-amd64.zip && \
+    unzip -o /tmp/xray-amd64.zip xray -d /tmp/xray-amd64 && \
+    tar czf /out/xray-linux-amd64.tar.gz -C /tmp/xray-amd64 xray && \
+    curl -fsSL "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/Xray-linux-arm64-v8a.zip" -o /tmp/xray-arm64.zip && \
+    unzip -o /tmp/xray-arm64.zip xray -d /tmp/xray-arm64 && \
+    tar czf /out/xray-linux-arm64.tar.gz -C /tmp/xray-arm64 xray
+
 # Build Agent (both architectures)
 FROM golang:1.25-alpine AS agent-builder
 WORKDIR /agent
 COPY agent/go.mod agent/go.sum ./
 RUN go mod download
 COPY agent/ .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o wiremesh-agent-linux-amd64 . && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o wiremesh-agent-linux-arm64 .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o wiremesh-agent . && \
+    tar czf wiremesh-agent-linux-amd64.tar.gz wiremesh-agent && rm wiremesh-agent && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o wiremesh-agent . && \
+    tar czf wiremesh-agent-linux-arm64.tar.gz wiremesh-agent && rm wiremesh-agent
 
 # Build Next.js
 FROM base AS builder
@@ -28,9 +42,13 @@ COPY --from=builder /app/drizzle ./drizzle
 COPY --from=builder /app/node_modules ./node_modules
 COPY worker/ ./worker/
 
-# Copy Agent binaries (both architectures)
-COPY --from=agent-builder /agent/wiremesh-agent-linux-amd64 ./public/agent/wiremesh-agent-linux-amd64
-COPY --from=agent-builder /agent/wiremesh-agent-linux-arm64 ./public/agent/wiremesh-agent-linux-arm64
+# Copy Agent binaries (both architectures, tar.gz)
+COPY --from=agent-builder /agent/wiremesh-agent-linux-amd64.tar.gz ./public/agent/
+COPY --from=agent-builder /agent/wiremesh-agent-linux-arm64.tar.gz ./public/agent/
+
+# Copy Xray binaries from GitHub
+COPY --from=xray-downloader /out/xray-linux-amd64.tar.gz ./public/xray/
+COPY --from=xray-downloader /out/xray-linux-arm64.tar.gz ./public/xray/
 
 EXPOSE 3000
 CMD ["sh", "-c", "node worker/index.js & node server.js"]

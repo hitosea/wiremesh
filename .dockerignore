@@ -4,3 +4,5 @@ data
 .env.local
 .git
 agent/wiremesh-agent
+public/agent/
+public/xray/
