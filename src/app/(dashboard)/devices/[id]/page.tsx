@@ -55,6 +55,7 @@ function DeviceDetailContent() {
   const ts = useTranslations("devices");
   const tn = useTranslations("deviceNew");
   const tc = useTranslations("common");
+  const te = useTranslations("errors");
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -117,7 +118,7 @@ function DeviceDetailContent() {
       });
       const json = await res.json();
       if (!res.ok) {
-        toast.error(json.error?.message ?? tc("saveFailed"));
+        toast.error(json.error?.message ? te(json.error.message, json.error.params) : tc("saveFailed"));
         return;
       }
 
@@ -131,7 +132,7 @@ function DeviceDetailContent() {
         });
         const lineJson = await lineRes.json();
         if (!lineRes.ok) {
-          toast.error(lineJson.error?.message ?? t("updateLineFailed"));
+          toast.error(lineJson.error?.message ? te(lineJson.error.message, lineJson.error.params) : t("updateLineFailed"));
           return;
         }
       }

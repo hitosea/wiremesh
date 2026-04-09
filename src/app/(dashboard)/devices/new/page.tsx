@@ -28,6 +28,7 @@ type LineOption = { id: number; name: string };
 export default function NewDevicePage() {
   const t = useTranslations("deviceNew");
   const tc = useTranslations("common");
+  const te = useTranslations("errors");
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
 
@@ -78,7 +79,7 @@ export default function NewDevicePage() {
         toast.success(t("created"));
         router.push("/devices");
       } else {
-        toast.error(json.error?.message ?? tc("createFailed"));
+        toast.error(json.error?.message ? te(json.error.message, json.error.params) : tc("createFailed"));
       }
     } catch {
       toast.error(tc("createFailedRetry"));

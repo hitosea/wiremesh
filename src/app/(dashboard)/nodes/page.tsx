@@ -30,6 +30,7 @@ export default function NodesPage() {
   const router = useRouter();
   const t = useTranslations("nodes");
   const tc = useTranslations("common");
+  const te = useTranslations("errors");
   const [data, setData] = useState<Node[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
@@ -92,7 +93,7 @@ export default function NodesPage() {
         fetchNodes(pagination.page);
       } else {
         const json = await res.json();
-        toast.error(json.error?.message ?? tc("deleteFailed"));
+        toast.error(json.error?.message ? te(json.error.message, json.error.params) : tc("deleteFailed"));
       }
     } catch {
       toast.error(tc("deleteFailedRetry"));
@@ -116,7 +117,7 @@ export default function NodesPage() {
         setShowBatchDelete(false);
         fetchNodes(pagination.page);
       } else {
-        toast.error(json.error?.message ?? t("batchDeleteFailed"));
+        toast.error(json.error?.message ? te(json.error.message, json.error.params) : t("batchDeleteFailed"));
       }
     } catch {
       toast.error(t("batchDeleteFailedRetry"));
@@ -141,7 +142,7 @@ export default function NodesPage() {
         setBatchTags("");
         fetchNodes(pagination.page);
       } else {
-        toast.error(json.error?.message ?? t("batchUpdateFailed"));
+        toast.error(json.error?.message ? te(json.error.message, json.error.params) : t("batchUpdateFailed"));
       }
     } catch {
       toast.error(t("batchUpdateFailedRetry"));

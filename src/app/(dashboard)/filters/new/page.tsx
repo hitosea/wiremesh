@@ -39,6 +39,7 @@ export default function NewFilterPage() {
   const router = useRouter();
   const t = useTranslations("filterNew");
   const tc = useTranslations("common");
+  const te = useTranslations("errors");
   const [saving, setSaving] = useState(false);
   const [linesWithBranches, setLinesWithBranches] = useState<LineWithBranches[]>([]);
 
@@ -95,7 +96,7 @@ export default function NewFilterPage() {
         toast.success(t("created"));
         router.push("/filters");
       } else {
-        toast.error(json.error?.message ?? tc("createFailed"));
+        toast.error(json.error?.message ? te(json.error.message, json.error.params) : tc("createFailed"));
       }
     } catch {
       toast.error(tc("createFailedRetry"));

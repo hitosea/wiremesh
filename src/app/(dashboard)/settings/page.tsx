@@ -50,6 +50,7 @@ export default function SettingsPage() {
   const tg = useTranslations("settingsGroups");
   const tf = useTranslations("settingsFields");
   const tc = useTranslations("common");
+  const te = useTranslations("errors");
 
   const [values, setValues] = useState<SettingsData>({});
   const [loading, setLoading] = useState(true);
@@ -85,7 +86,12 @@ export default function SettingsPage() {
         toast.success(t("saved"));
       } else {
         const json = await res.json();
-        toast.error(json.error?.message ?? tc("saveFailed"));
+        const keys = (json.error?.message ?? "").split(";").filter(Boolean);
+        if (keys.length > 0) {
+          keys.forEach((key: string) => toast.error(te(key.trim())));
+        } else {
+          toast.error(tc("saveFailed"));
+        }
       }
     } catch {
       toast.error(tc("saveFailedRetry"));
@@ -121,7 +127,7 @@ export default function SettingsPage() {
         setConfirmPassword("");
       } else {
         const json = await res.json();
-        toast.error(json.error?.message ?? t("changePasswordFailed"));
+        toast.error(json.error?.message ? te(json.error.message, json.error.params) : t("changePasswordFailed"));
       }
     } catch {
       toast.error(t("changePasswordFailedRetry"));

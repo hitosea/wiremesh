@@ -39,6 +39,7 @@ export default function FiltersPage() {
   const router = useRouter();
   const t = useTranslations("filters");
   const tc = useTranslations("common");
+  const te = useTranslations("errors");
   const [data, setData] = useState<Filter[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
@@ -97,7 +98,7 @@ export default function FiltersPage() {
         );
         toast.success(json.data.isEnabled ? t("enabled") : t("disabled"));
       } else {
-        toast.error(json.error?.message ?? t("toggleFailed"));
+        toast.error(json.error?.message ? te(json.error.message, json.error.params) : t("toggleFailed"));
       }
     } catch {
       toast.error(t("toggleFailedRetry"));
@@ -117,7 +118,7 @@ export default function FiltersPage() {
         fetchFilters(pagination.page);
       } else {
         const json = await res.json();
-        toast.error(json.error?.message ?? tc("deleteFailed"));
+        toast.error(json.error?.message ? te(json.error.message, json.error.params) : tc("deleteFailed"));
       }
     } catch {
       toast.error(tc("deleteFailedRetry"));

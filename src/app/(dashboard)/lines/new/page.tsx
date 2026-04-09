@@ -45,6 +45,7 @@ export default function NewLinePage() {
   const router = useRouter();
   const t = useTranslations("lineNew");
   const tc = useTranslations("common");
+  const te = useTranslations("errors");
   const [submitting, setSubmitting] = useState(false);
 
   const [name, setName] = useState("");
@@ -236,7 +237,7 @@ export default function NewLinePage() {
         toast.success(t("created"));
         router.push("/lines");
       } else {
-        toast.error(json.error?.message ?? tc("createFailed"));
+        toast.error(json.error?.message ? te(json.error.message, json.error.params) : tc("createFailed"));
       }
     } catch {
       toast.error(tc("createFailedRetry"));

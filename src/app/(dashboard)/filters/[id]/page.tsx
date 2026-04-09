@@ -56,6 +56,7 @@ export default function EditFilterPage() {
   const t = useTranslations("filterDetail");
   const tf = useTranslations("filterNew");
   const tc = useTranslations("common");
+  const te = useTranslations("errors");
 
   const [filter, setFilter] = useState<FilterDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -134,7 +135,7 @@ export default function EditFilterPage() {
         toast.success(t("saved"));
         setFilter(json.data);
       } else {
-        toast.error(json.error?.message ?? tc("saveFailed"));
+        toast.error(json.error?.message ? te(json.error.message, json.error.params) : tc("saveFailed"));
       }
     } catch {
       toast.error(tc("saveFailedRetry"));

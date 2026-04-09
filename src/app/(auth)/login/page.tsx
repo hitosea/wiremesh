@@ -19,6 +19,7 @@ export default function LoginPage() {
   const router = useRouter();
   const t = useTranslations("auth");
   const tc = useTranslations("common");
+  const te = useTranslations("errors");
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ username: "", password: "" });
 
@@ -33,7 +34,7 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data?.error?.message || t("loginFailed"));
+        toast.error(data?.error?.message ? te(data.error.message, data.error.params) : t("loginFailed"));
         return;
       }
       router.push("/dashboard");

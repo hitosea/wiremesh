@@ -86,6 +86,7 @@ function yamlIndent(obj: Record<string, unknown>, indent = 2): string {
 export default function DeviceConfigPage() {
   const t = useTranslations("deviceConfig");
   const tc = useTranslations("common");
+  const te = useTranslations("errors");
   const params = useParams();
   const router = useRouter();
   const deviceId = params.id as string;
@@ -99,7 +100,7 @@ export default function DeviceConfigPage() {
     fetch(`/api/devices/${deviceId}/config`)
       .then(async (res) => {
         const json = await res.json();
-        if (!res.ok) throw new Error(json.error?.message ?? t("loadFailed"));
+        if (!res.ok) throw new Error(json.error?.message ? te(json.error.message, json.error.params) : t("loadFailed"));
         return json.data as ConfigData;
       })
       .then((data) => setConfigData(data))

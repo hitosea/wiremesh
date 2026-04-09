@@ -34,6 +34,7 @@ export default function LinesPage() {
   const router = useRouter();
   const t = useTranslations("lines");
   const tc = useTranslations("common");
+  const te = useTranslations("errors");
   const [data, setData] = useState<Line[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
@@ -96,7 +97,7 @@ export default function LinesPage() {
         fetchLines(pagination.page);
       } else {
         const json = await res.json();
-        toast.error(json.error?.message ?? tc("deleteFailed"));
+        toast.error(json.error?.message ? te(json.error.message, json.error.params) : tc("deleteFailed"));
       }
     } catch {
       toast.error(tc("deleteFailedRetry"));

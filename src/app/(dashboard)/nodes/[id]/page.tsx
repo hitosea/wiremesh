@@ -47,6 +47,7 @@ export default function NodeDetailPage() {
   const tn = useTranslations("nodeNew");
   const ts = useTranslations("nodes");
   const tc = useTranslations("common");
+  const te = useTranslations("errors");
 
   const [node, setNode] = useState<NodeDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -125,7 +126,7 @@ export default function NodeDetailPage() {
         toast.success(tc("save"));
         setNode(json.data);
       } else {
-        toast.error(json.error?.message ?? tc("saveFailed"));
+        toast.error(json.error?.message ? te(json.error.message, json.error.params) : tc("saveFailed"));
       }
     } catch {
       toast.error(tc("saveFailedRetry"));

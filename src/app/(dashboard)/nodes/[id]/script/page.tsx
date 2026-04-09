@@ -13,6 +13,7 @@ export default function NodeScriptPage() {
   const nodeId = params.id as string;
   const t = useTranslations("nodeScript");
   const tc = useTranslations("common");
+  const te = useTranslations("errors");
 
   const [oneliner, setOneliner] = useState("");
   const [script, setScript] = useState("");
@@ -37,7 +38,7 @@ export default function NodeScriptPage() {
       .then(async (res) => {
         if (!res.ok) {
           const json = await res.json().catch(() => ({}));
-          throw new Error(json.error?.message ?? t("loadScriptFailed"));
+          throw new Error(json.error?.message ? te(json.error.message, json.error.params) : t("loadScriptFailed"));
         }
         return res.text();
       })

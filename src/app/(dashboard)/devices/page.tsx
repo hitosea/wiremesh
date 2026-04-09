@@ -58,6 +58,7 @@ export default function DevicesPage() {
 function DevicesContent() {
   const t = useTranslations("devices");
   const tc = useTranslations("common");
+  const te = useTranslations("errors");
   const router = useRouter();
   const searchParams = useSearchParams();
   const lineId = searchParams.get("lineId");
@@ -148,7 +149,7 @@ function DevicesContent() {
         fetchDevices(pagination.page);
       } else {
         const json = await res.json();
-        toast.error(json.error?.message ?? tc("deleteFailed"));
+        toast.error(json.error?.message ? te(json.error.message, json.error.params) : tc("deleteFailed"));
       }
     } catch {
       toast.error(tc("deleteFailedRetry"));
@@ -172,7 +173,7 @@ function DevicesContent() {
         setShowBatchDelete(false);
         fetchDevices(pagination.page);
       } else {
-        toast.error(json.error?.message ?? t("batchDeleteFailed"));
+        toast.error(json.error?.message ? te(json.error.message, json.error.params) : t("batchDeleteFailed"));
       }
     } catch {
       toast.error(t("batchDeleteFailedRetry"));
@@ -198,7 +199,7 @@ function DevicesContent() {
         setBatchLineId("");
         fetchDevices(pagination.page);
       } else {
-        toast.error(json.error?.message ?? t("batchSwitchFailed"));
+        toast.error(json.error?.message ? te(json.error.message, json.error.params) : t("batchSwitchFailed"));
       }
     } catch {
       toast.error(t("batchSwitchFailedRetry"));

@@ -20,6 +20,7 @@ export default function SetupPage() {
   const t = useTranslations("setup");
   const ta = useTranslations("auth");
   const tc = useTranslations("common");
+  const te = useTranslations("errors");
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const [form, setForm] = useState({
@@ -67,7 +68,7 @@ export default function SetupPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data?.error?.message || t("initFailed"));
+        toast.error(data?.error?.message ? te(data.error.message, data.error.params) : t("initFailed"));
         return;
       }
       toast.success(t("initSuccess"));

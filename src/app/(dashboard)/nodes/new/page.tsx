@@ -21,6 +21,7 @@ export default function NewNodePage() {
   const router = useRouter();
   const t = useTranslations("nodeNew");
   const tc = useTranslations("common");
+  const te = useTranslations("errors");
   const [submitting, setSubmitting] = useState(false);
 
   const [name, setName] = useState("");
@@ -71,7 +72,7 @@ export default function NewNodePage() {
         toast.success(t("created"));
         router.push("/nodes");
       } else {
-        toast.error(json.error?.message ?? tc("createFailed"));
+        toast.error(json.error?.message ? te(json.error.message, json.error.params) : tc("createFailed"));
       }
     } catch {
       toast.error(tc("createFailedRetry"));

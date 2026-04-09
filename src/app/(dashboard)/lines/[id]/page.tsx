@@ -87,6 +87,7 @@ export default function LineDetailPage() {
   const lineId = params.id as string;
   const t = useTranslations("lineDetail");
   const tc = useTranslations("common");
+  const te = useTranslations("errors");
   const tn = useTranslations("nodes");
   const tNew = useTranslations("lineNew");
 
@@ -141,7 +142,7 @@ export default function LineDetailPage() {
         toast.success(t("saved"));
         setLine((prev) => (prev ? { ...prev, ...json.data } : prev));
       } else {
-        toast.error(json.error?.message ?? tc("saveFailed"));
+        toast.error(json.error?.message ? te(json.error.message, json.error.params) : tc("saveFailed"));
       }
     } catch {
       toast.error(tc("saveFailedRetry"));
