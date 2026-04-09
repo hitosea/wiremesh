@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -80,30 +81,14 @@ type LineDetail = {
   deviceCount: number;
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  active: "活跃",
-  inactive: "停用",
-};
-
-
-const ROLE_LABELS: Record<string, string> = {
-  entry: "入口",
-  relay: "中转",
-  exit: "出口",
-};
-
-const NODE_STATUS_LABELS: Record<string, string> = {
-  online: "在线",
-  offline: "离线",
-  installing: "安装中",
-  error: "异常",
-};
-
-
 export default function LineDetailPage() {
   const router = useRouter();
   const params = useParams();
   const lineId = params.id as string;
+  const t = useTranslations("lineDetail");
+  const tc = useTranslations("common");
+  const tn = useTranslations("nodes");
+  const tNew = useTranslations("lineNew");
 
   const [line, setLine] = useState<LineDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -120,7 +105,7 @@ export default function LineDetailPage() {
       .then((json) => {
         const l = json.data;
         if (!l) {
-          toast.error("线路不存在");
+          toast.error(t("notFound"));
           router.push("/lines");
           return;
         }
@@ -130,13 +115,13 @@ export default function LineDetailPage() {
         setTags(l.tags ?? "");
         setRemark(l.remark ?? "");
       })
-      .catch(() => toast.error("加载线路失败"))
+      .catch(() => toast.error(t("loadFailed")))
       .finally(() => setLoading(false));
   }, [lineId, router]);
 
   const handleSave = async () => {
     if (!name.trim()) {
-      toast.error("线路名称不能为空");
+      toast.error(t("nameRequired"));
       return;
     }
     setSaving(true);
@@ -153,13 +138,13 @@ export default function LineDetailPage() {
       });
       const json = await res.json();
       if (res.ok) {
-        toast.success("线路已保存");
+        toast.success(t("saved"));
         setLine((prev) => (prev ? { ...prev, ...json.data } : prev));
       } else {
-        toast.error(json.error?.message ?? "保存失败");
+        toast.error(json.error?.message ?? tc("saveFailed"));
       }
     } catch {
-      toast.error("保存失败，请重试");
+      toast.error(tc("saveFailedRetry"));
     } finally {
       setSaving(false);
     }
@@ -168,7 +153,7 @@ export default function LineDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-48 text-muted-foreground">
-        加载中...
+        {tc("loading")}
       </div>
     );
   }
@@ -180,10 +165,10 @@ export default function LineDetailPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold">{line.name}</h1>
-          <StatusDot status={line.status} label={STATUS_LABELS[line.status] ?? line.status} />
+          <StatusDot status={line.status} label={line.status === "active" ? t("active") : line.status === "inactive" ? t("disabled") : line.status} />
         </div>
         <Button variant="outline" onClick={() => router.push("/lines")}>
-          返回
+          {tc("back")}
         </Button>
       </div>
 
@@ -193,15 +178,15 @@ export default function LineDetailPage() {
         return (
           <Card>
             <CardHeader>
-              <CardTitle>基本信息</CardTitle>
+              <CardTitle>{t("basicInfo")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="flex items-center gap-2 text-sm">
-                <span className="text-muted-foreground w-20 shrink-0">名称</span>
+                <span className="text-muted-foreground w-20 shrink-0">{t("name")}</span>
                 <span>{line.name}</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
-                <span className="text-muted-foreground w-20 shrink-0">入口节点</span>
+                <span className="text-muted-foreground w-20 shrink-0">{t("entryNode")}</span>
                 {entryNode ? (
                   <span className="flex items-center gap-2">
                     <Link
@@ -210,10 +195,10 @@ export default function LineDetailPage() {
                     >
                       {entryNode.nodeName}
                     </Link>
-                    <StatusDot status={entryNode.nodeStatus} label={NODE_STATUS_LABELS[entryNode.nodeStatus] ?? entryNode.nodeStatus} />
+                    <StatusDot status={entryNode.nodeStatus} label={tn(`status.${entryNode.nodeStatus}` as "status.online" | "status.offline" | "status.installing" | "status.error") ?? entryNode.nodeStatus} />
                   </span>
                 ) : (
-                  <span className="text-muted-foreground">未设置</span>
+                  <span className="text-muted-foreground">{t("notSet")}</span>
                 )}
               </div>
             </CardContent>
@@ -224,11 +209,11 @@ export default function LineDetailPage() {
       {/* Branch topology */}
       <Card>
         <CardHeader>
-          <CardTitle>分支拓扑</CardTitle>
+          <CardTitle>{t("branchTopology")}</CardTitle>
         </CardHeader>
         <CardContent>
           {line.branches.length === 0 ? (
-            <p className="text-sm text-muted-foreground">暂无分支数据</p>
+            <p className="text-sm text-muted-foreground">{t("noBranches")}</p>
           ) : (
             <div className="space-y-3">
               {line.branches.map((branch) => {
@@ -239,7 +224,7 @@ export default function LineDetailPage() {
                 const chainParts = entryNode
                   ? [entryNode.nodeName, ...branchNodeNames]
                   : branchNodeNames;
-                const chainStr = chainParts.join(" → ");
+                const chainStr = chainParts.join(" \u2192 ");
 
                 return (
                   <div
@@ -249,16 +234,16 @@ export default function LineDetailPage() {
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{branch.name}</span>
                       {branch.isDefault && (
-                        <Badge variant="outline">默认</Badge>
+                        <Badge variant="outline">{t("default")}</Badge>
                       )}
                     </div>
                     <div className="text-sm font-mono text-muted-foreground">
-                      {chainStr || "无节点"}
+                      {chainStr || tc("noData")}
                     </div>
                     <div className="flex items-center gap-1 text-sm">
-                      <span className="text-muted-foreground">分流规则:</span>
+                      <span className="text-muted-foreground">{t("filterRules")}</span>
                       {branch.filters.length === 0 ? (
-                        <span className="text-muted-foreground">(无)</span>
+                        <span className="text-muted-foreground">{t("noFilters")}</span>
                       ) : (
                         <span className="flex flex-wrap gap-1">
                           {branch.filters.map((f) => (
@@ -280,38 +265,38 @@ export default function LineDetailPage() {
       {/* Tunnel info card */}
       <Card>
         <CardHeader>
-          <CardTitle>隧道信息</CardTitle>
+          <CardTitle>{t("tunnelInfo")}</CardTitle>
         </CardHeader>
         <CardContent>
           {line.tunnels.length === 0 ? (
-            <p className="text-sm text-muted-foreground">暂无隧道数据</p>
+            <p className="text-sm text-muted-foreground">{t("noTunnels")}</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>段</TableHead>
-                  <TableHead>起点节点</TableHead>
-                  <TableHead>终点节点</TableHead>
-                  <TableHead>起点地址</TableHead>
-                  <TableHead>终点地址</TableHead>
-                  <TableHead>起点端口</TableHead>
-                  <TableHead>终点端口</TableHead>
+                  <TableHead>{t("segment")}</TableHead>
+                  <TableHead>{t("sourceNode")}</TableHead>
+                  <TableHead>{t("targetNode")}</TableHead>
+                  <TableHead>{t("sourceAddress")}</TableHead>
+                  <TableHead>{t("targetAddress")}</TableHead>
+                  <TableHead>{t("sourcePort")}</TableHead>
+                  <TableHead>{t("targetPort")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {line.tunnels.map((t) => (
-                  <TableRow key={t.id}>
-                    <TableCell>{t.hopIndex + 1}</TableCell>
-                    <TableCell>{t.fromNodeName}</TableCell>
-                    <TableCell>{t.toNodeName}</TableCell>
+                {line.tunnels.map((tun) => (
+                  <TableRow key={tun.id}>
+                    <TableCell>{tun.hopIndex + 1}</TableCell>
+                    <TableCell>{tun.fromNodeName}</TableCell>
+                    <TableCell>{tun.toNodeName}</TableCell>
                     <TableCell>
-                      <code className="text-xs">{t.fromWgAddress}</code>
+                      <code className="text-xs">{tun.fromWgAddress}</code>
                     </TableCell>
                     <TableCell>
-                      <code className="text-xs">{t.toWgAddress}</code>
+                      <code className="text-xs">{tun.toWgAddress}</code>
                     </TableCell>
-                    <TableCell>{t.fromWgPort}</TableCell>
-                    <TableCell>{t.toWgPort}</TableCell>
+                    <TableCell>{tun.fromWgPort}</TableCell>
+                    <TableCell>{tun.toWgPort}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -323,16 +308,16 @@ export default function LineDetailPage() {
       {/* Associated devices */}
       <Card>
         <CardHeader>
-          <CardTitle>关联设备</CardTitle>
+          <CardTitle>{t("relatedDevices")}</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            共关联{" "}
+            {t("deviceCount")}{" "}
             <Link
               href={`/devices?lineId=${line.id}`}
               className="text-primary hover:underline font-medium"
             >
-              {line.deviceCount} 台设备
+              {line.deviceCount} {t("deviceUnit")}
             </Link>
           </p>
         </CardContent>
@@ -341,12 +326,12 @@ export default function LineDetailPage() {
       {/* Edit form */}
       <Card>
         <CardHeader>
-          <CardTitle>编辑线路</CardTitle>
+          <CardTitle>{t("editLine")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">
-              线路名称 <span className="text-destructive">*</span>
+              {t("lineName")} <span className="text-destructive">*</span>
             </Label>
             <Input
               id="name"
@@ -355,28 +340,28 @@ export default function LineDetailPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="status">状态</Label>
+            <Label htmlFor="status">{t("status")}</Label>
             <Select value={status} onValueChange={setStatus}>
               <SelectTrigger id="status">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="active">活跃</SelectItem>
-                <SelectItem value="inactive">停用</SelectItem>
+                <SelectItem value="active">{t("active")}</SelectItem>
+                <SelectItem value="inactive">{t("disabled")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="tags">标签（逗号分隔）</Label>
+            <Label htmlFor="tags">{tNew("tagsComma")}</Label>
             <Input
               id="tags"
               value={tags}
               onChange={(e) => setTags(e.target.value)}
-              placeholder="例如：低延迟,稳定"
+              placeholder={tNew("tagsPlaceholder")}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="remark">备注</Label>
+            <Label htmlFor="remark">{tNew("notes")}</Label>
             <Textarea
               id="remark"
               value={remark}
@@ -389,10 +374,10 @@ export default function LineDetailPage() {
 
       <div className="flex flex-col sm:flex-row gap-2">
         <Button onClick={handleSave} disabled={saving}>
-          {saving ? "保存中..." : "保存"}
+          {saving ? tc("saving") : tc("save")}
         </Button>
         <Button variant="outline" onClick={() => router.push("/lines")}>
-          返回
+          {tc("back")}
         </Button>
       </div>
     </div>

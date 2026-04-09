@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,6 +43,8 @@ type BranchInput = {
 
 export default function NewLinePage() {
   const router = useRouter();
+  const t = useTranslations("lineNew");
+  const tc = useTranslations("common");
   const [submitting, setSubmitting] = useState(false);
 
   const [name, setName] = useState("");
@@ -50,7 +53,7 @@ export default function NewLinePage() {
 
   const [entryNodeId, setEntryNodeId] = useState("");
   const [branches, setBranches] = useState<BranchInput[]>([
-    { name: "默认出口", isDefault: true, nodeIds: [""], filterIds: [] },
+    { name: t("defaultBranch"), isDefault: true, nodeIds: [""], filterIds: [] },
   ]);
 
   const [nodeOptions, setNodeOptions] = useState<NodeOption[]>([]);
@@ -68,7 +71,7 @@ export default function NewLinePage() {
         setLoadingNodes(false);
       })
       .catch(() => {
-        toast.error("加载数据失败");
+        toast.error(t("loadFailed"));
         setLoadingNodes(false);
       });
   }, []);
@@ -101,7 +104,7 @@ export default function NewLinePage() {
     setBranches((prev) => [
       ...prev,
       {
-        name: `分支 ${prev.length + 1}`,
+        name: t("branch", { index: prev.length + 1 }),
         isDefault: false,
         nodeIds: [""],
         filterIds: [],
@@ -165,14 +168,14 @@ export default function NewLinePage() {
   const branchChainPreview = (branch: BranchInput) => {
     const entryName = entryNodeId ? getNodeName(entryNodeId) : "?";
     const rest = branch.nodeIds.map((id) => (id ? getNodeName(id) : "?"));
-    return [entryName, ...rest].join(" → ");
+    return [entryName, ...rest].join(" \u2192 ");
   };
 
   // --- Node label in branch ---
 
   const getBranchNodeLabel = (branch: BranchInput, nodeIdx: number): string => {
-    if (nodeIdx === branch.nodeIds.length - 1) return "出口节点";
-    return "中转节点";
+    if (nodeIdx === branch.nodeIds.length - 1) return t("exitNode");
+    return t("transitNode");
   };
 
   // --- Submit ---
@@ -180,33 +183,33 @@ export default function NewLinePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      toast.error("线路名称不能为空");
+      toast.error(t("nameRequired"));
       return;
     }
     if (!entryNodeId) {
-      toast.error("请选择入口节点");
+      toast.error(t("entryRequired"));
       return;
     }
     if (branches.length === 0) {
-      toast.error("至少需要一个分支");
+      toast.error(t("branchRequired"));
       return;
     }
     for (const branch of branches) {
       if (!branch.name.trim()) {
-        toast.error("分支名称不能为空");
+        toast.error(t("branchName"));
         return;
       }
       if (branch.nodeIds.length < 1) {
-        toast.error(`分支「${branch.name}」至少需要一个出口节点`);
+        toast.error(t("branchExitRequired", { name: branch.name }));
         return;
       }
       if (branch.nodeIds.some((id) => !id)) {
-        toast.error(`分支「${branch.name}」有未选择的节点`);
+        toast.error(t("branchNodeMissing", { name: branch.name }));
         return;
       }
     }
     if (!branches.some((b) => b.isDefault)) {
-      toast.error("必须设置一个默认分支");
+      toast.error(t("defaultBranchRequired"));
       return;
     }
 
@@ -230,13 +233,13 @@ export default function NewLinePage() {
       });
       const json = await res.json();
       if (res.ok) {
-        toast.success("线路创建成功");
+        toast.success(t("created"));
         router.push("/lines");
       } else {
-        toast.error(json.error?.message ?? "创建失败");
+        toast.error(json.error?.message ?? tc("createFailed"));
       }
     } catch {
-      toast.error("创建失败，请重试");
+      toast.error(tc("createFailedRetry"));
     } finally {
       setSubmitting(false);
     }
@@ -245,9 +248,9 @@ export default function NewLinePage() {
   return (
     <div className="space-y-6 w-full max-w-2xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">新增线路</h1>
+        <h1 className="text-2xl font-semibold">{t("title")}</h1>
         <Button variant="outline" onClick={() => router.back()}>
-          返回
+          {tc("back")}
         </Button>
       </div>
 
@@ -255,36 +258,36 @@ export default function NewLinePage() {
         {/* Basic Info Card */}
         <Card>
           <CardHeader>
-            <CardTitle>基本信息</CardTitle>
+            <CardTitle>{t("basicInfo")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">
-                线路名称 <span className="text-destructive">*</span>
+                {t("lineName")} <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="例如：香港→日本直连"
+                placeholder={t("lineNamePlaceholder")}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="tags">标签（逗号分隔）</Label>
+              <Label htmlFor="tags">{t("tagsComma")}</Label>
               <Input
                 id="tags"
                 value={tags}
                 onChange={(e) => setTags(e.target.value)}
-                placeholder="例如：低延迟,稳定"
+                placeholder={t("tagsPlaceholder")}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="remark">备注</Label>
+              <Label htmlFor="remark">{t("notes")}</Label>
               <Textarea
                 id="remark"
                 value={remark}
                 onChange={(e) => setRemark(e.target.value)}
-                placeholder="备注信息"
+                placeholder={t("notesPlaceholder")}
                 rows={3}
               />
             </div>
@@ -294,19 +297,19 @@ export default function NewLinePage() {
         {/* Entry Node Card */}
         <Card>
           <CardHeader>
-            <CardTitle>入口节点</CardTitle>
+            <CardTitle>{t("entryNode")}</CardTitle>
           </CardHeader>
           <CardContent>
             {loadingNodes ? (
-              <div className="text-sm text-muted-foreground">加载节点中...</div>
+              <div className="text-sm text-muted-foreground">{t("loadingNodes")}</div>
             ) : (
               <div className="space-y-2">
                 <Label>
-                  入口节点 <span className="text-destructive">*</span>
+                  {t("entryNode")} <span className="text-destructive">*</span>
                 </Label>
                 <Select value={entryNodeId} onValueChange={setEntryNodeId}>
                   <SelectTrigger>
-                    <SelectValue placeholder="选择入口节点" />
+                    <SelectValue placeholder={t("selectEntry")} />
                   </SelectTrigger>
                   <SelectContent>
                     {nodeOptions.map((n) => (
@@ -327,7 +330,7 @@ export default function NewLinePage() {
             <Card key={branchIdx}>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle>分支 {branchIdx + 1}</CardTitle>
+                  <CardTitle>{t("branch", { index: branchIdx + 1 })}</CardTitle>
                   <Button
                     type="button"
                     variant="outline"
@@ -335,7 +338,7 @@ export default function NewLinePage() {
                     disabled={branches.length <= 1}
                     onClick={() => removeBranch(branchIdx)}
                   >
-                    删除分支
+                    {t("deleteBranch")}
                   </Button>
                 </div>
               </CardHeader>
@@ -343,7 +346,7 @@ export default function NewLinePage() {
                 {/* Branch name + default radio */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label>分支名称</Label>
+                    <Label>{t("branchName")}</Label>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="radio"
@@ -352,7 +355,7 @@ export default function NewLinePage() {
                         onChange={() => setDefaultBranch(branchIdx)}
                         className="accent-primary"
                       />
-                      <span className="text-sm whitespace-nowrap">默认分支</span>
+                      <span className="text-sm whitespace-nowrap">{t("defaultBranch")}</span>
                     </label>
                   </div>
                   <Input
@@ -360,13 +363,13 @@ export default function NewLinePage() {
                     onChange={(e) =>
                       updateBranch(branchIdx, { name: e.target.value })
                     }
-                    placeholder="分支名称"
+                    placeholder={t("branchName")}
                   />
                 </div>
 
                 {/* Node chain: relay nodes + exit node */}
                 <div className="space-y-3">
-                  <Label>节点链路</Label>
+                  <Label>{t("nodeChain")}</Label>
                   <div className="rounded-md border border-border p-3 space-y-2">
                     {branch.nodeIds.map((nodeId, nodeIdx) => (
                       <div key={nodeIdx} className="flex items-center gap-2">
@@ -382,7 +385,7 @@ export default function NewLinePage() {
                           >
                             <SelectTrigger>
                               <SelectValue
-                                placeholder={`选择${getBranchNodeLabel(branch, nodeIdx)}`}
+                                placeholder={t("selectNode", { label: getBranchNodeLabel(branch, nodeIdx) })}
                               />
                             </SelectTrigger>
                             <SelectContent>
@@ -403,7 +406,7 @@ export default function NewLinePage() {
                             className="text-muted-foreground hover:text-destructive"
                             onClick={() => removeBranchRelay(branchIdx, nodeIdx)}
                           >
-                            移除
+                            {tc("remove")}
                           </Button>
                         )}
                       </div>
@@ -415,7 +418,7 @@ export default function NewLinePage() {
                       className="w-full border-dashed"
                       onClick={() => addBranchRelay(branchIdx)}
                     >
-                      + 添加中转
+                      {t("addTransit")}
                     </Button>
                   </div>
                 </div>
@@ -423,7 +426,7 @@ export default function NewLinePage() {
                 {/* Filter multi-select */}
                 {availableFilters.length > 0 && (
                   <div className="space-y-3">
-                    <Label>分流规则</Label>
+                    <Label>{t("filterRules")}</Label>
                     <div className="flex flex-wrap gap-x-5 gap-y-2.5">
                       {availableFilters.map((f) => (
                         <label
@@ -446,7 +449,7 @@ export default function NewLinePage() {
                 {/* Chain preview */}
                 {(entryNodeId || branch.nodeIds.some((id) => id)) && (
                   <div className="p-3 bg-muted rounded text-sm">
-                    <span className="text-muted-foreground">链路：</span>
+                    <span className="text-muted-foreground">{t("chainLabel")}</span>
                     {branchChainPreview(branch)}
                   </div>
                 )}
@@ -457,21 +460,21 @@ export default function NewLinePage() {
         {/* Add branch button */}
         {!loadingNodes && (
           <Button type="button" variant="outline" onClick={addBranch}>
-            添加分支
+            {t("addBranch")}
           </Button>
         )}
 
         {/* Submit / Cancel */}
         <div className="flex flex-col sm:flex-row gap-2">
           <Button type="submit" disabled={submitting}>
-            {submitting ? "创建中..." : "创建线路"}
+            {submitting ? tc("creating") : t("createLine")}
           </Button>
           <Button
             type="button"
             variant="outline"
             onClick={() => router.back()}
           >
-            取消
+            {tc("cancel")}
           </Button>
         </div>
       </form>

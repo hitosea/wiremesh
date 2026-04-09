@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { StatusDot } from "@/components/status-dot";
 import {
@@ -29,26 +30,10 @@ type Line = {
   nodes: LineNode[];
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  active: "活跃",
-  inactive: "停用",
-};
-
-
-const ROLE_LABELS: Record<string, string> = {
-  entry: "入口",
-  relay: "中转",
-  exit: "出口",
-};
-
-function renderNodeChain(nodes: LineNode[]): string {
-  return nodes
-    .map((n) => `${n.nodeName}(${ROLE_LABELS[n.role] ?? n.role})`)
-    .join(" → ");
-}
-
 export default function LinesPage() {
   const router = useRouter();
+  const t = useTranslations("lines");
+  const tc = useTranslations("common");
   const [data, setData] = useState<Line[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
@@ -60,6 +45,12 @@ export default function LinesPage() {
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  const renderNodeChain = (nodes: LineNode[]): string => {
+    return nodes
+      .map((n) => `${n.nodeName}(${t(`role.${n.role}` as "role.entry" | "role.transit" | "role.exit") ?? n.role})`)
+      .join(" \u2192 ");
+  };
 
   const fetchLines = async (page = 1, q = search) => {
     setLoading(true);
@@ -74,7 +65,7 @@ export default function LinesPage() {
       setData(json.data ?? []);
       if (json.pagination) setPagination(json.pagination);
     } catch {
-      toast.error("加载线路列表失败");
+      toast.error(t("loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -100,15 +91,15 @@ export default function LinesPage() {
     try {
       const res = await fetch(`/api/lines/${deleteId}`, { method: "DELETE" });
       if (res.ok) {
-        toast.success("线路已删除");
+        toast.success(t("deleted"));
         setDeleteId(null);
         fetchLines(pagination.page);
       } else {
         const json = await res.json();
-        toast.error(json.error?.message ?? "删除失败");
+        toast.error(json.error?.message ?? tc("deleteFailed"));
       }
     } catch {
-      toast.error("删除失败，请重试");
+      toast.error(tc("deleteFailedRetry"));
     } finally {
       setDeleting(false);
     }
@@ -117,7 +108,7 @@ export default function LinesPage() {
   const columns: Column<Line>[] = [
     {
       key: "name",
-      label: "名称",
+      label: t("name"),
       render: (row) => (
         <Link
           href={`/lines/${row.id}`}
@@ -129,18 +120,18 @@ export default function LinesPage() {
     },
     {
       key: "nodes",
-      label: "节点链路",
+      label: t("nodeChain"),
       render: (row) => (
         <span className="text-sm text-muted-foreground">
-          {row.nodes.length > 0 ? renderNodeChain(row.nodes) : "—"}
+          {row.nodes.length > 0 ? renderNodeChain(row.nodes) : "\u2014"}
         </span>
       ),
     },
     {
       key: "status",
-      label: "状态",
+      label: t("status"),
       render: (row) => (
-        <StatusDot status={row.status} label={STATUS_LABELS[row.status] ?? row.status} />
+        <StatusDot status={row.status} label={t(`status.${row.status}` as "status.active" | "status.disabled") ?? row.status} />
       ),
     },
     {
@@ -154,14 +145,14 @@ export default function LinesPage() {
             size="sm"
             onClick={() => router.push(`/lines/${row.id}`)}
           >
-            详情
+            {t("details")}
           </Button>
           <Button
             variant="destructive"
             size="sm"
             onClick={() => setDeleteId(row.id)}
           >
-            删除
+            {tc("delete")}
           </Button>
         </div>
       ),
@@ -171,12 +162,12 @@ export default function LinesPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-end">
-        <Button onClick={() => router.push("/lines/new")}>新增线路</Button>
+        <Button onClick={() => router.push("/lines/new")}>{t("addLine")}</Button>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center h-48 text-muted-foreground">
-          加载中...
+          {tc("loading")}
         </div>
       ) : (
         <DataTable
@@ -186,28 +177,28 @@ export default function LinesPage() {
           onPageChange={handlePageChange}
           onSearch={handleSearch}
           onRefresh={() => fetchLines(pagination.page)}
-          searchPlaceholder="搜索线路名称..."
+          searchPlaceholder={t("searchPlaceholder")}
         />
       )}
 
       <Dialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>确认删除</DialogTitle>
+            <DialogTitle>{tc("confirmDelete")}</DialogTitle>
           </DialogHeader>
           <p className="text-muted-foreground">
-            确定要删除该线路吗？关联设备将取消绑定，此操作不可恢复。
+            {t("confirmDeleteLine")}
           </p>
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={() => setDeleteId(null)}>
-              取消
+              {tc("cancel")}
             </Button>
             <Button
               variant="destructive"
               onClick={handleDelete}
               disabled={deleting}
             >
-              {deleting ? "删除中..." : "确认删除"}
+              {deleting ? tc("deleting") : tc("confirmDelete")}
             </Button>
           </div>
         </DialogContent>
