@@ -325,6 +325,8 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Only set dnsProxy when domain rules exist (agent DNS proxy only starts with domain rules)
+    const hasDomainRules = xrayRoutes.some((r) => r.branches.some((b) => b.domain_rules.length > 0));
     xrayConfig = {
       enabled: true,
       protocol: "vless",
@@ -334,7 +336,7 @@ export async function GET(request: NextRequest) {
       realityDest: realitySettings.realityDest ?? "www.microsoft.com:443",
       realityServerNames: [realitySettings.realityServerName ?? "www.microsoft.com"],
       routes: xrayRoutes,
-      dnsProxy: node.wgAddress ? node.wgAddress.split("/")[0] : "",
+      dnsProxy: hasDomainRules && node.wgAddress ? node.wgAddress.split("/")[0] : "",
     };
   }
 
