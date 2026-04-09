@@ -38,7 +38,7 @@ export default async function RootLayout({
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} antialiased overflow-hidden`}
     >
-      <body className="h-screen flex flex-col overflow-hidden">
+      <body className="h-dvh flex flex-col overflow-hidden">
         <ThemeProvider>
           <NextIntlClientProvider locale={locale} messages={messages}>
             {children}
