@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   Table,
   TableBody,
@@ -48,12 +49,13 @@ export function DataTable<T extends Record<string, unknown>>({
   onPageChange,
   onSearch,
   onRefresh,
-  searchPlaceholder = "搜索...",
+  searchPlaceholder,
   selectable = false,
   selectedIds = new Set(),
   onSelectionChange,
   getRowId = (row) => row.id as number,
 }: DataTableProps<T>) {
+  const t = useTranslations();
   const [searchValue, setSearchValue] = useState("");
 
   const handleSearch = () => {
@@ -74,15 +76,15 @@ export function DataTable<T extends Record<string, unknown>>({
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={searchPlaceholder}
+            placeholder={searchPlaceholder ?? t("dataTable.searchPlaceholder")}
             className="sm:max-w-sm"
           />
           <Button variant="outline" onClick={handleSearch}>
-            搜索
+            {t("common.search")}
           </Button>
           {onRefresh && (
             <Button variant="outline" onClick={onRefresh}>
-              刷新
+              {t("common.refresh")}
             </Button>
           )}
         </div>
@@ -119,7 +121,7 @@ export function DataTable<T extends Record<string, unknown>>({
                   colSpan={columns.length + (selectable ? 1 : 0)}
                   className="h-24 text-center text-muted-foreground"
                 >
-                  暂无数据
+                  {t("common.noData")}
                 </TableCell>
               </TableRow>
             ) : (
@@ -154,8 +156,7 @@ export function DataTable<T extends Record<string, unknown>>({
       {pagination && pagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">
-            第 {pagination.page} / {pagination.totalPages} 页，共{" "}
-            {pagination.total} 条
+            {t("common.pagination", { page: pagination.page, totalPages: pagination.totalPages, total: pagination.total })}
           </span>
           <div className="flex gap-2">
             <Button
@@ -164,7 +165,7 @@ export function DataTable<T extends Record<string, unknown>>({
               disabled={pagination.page <= 1}
               onClick={() => onPageChange?.(pagination.page - 1)}
             >
-              上一页
+              {t("common.prevPage")}
             </Button>
             <Button
               variant="outline"
@@ -172,7 +173,7 @@ export function DataTable<T extends Record<string, unknown>>({
               disabled={pagination.page >= pagination.totalPages}
               onClick={() => onPageChange?.(pagination.page + 1)}
             >
-              下一页
+              {t("common.nextPage")}
             </Button>
           </div>
         </div>

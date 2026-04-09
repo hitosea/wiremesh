@@ -9,30 +9,30 @@ import {
 
 export type NavItem = {
   href: string;
-  label: string;
+  labelKey: string;
   icon: typeof LayoutDashboard;
 };
 
 export type NavGroup = {
-  title: string;
+  titleKey: string;
   items: NavItem[];
 };
 
 export const NAV_GROUPS: NavGroup[] = [
   {
-    title: "网络",
+    titleKey: "nav.network",
     items: [
-      { href: "/dashboard", label: "仪表盘", icon: LayoutDashboard },
-      { href: "/nodes", label: "节点管理", icon: Server },
-      { href: "/devices", label: "设备管理", icon: Smartphone },
-      { href: "/lines", label: "线路管理", icon: Cable },
+      { href: "/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard },
+      { href: "/nodes", labelKey: "nav.nodes", icon: Server },
+      { href: "/devices", labelKey: "nav.devices", icon: Smartphone },
+      { href: "/lines", labelKey: "nav.lines", icon: Cable },
     ],
   },
   {
-    title: "配置",
+    titleKey: "nav.config",
     items: [
-      { href: "/filters", label: "分流规则", icon: Split },
-      { href: "/settings", label: "系统设置", icon: Settings },
+      { href: "/filters", labelKey: "nav.filters", icon: Split },
+      { href: "/settings", labelKey: "nav.settings", icon: Settings },
     ],
   },
 ];

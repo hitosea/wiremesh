@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import {
   LineChart,
@@ -49,6 +50,8 @@ function formatBytes(bytes: number): string {
 }
 
 export function NodeStatusChart({ nodeId }: { nodeId: string }) {
+  const t = useTranslations("nodeStatusChart");
+  const tc = useTranslations("common");
   const [points, setPoints] = useState<ChartPoint[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -71,14 +74,14 @@ export function NodeStatusChart({ nodeId }: { nodeId: string }) {
         });
         setPoints(mapped);
       })
-      .catch(() => toast.error("加载历史状态失败"))
+      .catch(() => toast.error(t("loadFailed")))
       .finally(() => setLoading(false));
   }, [nodeId]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-24 text-muted-foreground">
-        加载中...
+        {tc("loading")}
       </div>
     );
   }
@@ -86,7 +89,7 @@ export function NodeStatusChart({ nodeId }: { nodeId: string }) {
   if (points.length === 0) {
     return (
       <div className="flex items-center justify-center h-24 text-muted-foreground">
-        暂无历史数据
+        {t("noData")}
       </div>
     );
   }
@@ -95,7 +98,7 @@ export function NodeStatusChart({ nodeId }: { nodeId: string }) {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>延迟 (ms)</CardTitle>
+          <CardTitle>{t("latency")}</CardTitle>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={250}>
@@ -125,7 +128,7 @@ export function NodeStatusChart({ nodeId }: { nodeId: string }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>流量</CardTitle>
+          <CardTitle>{t("traffic")}</CardTitle>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={250}>
@@ -148,7 +151,7 @@ export function NodeStatusChart({ nodeId }: { nodeId: string }) {
                 stroke="hsl(var(--chart-1))"
                 fill="hsl(var(--chart-1))"
                 fillOpacity={0.2}
-                name="上传"
+                name={t("upload")}
               />
               <Area
                 type="monotone"
@@ -156,7 +159,7 @@ export function NodeStatusChart({ nodeId }: { nodeId: string }) {
                 stroke="hsl(var(--chart-2))"
                 fill="hsl(var(--chart-2))"
                 fillOpacity={0.2}
-                name="下载"
+                name={t("download")}
               />
             </AreaChart>
           </ResponsiveContainer>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, createContext, useContext } from "react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PanelLeftClose, PanelLeft } from "lucide-react";
@@ -51,6 +52,7 @@ function NavLink({
   active: boolean;
   onClick?: () => void;
 }) {
+  const t = useTranslations();
   const Icon = item.icon;
 
   const link = (
@@ -66,7 +68,7 @@ function NavLink({
       )}
     >
       <Icon className="h-4 w-4 shrink-0" />
-      {!collapsed && <span>{item.label}</span>}
+      {!collapsed && <span>{t(item.labelKey)}</span>}
     </Link>
   );
 
@@ -74,7 +76,7 @@ function NavLink({
     return (
       <Tooltip>
         <TooltipTrigger asChild>{link}</TooltipTrigger>
-        <TooltipContent side="right">{item.label}</TooltipContent>
+        <TooltipContent side="right">{t(item.labelKey)}</TooltipContent>
       </Tooltip>
     );
   }
@@ -89,16 +91,17 @@ function SidebarNav({
   collapsed: boolean;
   onNavigate?: () => void;
 }) {
+  const t = useTranslations();
   const pathname = usePathname();
 
   return (
     <TooltipProvider delayDuration={0}>
       <nav className="flex-1 py-4 space-y-4 overflow-y-auto">
         {NAV_GROUPS.map((group) => (
-          <div key={group.title} className={collapsed ? "space-y-1 px-1" : "space-y-1 px-2"}>
+          <div key={group.titleKey} className={collapsed ? "space-y-1 px-1" : "space-y-1 px-2"}>
             {!collapsed && (
               <div className="px-3 py-1 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {group.title}
+                {t(group.titleKey)}
               </div>
             )}
             {collapsed && (
@@ -173,12 +176,13 @@ function DesktopSidebar() {
 }
 
 function MobileSidebar() {
+  const t = useTranslations();
   const { mobileOpen, setMobileOpen } = useSidebarMobile();
 
   return (
     <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
       <SheetContent side="left" className="w-[var(--sidebar-width)] p-0">
-        <SheetTitle className="sr-only">导航菜单</SheetTitle>
+        <SheetTitle className="sr-only">{t("sidebar.navMenu")}</SheetTitle>
         <div className="h-14 flex items-center px-4 border-b border-sidebar-border">
           <span className="font-semibold text-foreground">WireMesh</span>
         </div>
