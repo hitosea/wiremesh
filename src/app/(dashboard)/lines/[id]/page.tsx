@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/status-dot";
 import {
   Card,
   CardContent,
@@ -84,13 +85,6 @@ const STATUS_LABELS: Record<string, string> = {
   inactive: "停用",
 };
 
-const STATUS_VARIANTS: Record<
-  string,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  active: "default",
-  inactive: "secondary",
-};
 
 const ROLE_LABELS: Record<string, string> = {
   entry: "入口",
@@ -105,15 +99,6 @@ const NODE_STATUS_LABELS: Record<string, string> = {
   error: "异常",
 };
 
-const NODE_STATUS_VARIANTS: Record<
-  string,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  online: "default",
-  offline: "secondary",
-  installing: "outline",
-  error: "destructive",
-};
 
 export default function LineDetailPage() {
   const router = useRouter();
@@ -195,9 +180,7 @@ export default function LineDetailPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold">{line.name}</h1>
-          <Badge variant={STATUS_VARIANTS[line.status] ?? "secondary"}>
-            {STATUS_LABELS[line.status] ?? line.status}
-          </Badge>
+          <StatusDot status={line.status} label={STATUS_LABELS[line.status] ?? line.status} />
         </div>
         <Button variant="outline" onClick={() => router.push("/lines")}>
           返回
@@ -227,11 +210,7 @@ export default function LineDetailPage() {
                     >
                       {entryNode.nodeName}
                     </Link>
-                    <Badge
-                      variant={NODE_STATUS_VARIANTS[entryNode.nodeStatus] ?? "secondary"}
-                    >
-                      {NODE_STATUS_LABELS[entryNode.nodeStatus] ?? entryNode.nodeStatus}
-                    </Badge>
+                    <StatusDot status={entryNode.nodeStatus} label={NODE_STATUS_LABELS[entryNode.nodeStatus] ?? entryNode.nodeStatus} />
                   </span>
                 ) : (
                   <span className="text-muted-foreground">未设置</span>

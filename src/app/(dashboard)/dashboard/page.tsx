@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/status-dot";
 import {
   Card,
   CardContent,
@@ -75,15 +75,6 @@ const NODE_STATUS_LABELS: Record<string, string> = {
   error: "异常",
 };
 
-const NODE_STATUS_VARIANTS: Record<
-  string,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  online: "default",
-  offline: "secondary",
-  installing: "outline",
-  error: "destructive",
-};
 
 const DEVICE_STATUS_LABELS: Record<string, string> = {
   online: "在线",
@@ -205,11 +196,7 @@ export default function DashboardPage() {
                         {node.ip}
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant={NODE_STATUS_VARIANTS[node.status] ?? "secondary"}
-                        >
-                          {NODE_STATUS_LABELS[node.status] ?? node.status}
-                        </Badge>
+                        <StatusDot status={node.status} label={NODE_STATUS_LABELS[node.status] ?? node.status} />
                       </TableCell>
                     </TableRow>
                   ))
@@ -258,13 +245,7 @@ export default function DashboardPage() {
                         {device.status === "-" ? (
                           <span className="text-muted-foreground text-sm">-</span>
                         ) : (
-                          <Badge
-                            variant={
-                              NODE_STATUS_VARIANTS[device.status] ?? "secondary"
-                            }
-                          >
-                            {DEVICE_STATUS_LABELS[device.status] ?? device.status}
-                          </Badge>
+                          <StatusDot status={device.status} label={DEVICE_STATUS_LABELS[device.status] ?? device.status} />
                         )}
                       </TableCell>
                     </TableRow>

@@ -13,7 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/status-dot";
 import {
   Select,
   SelectContent,
@@ -46,14 +46,6 @@ const STATUS_LABELS: Record<string, string> = {
   error: "异常",
 };
 
-const STATUS_VARIANTS: Record<
-  string,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  online: "default",
-  offline: "secondary",
-  error: "destructive",
-};
 
 const PROTOCOL_LABELS: Record<string, string> = {
   wireguard: "WireGuard",
@@ -175,9 +167,7 @@ function DeviceDetailContent() {
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold">{device.name}</h1>
           {device.status !== "-" && (
-            <Badge variant={STATUS_VARIANTS[device.status] ?? "secondary"}>
-              {STATUS_LABELS[device.status] ?? device.status}
-            </Badge>
+            <StatusDot status={device.status} label={STATUS_LABELS[device.status] ?? device.status} />
           )}
         </div>
         <Button variant="outline" onClick={() => router.push(backPath)}>

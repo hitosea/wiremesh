@@ -14,7 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/status-dot";
 import { NodeStatusChart } from "@/components/node-status-chart";
 
 type NodeDetail = {
@@ -44,15 +44,6 @@ const STATUS_LABELS: Record<string, string> = {
   error: "异常",
 };
 
-const STATUS_VARIANTS: Record<
-  string,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  online: "default",
-  offline: "secondary",
-  installing: "outline",
-  error: "destructive",
-};
 
 export default function NodeDetailPage() {
   const router = useRouter();
@@ -161,9 +152,7 @@ export default function NodeDetailPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold">{node.name}</h1>
-          <Badge variant={STATUS_VARIANTS[node.status] ?? "secondary"}>
-            {STATUS_LABELS[node.status] ?? node.status}
-          </Badge>
+          <StatusDot status={node.status} label={STATUS_LABELS[node.status] ?? node.status} />
         </div>
         <Button variant="outline" onClick={() => router.push("/nodes")}>
           返回

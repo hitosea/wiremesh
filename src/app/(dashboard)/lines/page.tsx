@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/status-dot";
 import {
   Dialog,
   DialogContent,
@@ -34,13 +34,6 @@ const STATUS_LABELS: Record<string, string> = {
   inactive: "停用",
 };
 
-const STATUS_VARIANTS: Record<
-  string,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  active: "default",
-  inactive: "secondary",
-};
 
 const ROLE_LABELS: Record<string, string> = {
   entry: "入口",
@@ -147,9 +140,7 @@ export default function LinesPage() {
       key: "status",
       label: "状态",
       render: (row) => (
-        <Badge variant={STATUS_VARIANTS[row.status] ?? "secondary"}>
-          {STATUS_LABELS[row.status] ?? row.status}
-        </Badge>
+        <StatusDot status={row.status} label={STATUS_LABELS[row.status] ?? row.status} />
       ),
     },
     {
