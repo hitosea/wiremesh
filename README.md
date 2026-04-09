@@ -166,10 +166,12 @@ npm install
 # 开发模式
 npm run dev -- --port 3000 --hostname 0.0.0.0
 
-# 编译 Agent
+# 编译 Agent（打包为 tar.gz，放到 public/agent/ 供安装脚本下载）
 cd agent
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o wiremesh-agent-linux-amd64 .
-CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o wiremesh-agent-linux-arm64 .
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /tmp/wiremesh-agent -ldflags="-s -w" .
+tar -czf ../public/agent/wiremesh-agent-linux-amd64.tar.gz -C /tmp wiremesh-agent
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o /tmp/wiremesh-agent -ldflags="-s -w" .
+tar -czf ../public/agent/wiremesh-agent-linux-arm64.tar.gz -C /tmp wiremesh-agent
 
 # 测试
 npm run test              # Next.js 测试
