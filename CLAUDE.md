@@ -54,7 +54,10 @@ wiremesh/
 
 ## 开发注意事项
 
-- 仅中文界面，不需要国际化
+- 国际化使用 next-intl 无路由模式，翻译文件在 messages/ 目录（zh-CN.json, en.json）
+- 新增 UI 文本必须使用 useTranslations() hook，不要硬编码中文或英文
+- API 错误消息使用翻译 key（如 "validation.nameRequired"），前端负责翻译
+- 新增语言：复制 en.json，翻译所有 value，在 src/i18n/config.ts 的 locales 数组中注册
 - 适配桌面和平板，不需要移动端优化
 - 所有列表 API 使用服务端分页
 - 敏感数据（WG 私钥）必须 AES-256-GCM 加密存储
