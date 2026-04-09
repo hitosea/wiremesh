@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -83,6 +84,8 @@ function yamlIndent(obj: Record<string, unknown>, indent = 2): string {
 }
 
 export default function DeviceConfigPage() {
+  const t = useTranslations("deviceConfig");
+  const tc = useTranslations("common");
   const params = useParams();
   const router = useRouter();
   const deviceId = params.id as string;
@@ -96,11 +99,11 @@ export default function DeviceConfigPage() {
     fetch(`/api/devices/${deviceId}/config`)
       .then(async (res) => {
         const json = await res.json();
-        if (!res.ok) throw new Error(json.error?.message ?? "加载失败");
+        if (!res.ok) throw new Error(json.error?.message ?? t("loadFailed"));
         return json.data as ConfigData;
       })
       .then((data) => setConfigData(data))
-      .catch((err) => toast.error(err.message ?? "加载配置失败"))
+      .catch((err) => toast.error(err.message ?? t("loadFailed")))
       .finally(() => setLoading(false));
 
     // Fetch device info to get lineId, then resolve line name
@@ -123,8 +126,8 @@ export default function DeviceConfigPage() {
     if (!content) return;
     navigator.clipboard
       .writeText(content)
-      .then(() => toast.success("已复制到剪贴板"))
-      .catch(() => toast.error("复制失败，请手动复制"));
+      .then(() => toast.success(t("copied")))
+      .catch(() => toast.error(t("copyFailed")));
   };
 
   const handleDownload = () => {
@@ -138,11 +141,6 @@ export default function DeviceConfigPage() {
     URL.revokeObjectURL(url);
   };
 
-  const formatLabel: Record<string, string> = {
-    wireguard: "WireGuard",
-    xray: "Xray",
-  };
-
   const isXray = configData?.format === "xray";
   const shadowrocketUri = configData ? buildShadowrocketUri(configData) : null;
   const clashConfig = configData ? buildClashMeta(configData) : null;
@@ -150,9 +148,9 @@ export default function DeviceConfigPage() {
   return (
     <div className="space-y-6 w-full max-w-3xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">客户端配置</h1>
+        <h1 className="text-2xl font-semibold">{t("title")}</h1>
         <Button variant="outline" onClick={() => router.push("/devices")}>
-          返回
+          {tc("back")}
         </Button>
       </div>
 
@@ -160,7 +158,7 @@ export default function DeviceConfigPage() {
         <Card>
           <CardContent>
             <div className="flex items-center justify-center h-48 text-muted-foreground">
-              加载中...
+              {tc("loading")}
             </div>
           </CardContent>
         </Card>
@@ -168,7 +166,7 @@ export default function DeviceConfigPage() {
         <Card>
           <CardContent>
             <div className="text-muted-foreground text-sm py-8 text-center">
-              无法加载配置，请确认设备已绑定线路
+              {t("cannotLoad")}
             </div>
           </CardContent>
         </Card>
@@ -177,7 +175,7 @@ export default function DeviceConfigPage() {
           {/* Line info */}
           {lineName && (
             <div className="text-sm text-muted-foreground">
-              所属线路：<span className="font-medium text-foreground">{lineName}</span>
+              {t("belongsToLine")}<span className="font-medium text-foreground">{lineName}</span>
             </div>
           )}
 
@@ -185,17 +183,17 @@ export default function DeviceConfigPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle>
-                {formatLabel[configData.format] ?? configData.format} 配置
+                {t("configTitle", { format: configData.format === "wireguard" ? "WireGuard" : configData.format === "xray" ? "Xray" : configData.format })}
               </CardTitle>
               <div className="flex gap-2">
                 <Button size="sm" onClick={() => handleCopy()}>
-                  复制
+                  {tc("copy")}
                 </Button>
                 <Button size="sm" variant="outline" onClick={handleDownload}>
-                  下载
+                  {tc("download")}
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => router.push(`/devices/${deviceId}?from=config`)}>
-                  编辑
+                  {tc("edit")}
                 </Button>
               </div>
             </CardHeader>
@@ -209,13 +207,13 @@ export default function DeviceConfigPage() {
           {/* QR code card */}
           <Card>
             <CardHeader>
-              <CardTitle>二维码</CardTitle>
+              <CardTitle>{t("qrCode")}</CardTitle>
             </CardHeader>
             <CardContent>
               {isXray && configData.shareLink ? (
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">
-                    使用 Shadowrocket、v2rayN 等客户端扫码导入
+                    {t("xrayQrHint")}
                   </p>
                   <div className="flex justify-center rounded-lg bg-white p-4">
                     <QRCodeSVG value={configData.shareLink} size={260} />
@@ -224,7 +222,7 @@ export default function DeviceConfigPage() {
               ) : (
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">
-                    使用 WireGuard 客户端扫码导入
+                    {t("wgQrHint")}
                   </p>
                   <div className="flex justify-center rounded-lg bg-white p-4">
                     <QRCodeSVG value={configData.config} size={260} />
@@ -238,19 +236,19 @@ export default function DeviceConfigPage() {
           {isXray && (
             <Card>
               <CardHeader>
-                <CardTitle>常用客户端配置</CardTitle>
+                <CardTitle>{t("clientConfig")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <Tabs defaultValue="sharelink">
                   <TabsList>
-                    <TabsTrigger value="sharelink">分享链接</TabsTrigger>
-                    <TabsTrigger value="shadowrocket">Shadowrocket</TabsTrigger>
-                    {clashConfig && <TabsTrigger value="clash">Clash Meta</TabsTrigger>}
+                    <TabsTrigger value="sharelink">{t("shareLink")}</TabsTrigger>
+                    <TabsTrigger value="shadowrocket">{t("shadowrocket")}</TabsTrigger>
+                    {clashConfig && <TabsTrigger value="clash">{t("clashMeta")}</TabsTrigger>}
                   </TabsList>
 
                   <TabsContent value="sharelink" className="mt-4 space-y-3">
                     <p className="text-sm text-muted-foreground">
-                      适用于 v2rayN、v2rayNG、Nekoray 等客户端，复制后直接从剪贴板导入
+                      {t("shareLinkHint")}
                     </p>
                     <pre className="code-block p-4 rounded-lg text-xs w-full overflow-x-auto whitespace-pre-wrap break-all">
                       {configData.shareLink}
@@ -260,28 +258,28 @@ export default function DeviceConfigPage() {
                       size="sm"
                       onClick={() => handleCopy(configData.shareLink)}
                     >
-                      复制链接
+                      {t("copyLink")}
                     </Button>
                   </TabsContent>
 
                   <TabsContent value="shadowrocket" className="mt-4 space-y-3">
                     <p className="text-sm text-muted-foreground">
-                      Shadowrocket (iOS) 支持直接扫描上方二维码导入，或复制分享链接后在 App 中选择「从剪贴板导入」
+                      {t("shadowrocketHint")}
                     </p>
                     <div className="space-y-2 text-sm">
-                      <h4 className="font-medium">手动配置参数</h4>
+                      <h4 className="font-medium">{t("manualConfig")}</h4>
                       <div className="code-block rounded-lg p-4 text-xs space-y-1">
-                        <ConfigRow label="类型" value="VLESS" />
-                        <ConfigRow label="地址" value={getXrayField(configData, "address")} />
-                        <ConfigRow label="端口" value={getXrayField(configData, "port")} />
-                        <ConfigRow label="UUID" value={getXrayField(configData, "uuid")} />
-                        <ConfigRow label="流控" value="xtls-rprx-vision" />
-                        <ConfigRow label="传输" value="tcp" />
-                        <ConfigRow label="TLS" value="reality" />
-                        <ConfigRow label="SNI" value={getXrayField(configData, "sni")} />
-                        <ConfigRow label="指纹" value="chrome" />
-                        <ConfigRow label="公钥" value={getXrayField(configData, "publicKey")} />
-                        <ConfigRow label="Short ID" value={getXrayField(configData, "shortId")} />
+                        <ConfigRow label={t("type")} value="VLESS" />
+                        <ConfigRow label={t("address")} value={getXrayField(configData, "address")} />
+                        <ConfigRow label={t("port")} value={getXrayField(configData, "port")} />
+                        <ConfigRow label={t("uuid")} value={getXrayField(configData, "uuid")} />
+                        <ConfigRow label={t("flow")} value="xtls-rprx-vision" />
+                        <ConfigRow label={t("transport")} value="tcp" />
+                        <ConfigRow label={t("tls")} value="reality" />
+                        <ConfigRow label={t("sni")} value={getXrayField(configData, "sni")} />
+                        <ConfigRow label={t("fingerprint")} value="chrome" />
+                        <ConfigRow label={t("publicKey")} value={getXrayField(configData, "publicKey")} />
+                        <ConfigRow label={t("shortId")} value={getXrayField(configData, "shortId")} />
                       </div>
                     </div>
                   </TabsContent>
@@ -289,7 +287,7 @@ export default function DeviceConfigPage() {
                   {clashConfig && (
                     <TabsContent value="clash" className="mt-4 space-y-3">
                       <p className="text-sm text-muted-foreground">
-                        适用于 Clash Meta / Clash Verge，复制后添加到 proxies 配置段
+                        {t("clashHint")}
                       </p>
                       <pre className="code-block p-4 rounded-lg text-xs w-full overflow-x-auto whitespace-pre-wrap break-all">
                         {clashConfig}
@@ -299,7 +297,7 @@ export default function DeviceConfigPage() {
                         size="sm"
                         onClick={() => handleCopy(clashConfig)}
                       >
-                        复制配置
+                        {t("copyConfig")}
                       </Button>
                     </TabsContent>
                   )}

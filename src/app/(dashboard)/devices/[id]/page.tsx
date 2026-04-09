@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,27 +41,20 @@ type DeviceDetail = {
   remark: string | null;
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  online: "在线",
-  offline: "离线",
-  error: "异常",
-};
-
-
-const PROTOCOL_LABELS: Record<string, string> = {
-  wireguard: "WireGuard",
-  xray: "Xray",
-};
-
 export default function DeviceDetailPage() {
+  const tc = useTranslations("common");
   return (
-    <Suspense fallback={<div className="flex items-center justify-center h-48 text-muted-foreground">加载中...</div>}>
+    <Suspense fallback={<div className="flex items-center justify-center h-48 text-muted-foreground">{tc("loading")}</div>}>
       <DeviceDetailContent />
     </Suspense>
   );
 }
 
 function DeviceDetailContent() {
+  const t = useTranslations("deviceDetail");
+  const ts = useTranslations("devices");
+  const tn = useTranslations("deviceNew");
+  const tc = useTranslations("common");
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -91,7 +85,7 @@ function DeviceDetailContent() {
       .then((json) => {
         const d = json.data;
         if (!d) {
-          toast.error("设备不存在");
+          toast.error(t("notFound"));
           router.push("/devices");
           return;
         }
@@ -101,13 +95,13 @@ function DeviceDetailContent() {
         setRemark(d.remark ?? "");
         setLineId(d.lineId ? String(d.lineId) : "");
       })
-      .catch(() => toast.error("加载设备失败"))
+      .catch(() => toast.error(t("loadFailed")))
       .finally(() => setLoading(false));
   }, [deviceId, router]);
 
   const handleSave = async () => {
     if (!name.trim()) {
-      toast.error("设备名称不能为空");
+      toast.error(t("nameRequired"));
       return;
     }
     setSaving(true);
@@ -123,7 +117,7 @@ function DeviceDetailContent() {
       });
       const json = await res.json();
       if (!res.ok) {
-        toast.error(json.error?.message ?? "保存失败");
+        toast.error(json.error?.message ?? tc("saveFailed"));
         return;
       }
 
@@ -137,15 +131,15 @@ function DeviceDetailContent() {
         });
         const lineJson = await lineRes.json();
         if (!lineRes.ok) {
-          toast.error(lineJson.error?.message ?? "更新线路失败");
+          toast.error(lineJson.error?.message ?? t("updateLineFailed"));
           return;
         }
       }
 
-      toast.success("设备已保存");
+      toast.success(t("saved"));
       setDevice({ ...json.data, lineId: parsedLineId });
     } catch {
-      toast.error("保存失败，请重试");
+      toast.error(tc("saveFailedRetry"));
     } finally {
       setSaving(false);
     }
@@ -154,7 +148,7 @@ function DeviceDetailContent() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-48 text-muted-foreground">
-        加载中...
+        {tc("loading")}
       </div>
     );
   }
@@ -167,34 +161,34 @@ function DeviceDetailContent() {
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold">{device.name}</h1>
           {device.status !== "-" && (
-            <StatusDot status={device.status} label={STATUS_LABELS[device.status] ?? device.status} />
+            <StatusDot status={device.status} label={ts(`status.${device.status}`)} />
           )}
         </div>
         <Button variant="outline" onClick={() => router.push(backPath)}>
-          返回
+          {tc("back")}
         </Button>
       </div>
 
       {/* Read-only info */}
       <Card>
         <CardHeader>
-          <CardTitle>设备信息</CardTitle>
+          <CardTitle>{t("deviceInfo")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>协议</Label>
+            <Label>{t("protocol")}</Label>
             <p className="text-sm font-medium">
-              {PROTOCOL_LABELS[device.protocol] ?? device.protocol}
+              {ts(`protocol.${device.protocol}`)}
             </p>
           </div>
           {device.protocol === "wireguard" && (
             <>
               <div className="space-y-2">
-                <Label>WireGuard 内网地址</Label>
+                <Label>{t("wgInternalAddress")}</Label>
                 <p className="text-sm font-medium">{device.wgAddress ?? "—"}</p>
               </div>
               <div className="space-y-2">
-                <Label>WireGuard 公钥</Label>
+                <Label>{t("wgPublicKey")}</Label>
                 <code className="block text-xs bg-muted px-3 py-2 rounded break-all">
                   {device.wgPublicKey ?? "—"}
                 </code>
@@ -203,7 +197,7 @@ function DeviceDetailContent() {
           )}
           {device.protocol === "xray" && (
             <div className="space-y-2">
-              <Label>Xray UUID</Label>
+              <Label>{t("xrayUuid")}</Label>
               <code className="block text-xs bg-muted px-3 py-2 rounded break-all">
                 {device.xrayUuid ?? "—"}
               </code>
@@ -211,7 +205,7 @@ function DeviceDetailContent() {
           )}
           {device.lastHandshake && (
             <div className="space-y-2">
-              <Label>最后握手时间</Label>
+              <Label>{t("lastHandshake")}</Label>
               <p className="text-sm text-muted-foreground">
                 {device.lastHandshake}
               </p>
@@ -223,12 +217,12 @@ function DeviceDetailContent() {
       {/* Edit form */}
       <Card>
         <CardHeader>
-          <CardTitle>编辑设备</CardTitle>
+          <CardTitle>{t("editDevice")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">
-              设备名称 <span className="text-destructive">*</span>
+              {ts("name")} <span className="text-destructive">*</span>
             </Label>
             <Input
               id="name"
@@ -237,16 +231,16 @@ function DeviceDetailContent() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="tags">标签（逗号分隔）</Label>
+            <Label htmlFor="tags">{tn("tagsComma")}</Label>
             <Input
               id="tags"
               value={tags}
               onChange={(e) => setTags(e.target.value)}
-              placeholder="例如：工作,个人"
+              placeholder={tn("tagsPlaceholder")}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="remark">备注</Label>
+            <Label htmlFor="remark">{tn("notes")}</Label>
             <Textarea
               id="remark"
               value={remark}
@@ -255,18 +249,18 @@ function DeviceDetailContent() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="lineId">所属线路</Label>
+            <Label htmlFor="lineId">{tn("line")}</Label>
             {lineOptions.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                暂无线路，请先<Link href="/lines/new" className="text-primary hover:underline">创建线路</Link>
+                {tn("noLines")}<Link href="/lines/new" className="text-primary hover:underline">{tn("createLine")}</Link>
               </p>
             ) : (
               <Select value={lineId || "none"} onValueChange={(v) => setLineId(v === "none" ? "" : v)}>
                 <SelectTrigger id="lineId">
-                  <SelectValue placeholder="选择线路" />
+                  <SelectValue placeholder={tn("selectLine")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">不绑定线路</SelectItem>
+                  <SelectItem value="none">{tn("noLine")}</SelectItem>
                   {lineOptions.map((l) => (
                     <SelectItem key={l.id} value={String(l.id)}>
                       {l.name}
@@ -281,10 +275,10 @@ function DeviceDetailContent() {
 
       <div className="flex flex-col sm:flex-row gap-2">
         <Button onClick={handleSave} disabled={saving}>
-          {saving ? "保存中..." : "保存"}
+          {saving ? tc("saving") : tc("save")}
         </Button>
         <Button variant="outline" onClick={() => router.push(backPath)}>
-          返回
+          {tc("back")}
         </Button>
       </div>
     </div>
