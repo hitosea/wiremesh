@@ -87,7 +87,7 @@ export function HelpToc({
             )}
           />
         </button>
-        {isOpen && <div className="pb-3">{tocList}</div>}
+        {isOpen && <div className="pb-3 max-h-[60vh] overflow-y-auto">{tocList}</div>}
       </div>
     </>
   );
