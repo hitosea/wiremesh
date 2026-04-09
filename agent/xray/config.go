@@ -32,8 +32,10 @@ func GenerateConfig(cfg *api.XrayConfig) ([]byte, error) {
 		var clients []map[string]interface{}
 		for _, uuid := range route.UUIDs {
 			clients = append(clients, map[string]interface{}{
-				"id":   uuid,
-				"flow": "xtls-rprx-vision",
+				"id":    uuid,
+				"email": uuid,
+				"level": 0,
+				"flow":  "xtls-rprx-vision",
 			})
 		}
 
@@ -91,6 +93,26 @@ func GenerateConfig(cfg *api.XrayConfig) ([]byte, error) {
 		return nil, fmt.Errorf("no lines with Xray clients configured")
 	}
 
+	// Prepend dokodemo-door API inbound for Stats gRPC access
+	apiInbound := map[string]interface{}{
+		"tag":      "api-in",
+		"listen":   "127.0.0.1",
+		"port":     XrayAPIPort,
+		"protocol": "dokodemo-door",
+		"settings": map[string]interface{}{
+			"address": "127.0.0.1",
+		},
+	}
+	inbounds = append([]interface{}{apiInbound}, inbounds...)
+
+	// Prepend API routing rule (must be before line routing rules)
+	apiRule := map[string]interface{}{
+		"type":        "field",
+		"inboundTag":  []string{"api-in"},
+		"outboundTag": "api",
+	}
+	routingRules = append([]map[string]interface{}{apiRule}, routingRules...)
+
 	// Fallback outbound
 	outbounds = append(outbounds, map[string]interface{}{
 		"protocol": "freedom",
@@ -100,6 +122,18 @@ func GenerateConfig(cfg *api.XrayConfig) ([]byte, error) {
 	config := map[string]interface{}{
 		"log": map[string]interface{}{
 			"loglevel": "warning",
+		},
+		"stats": map[string]interface{}{},
+		"api": map[string]interface{}{
+			"tag":      "api",
+			"services": []string{"StatsService"},
+		},
+		"policy": map[string]interface{}{
+			"levels": map[string]interface{}{
+				"0": map[string]interface{}{
+					"statsUserOnline": true,
+				},
+			},
 		},
 		"inbounds":  inbounds,
 		"outbounds": outbounds,

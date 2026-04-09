@@ -27,7 +27,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   const data = rows.map((r) => ({
     ...r,
-    status: computeDeviceStatus(r.lastHandshake, r.protocol),
+    status: computeDeviceStatus(r.lastHandshake),
   }));
 
   return success(data);

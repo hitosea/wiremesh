@@ -13,6 +13,7 @@ const (
 	XrayConfigDir  = "/etc/wiremesh/xray"
 	XrayConfigFile = "/etc/wiremesh/xray/config.json"
 	XrayService    = "xray"
+	XrayAPIPort    = 41380 // Stats gRPC API, localhost only
 )
 
 // Sync generates the Xray config and manages the service.

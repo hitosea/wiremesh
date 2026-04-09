@@ -1,8 +1,10 @@
 package collector
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/wiremesh/agent/api"
 	"github.com/wiremesh/agent/wg"
+	"github.com/wiremesh/agent/xray"
 )
 
 // previousTransfers stores cumulative values from the last collection,
@@ -28,6 +31,7 @@ func Collect(serverURL string) *api.StatusReport {
 	}
 	report.Transfers = collectTransfers()
 	report.Handshakes = collectHandshakes()
+	report.XrayOnlineUsers = collectXrayOnlineUsers()
 	return report
 }
 
@@ -129,6 +133,34 @@ func collectHandshakes() []api.HandshakeReport {
 		})
 	}
 	return handshakes
+}
+
+func collectXrayOnlineUsers() []string {
+	cmd := exec.Command("xray", "api", "statsgetallonlineusers", "-s", fmt.Sprintf("127.0.0.1:%d", xray.XrayAPIPort))
+	output, err := cmd.Output()
+	if err != nil {
+		// Xray not running or command failed — silently return empty
+		return nil
+	}
+	return parseXrayOnlineUsers(string(output))
+}
+
+func parseXrayOnlineUsers(output string) []string {
+	var result struct {
+		Users []string `json:"users"`
+	}
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		return nil
+	}
+	// Xray returns users in format "user>>>email>>>online", extract the email (our UUID)
+	var users []string
+	for _, u := range result.Users {
+		parts := strings.SplitN(u, ">>>", 3)
+		if len(parts) >= 2 {
+			users = append(users, parts[1])
+		}
+	}
+	return users
 }
 
 func FormatBytes(bytes int64) string {

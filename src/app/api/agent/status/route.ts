@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { nodes, nodeStatus, devices } from "@/lib/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, inArray } from "drizzle-orm";
 import { authenticateAgent } from "@/lib/agent-auth";
 
 export const dynamic = "force-dynamic";
@@ -20,9 +20,10 @@ export async function POST(request: NextRequest) {
     latency?: number;
     transfers?: Transfer[];
     handshakes?: Handshake[];
+    xray_online_users?: string[];
   };
 
-  const { is_online, latency, transfers = [], handshakes = [] } = body;
+  const { is_online, latency, transfers = [], handshakes = [], xray_online_users = [] } = body;
 
   // Sum upload/download bytes from all transfers
   let totalUpload = 0;
@@ -80,6 +81,15 @@ export async function POST(request: NextRequest) {
         .where(eq(devices.id, device.id))
         .run();
     }
+  }
+
+  // Update online status for Xray-protocol devices
+  if (xray_online_users.length > 0) {
+    const now = new Date().toISOString();
+    db.update(devices)
+      .set({ lastHandshake: now, updatedAt: now })
+      .where(inArray(devices.xrayUuid, xray_online_users))
+      .run();
   }
 
   return Response.json({ data: { ok: true } });

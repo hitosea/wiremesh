@@ -5,8 +5,6 @@ export function isDeviceOnline(lastHandshake: string | null): boolean {
   return Date.now() - new Date(lastHandshake).getTime() < DEVICE_ONLINE_THRESHOLD_MS;
 }
 
-export function computeDeviceStatus(lastHandshake: string | null, protocol?: string): "online" | "offline" | "-" {
-  // Xray devices don't have WireGuard handshakes, status unknown
-  if (protocol === "xray") return "-";
+export function computeDeviceStatus(lastHandshake: string | null): "online" | "offline" {
   return isDeviceOnline(lastHandshake) ? "online" : "offline";
 }

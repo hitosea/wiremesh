@@ -42,7 +42,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     .get();
 
   if (!device) return error("NOT_FOUND", "设备不存在");
-  return success({ ...device, status: computeDeviceStatus(device.lastHandshake, device.protocol) });
+  return success({ ...device, status: computeDeviceStatus(device.lastHandshake) });
 }
 
 export async function PUT(request: NextRequest, { params }: Params) {

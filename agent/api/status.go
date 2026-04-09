@@ -1,10 +1,11 @@
 package api
 
 type StatusReport struct {
-	IsOnline   bool              `json:"is_online"`
-	Latency    *int              `json:"latency,omitempty"`
-	Transfers  []TransferReport  `json:"transfers,omitempty"`
-	Handshakes []HandshakeReport `json:"handshakes,omitempty"`
+	IsOnline        bool              `json:"is_online"`
+	Latency         *int              `json:"latency,omitempty"`
+	Transfers       []TransferReport  `json:"transfers,omitempty"`
+	Handshakes      []HandshakeReport `json:"handshakes,omitempty"`
+	XrayOnlineUsers []string          `json:"xray_online_users,omitempty"`
 }
 
 type TransferReport struct {
