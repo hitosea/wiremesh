@@ -18,6 +18,10 @@ function isNodeScriptPath(pathname: string): boolean {
   return /^\/api\/nodes\/\d+\/script$/.test(pathname);
 }
 
+function isUninstallScriptPath(pathname: string): boolean {
+  return pathname === "/api/uninstall-script";
+}
+
 function isStaticPath(pathname: string): boolean {
   return pathname.startsWith("/_next") || pathname === "/favicon.ico";
 }
@@ -34,7 +38,7 @@ async function checkInitialized(_request: NextRequest): Promise<boolean> {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (isStaticPath(pathname) || isAgentPath(pathname) || isNodeScriptPath(pathname)) {
+  if (isStaticPath(pathname) || isAgentPath(pathname) || isNodeScriptPath(pathname) || isUninstallScriptPath(pathname)) {
     return NextResponse.next();
   }
 
