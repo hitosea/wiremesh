@@ -19,27 +19,27 @@ const SETTING_GROUPS = [
     title: "WireGuard",
     description: "以下设置仅对新建节点/设备生效，不影响已有资源",
     fields: [
-      { key: "wg_default_port", label: "默认端口", hint: "新建节点时的默认 WireGuard 监听端口" },
-      { key: "wg_default_subnet", label: "默认子网", hint: "IP 自动分配的网段" },
-      { key: "wg_default_dns", label: "默认 DNS", hint: "客户端配置使用的 DNS，修改后立即生效" },
-      { key: "wg_node_ip_start", label: "节点 IP 起始位", hint: "节点内网 IP 从该位开始分配" },
-      { key: "wg_device_ip_start", label: "设备 IP 起始位", hint: "设备内网 IP 从该位开始分配" },
+      { key: "wg_default_port", label: "默认端口", placeholder: "41820", type: "number", hint: "新建节点时的默认 WireGuard 监听端口（UDP），需在节点防火墙中放行" },
+      { key: "wg_default_subnet", label: "默认子网", placeholder: "10.210.0.0/24", hint: "IP 自动分配的网段" },
+      { key: "wg_default_dns", label: "默认 DNS", placeholder: "1.1.1.1", hint: "客户端配置使用的 DNS，修改后立即生效" },
+      { key: "wg_node_ip_start", label: "节点 IP 起始位", placeholder: "1", type: "number", hint: "节点内网 IP 从该位开始分配" },
+      { key: "wg_device_ip_start", label: "设备 IP 起始位", placeholder: "100", type: "number", hint: "设备内网 IP 从该位开始分配" },
     ],
   },
   {
     title: "隧道",
     description: "以下设置仅对新建线路生效",
     fields: [
-      { key: "tunnel_subnet", label: "隧道子网", hint: "节点间点对点隧道的 IP 地址池" },
-      { key: "tunnel_port_start", label: "隧道端口起始", hint: "隧道 WireGuard 端口自动分配起始值，必须大于 WireGuard 默认端口" },
+      { key: "tunnel_subnet", label: "隧道子网", placeholder: "10.211.0.0/16", hint: "节点间点对点隧道的 IP 地址池" },
+      { key: "tunnel_port_start", label: "隧道端口起始", placeholder: "41830", type: "number", hint: "隧道端口自动分配起始值（UDP），必须大于 WireGuard 默认端口，每条隧道占两个端口，需在节点防火墙中放行对应范围" },
     ],
   },
   {
     title: "分流与 DNS",
     description: "外部规则源同步和 DNS 代理相关设置",
     fields: [
-      { key: "filter_sync_interval", label: "外部规则源同步间隔（秒）", hint: "Agent 定时拉取外部分流规则源的间隔，默认 86400（24 小时）" },
-      { key: "dns_upstream", label: "DNS 上游服务器（逗号分隔）", hint: "Agent DNS 代理使用的上游服务器，默认 8.8.8.8,1.1.1.1" },
+      { key: "filter_sync_interval", label: "外部规则源同步间隔（秒）", placeholder: "86400", type: "number", hint: "Agent 定时拉取外部分流规则源的间隔，最小 60 秒" },
+      { key: "dns_upstream", label: "DNS 上游服务器（逗号分隔）", placeholder: "8.8.8.8,1.1.1.1", hint: "Agent DNS 代理使用的上游服务器，默认 8.8.8.8,1.1.1.1" },
     ],
   },
 ];
@@ -149,9 +149,10 @@ export default function SettingsPage() {
                   <Label htmlFor={field.key}>{field.label}</Label>
                   <Input
                     id={field.key}
+                    type={field.type ?? "text"}
                     value={values[field.key] ?? ""}
                     onChange={(e) => handleChange(field.key, e.target.value)}
-                    placeholder={field.key}
+                    placeholder={field.placeholder ?? field.key}
                   />
                   {field.hint && (
                     <p className="text-xs text-muted-foreground">{field.hint}</p>
@@ -181,6 +182,7 @@ export default function SettingsPage() {
                 type="password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="请输入当前密码"
               />
             </div>
             <div className="space-y-2">
@@ -190,7 +192,7 @@ export default function SettingsPage() {
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="至少 6 位字符"
+                placeholder="请输入新密码（至少 6 位）"
               />
             </div>
             <div className="space-y-2">
@@ -200,6 +202,7 @@ export default function SettingsPage() {
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="请再次输入新密码"
               />
             </div>
           </div>
