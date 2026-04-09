@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { compileMDX } from "next-mdx-remote/rsc";
+import remarkGfm from "remark-gfm";
 import { getLocale, getTranslations } from "next-intl/server";
 import { HelpToc } from "@/components/help-toc";
 import { type Heading } from "@/types/help";
@@ -91,10 +92,15 @@ export default async function HelpPage() {
   const { content } = await compileMDX({
     source: markdown,
     components,
+    options: {
+      mdxOptions: {
+        remarkPlugins: [remarkGfm],
+      },
+    },
   });
 
   return (
-    <div className="flex gap-6 max-w-6xl mx-auto">
+    <div className="flex gap-6 max-w-6xl mx-auto pt-12 lg:pt-0">
       <HelpToc headings={headings} title={t("toc")} />
       <article className="prose prose-neutral dark:prose-invert max-w-none flex-1 min-w-0">
         <h1>{t("title")}</h1>
