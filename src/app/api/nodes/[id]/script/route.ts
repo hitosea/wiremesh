@@ -292,6 +292,18 @@ else
   ok "IP forwarding enabled"
 fi
 
+# 3.3b Check FORWARD chain default policy
+FORWARD_POLICY=$(iptables -L FORWARD 2>/dev/null | head -1 | grep -oP '\\(policy \\K\\w+' || echo "unknown")
+if [ "\$FORWARD_POLICY" = "ACCEPT" ]; then
+  warn "============================================"
+  warn "FORWARD chain default policy is ACCEPT."
+  warn "With ip_forward enabled, this server may"
+  warn "forward traffic between network interfaces."
+  warn "If this is not intended, consider running:"
+  warn "  iptables -P FORWARD DROP"
+  warn "============================================"
+fi
+
 # 3.4 Start WireGuard interface
 if ip link show wm-wg0 &>/dev/null; then
   info "WireGuard interface wm-wg0 already exists, reconfiguring..."
@@ -305,17 +317,19 @@ fi
 ok "WireGuard interface wm-wg0 is up"
 
 # 3.5 Install Xray (download from management platform)
-if command -v xray &>/dev/null; then
-  ok "Xray already installed"
+if [ -f /usr/local/bin/wiremesh-xray ]; then
+  ok "Xray already installed (wiremesh-xray)"
 else
   info "Installing Xray..."
-  curl -fsSL "${serverUrl}/api/agent/xray?arch=$AGENT_ARCH" -o /tmp/xray.tar.gz
+  curl -fsSL "${serverUrl}/api/agent/xray?arch=\$AGENT_ARCH" -o /tmp/xray.tar.gz
   if [ -f /tmp/xray.tar.gz ] && [ -s /tmp/xray.tar.gz ]; then
-    tar -xzf /tmp/xray.tar.gz -C /usr/local/bin/
-    chmod +x /usr/local/bin/xray
-    rm -f /tmp/xray.tar.gz
-    if command -v xray &>/dev/null; then
-      ok "Xray installed"
+    tar -xzf /tmp/xray.tar.gz -C /tmp/
+    mv /tmp/xray /usr/local/bin/wiremesh-xray 2>/dev/null || \\
+      cp /tmp/xray /usr/local/bin/wiremesh-xray
+    chmod +x /usr/local/bin/wiremesh-xray
+    rm -f /tmp/xray.tar.gz /tmp/xray
+    if [ -f /usr/local/bin/wiremesh-xray ]; then
+      ok "Xray installed as wiremesh-xray"
     else
       warn "Xray installation failed (non-fatal, can be installed later)"
     fi
@@ -324,38 +338,28 @@ else
   fi
 fi
 
-# 3.6 Configure Xray service for WireMesh
+# 3.6 Configure wiremesh-xray service
 mkdir -p /etc/wiremesh/xray
-if [ ! -f /etc/systemd/system/xray.service ]; then
-  cat > /etc/systemd/system/xray.service << 'XRAYSVCEOF'
+cat > /etc/systemd/system/wiremesh-xray.service << 'XRAYSVCEOF'
 [Unit]
-Description=Xray Service
+Description=WireMesh Xray Service
 After=network.target
 
 [Service]
 Type=simple
 User=root
-ExecStart=/usr/local/bin/xray run -config /etc/wiremesh/xray/config.json
+ExecStart=/usr/local/bin/wiremesh-xray run -config /etc/wiremesh/xray/config.json
 Restart=on-failure
 RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
 XRAYSVCEOF
-else
-  # Existing xray service — override config path
-  mkdir -p /etc/systemd/system/xray.service.d
-  cat > /etc/systemd/system/xray.service.d/wiremesh.conf << 'XRAYEOF'
-[Service]
-ExecStart=
-ExecStart=/usr/local/bin/xray run -config /etc/wiremesh/xray/config.json
-XRAYEOF
-fi
 systemctl daemon-reload
-systemctl enable xray >/dev/null 2>&1
-# Do not start xray here — Agent will start it after pulling config
-systemctl stop xray 2>/dev/null || true
-ok "Xray service configured"
+systemctl enable wiremesh-xray >/dev/null 2>&1
+# Do not start wiremesh-xray here — Agent will start it after pulling config
+systemctl stop wiremesh-xray 2>/dev/null || true
+ok "Xray service configured (wiremesh-xray)"
 
 echo ""
 

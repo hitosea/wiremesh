@@ -48,6 +48,8 @@ wiremesh/
 | 设备接入接口 | wm-wg0 |
 | 隧道接口 | wm-tun1, wm-tun2, ... |
 | iptables 标签 | wm-line-{id} |
+| Xray 二进制 | wiremesh-xray |
+| Xray 服务 | wiremesh-xray.service |
 | 数据库文件 | wiremesh.db |
 
 ## 开发注意事项

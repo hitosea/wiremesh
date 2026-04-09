@@ -12,7 +12,7 @@ import (
 const (
 	XrayConfigDir  = "/etc/wiremesh/xray"
 	XrayConfigFile = "/etc/wiremesh/xray/config.json"
-	XrayService    = "xray"
+	XrayService    = "wiremesh-xray"
 	XrayAPIPort    = 41380 // Stats gRPC API, localhost only
 )
 
@@ -64,7 +64,7 @@ func Stop() {
 }
 
 func isInstalled() bool {
-	_, err := exec.LookPath("xray")
+	_, err := exec.LookPath("wiremesh-xray")
 	return err == nil
 }
 
