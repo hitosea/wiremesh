@@ -223,7 +223,7 @@ function DevicesContent() {
     },
     {
       key: "protocol",
-      label: t("protocol"),
+      label: t("protocolCol"),
       render: (row) => (
         <Badge variant={PROTOCOL_VARIANTS[row.protocol] ?? "secondary"}>
           {t(`protocol.${row.protocol}`)}
@@ -256,7 +256,7 @@ function DevicesContent() {
     },
     {
       key: "status",
-      label: t("status"),
+      label: t("statusCol"),
       render: (row) => (
         <StatusDot status={row.status} label={t(`status.${row.status}`)} />
       ),

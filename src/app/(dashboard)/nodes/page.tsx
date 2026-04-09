@@ -168,7 +168,7 @@ export default function NodesPage() {
     { key: "wgAddress", label: t("internalAddress") },
     {
       key: "status",
-      label: t("status"),
+      label: t("statusCol"),
       render: (row) => (
         <StatusDot status={row.status} label={t(`status.${row.status}`)} />
       ),

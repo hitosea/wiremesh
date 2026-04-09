@@ -142,7 +142,7 @@ export default function FiltersPage() {
     },
     {
       key: "mode",
-      label: t("mode"),
+      label: t("modeCol"),
       render: (row) => (
         <Badge variant={MODE_VARIANTS[row.mode] ?? "secondary"}>
           {t(`mode.${row.mode}`)}
@@ -161,7 +161,7 @@ export default function FiltersPage() {
     },
     {
       key: "isEnabled",
-      label: t("status"),
+      label: t("statusCol"),
       render: (row) => (
         <div className="flex items-center gap-2">
           <Switch
