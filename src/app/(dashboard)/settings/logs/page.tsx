@@ -12,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 interface AuditLog {
   id: number;
@@ -30,12 +31,6 @@ interface Pagination {
   totalPages: number;
 }
 
-const ACTION_LABELS: Record<string, string> = {
-  create: "创建",
-  update: "更新",
-  delete: "删除",
-};
-
 const ACTION_VARIANTS: Record<
   string,
   "default" | "secondary" | "destructive" | "outline"
@@ -45,15 +40,10 @@ const ACTION_VARIANTS: Record<
   delete: "destructive",
 };
 
-const TYPE_LABELS: Record<string, string> = {
-  node: "节点",
-  device: "设备",
-  line: "线路",
-  filter: "过滤规则",
-  settings: "设置",
-};
-
 export default function AuditLogsPage() {
+  const t = useTranslations("auditLogs");
+  const tc = useTranslations("common");
+
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
@@ -69,16 +59,16 @@ export default function AuditLogsPage() {
       const res = await fetch(
         `/api/audit-logs?page=${page}&pageSize=20`
       );
-      if (!res.ok) throw new Error("加载失败");
+      if (!res.ok) throw new Error("load failed");
       const json = await res.json();
       setLogs(json.data ?? []);
       setPagination(json.pagination);
     } catch {
-      toast.error("加载审计日志失败");
+      toast.error(t("loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchLogs(1);
@@ -109,11 +99,11 @@ export default function AuditLogsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>时间</TableHead>
-              <TableHead>操作</TableHead>
-              <TableHead>类型</TableHead>
-              <TableHead>对象</TableHead>
-              <TableHead>详情</TableHead>
+              <TableHead>{t("time")}</TableHead>
+              <TableHead>{t("actionCol")}</TableHead>
+              <TableHead>{t("typeCol")}</TableHead>
+              <TableHead>{t("target")}</TableHead>
+              <TableHead>{t("details")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -123,7 +113,7 @@ export default function AuditLogsPage() {
                   colSpan={5}
                   className="text-center text-muted-foreground py-8"
                 >
-                  加载中...
+                  {tc("loading")}
                 </TableCell>
               </TableRow>
             ) : logs.length === 0 ? (
@@ -132,7 +122,7 @@ export default function AuditLogsPage() {
                   colSpan={5}
                   className="text-center text-muted-foreground py-8"
                 >
-                  暂无日志记录
+                  {t("noLogs")}
                 </TableCell>
               </TableRow>
             ) : (
@@ -143,11 +133,11 @@ export default function AuditLogsPage() {
                   </TableCell>
                   <TableCell>
                     <Badge variant={ACTION_VARIANTS[log.action] ?? "outline"}>
-                      {ACTION_LABELS[log.action] ?? log.action}
+                      {t(`action.${log.action}`)}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm">
-                    {TYPE_LABELS[log.targetType] ?? log.targetType}
+                    {t(`type.${log.targetType}`)}
                   </TableCell>
                   <TableCell className="text-sm">
                     {log.targetName ?? (log.targetId ? `#${log.targetId}` : "-")}
@@ -165,8 +155,11 @@ export default function AuditLogsPage() {
       {pagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            共 {pagination.total} 条记录，第 {pagination.page} /{" "}
-            {pagination.totalPages} 页
+            {t("paginationInfo", {
+              total: pagination.total,
+              page: pagination.page,
+              totalPages: pagination.totalPages,
+            })}
           </p>
           <div className="flex gap-2">
             <Button
@@ -175,7 +168,7 @@ export default function AuditLogsPage() {
               disabled={pagination.page <= 1}
               onClick={() => handlePageChange(pagination.page - 1)}
             >
-              上一页
+              {tc("prevPage")}
             </Button>
             <Button
               variant="outline"
@@ -183,7 +176,7 @@ export default function AuditLogsPage() {
               disabled={pagination.page >= pagination.totalPages}
               onClick={() => handlePageChange(pagination.page + 1)}
             >
-              下一页
+              {tc("nextPage")}
             </Button>
           </div>
         </div>
