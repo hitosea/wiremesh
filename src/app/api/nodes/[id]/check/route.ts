@@ -10,14 +10,14 @@ type Params = { params: Promise<{ id: string }> };
 export async function POST(request: NextRequest, { params }: Params) {
   const { id } = await params;
   const nodeId = parseInt(id);
-  if (isNaN(nodeId)) return error("VALIDATION_ERROR", "无效的节点 ID");
+  if (isNaN(nodeId)) return error("VALIDATION_ERROR", "validation.invalidNodeId");
 
   const node = db
     .select({ id: nodes.id, status: nodes.status })
     .from(nodes)
     .where(eq(nodes.id, nodeId))
     .get();
-  if (!node) return error("NOT_FOUND", "节点不存在");
+  if (!node) return error("NOT_FOUND", "notFound.node");
 
   const isConnected = sseManager.isConnected(nodeId);
 

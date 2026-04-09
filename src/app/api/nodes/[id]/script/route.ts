@@ -10,7 +10,7 @@ type Params = { params: Promise<{ id: string }> };
 export async function GET(request: NextRequest, { params }: Params) {
   const { id } = await params;
   const nodeId = parseInt(id);
-  if (isNaN(nodeId)) return error("VALIDATION_ERROR", "无效的节点 ID");
+  if (isNaN(nodeId)) return error("VALIDATION_ERROR", "validation.invalidNodeId");
 
   const node = db
     .select()
@@ -18,20 +18,20 @@ export async function GET(request: NextRequest, { params }: Params) {
     .where(eq(nodes.id, nodeId))
     .get();
 
-  if (!node) return error("NOT_FOUND", "节点不存在");
+  if (!node) return error("NOT_FOUND", "notFound.node");
 
   // Allow access via agentToken query param (for curl one-liner)
   const token = request.nextUrl.searchParams.get("token");
   const hasSession = request.cookies.get("token")?.value;
   if (!hasSession && token !== node.agentToken) {
-    return error("UNAUTHORIZED", "无权访问");
+    return error("UNAUTHORIZED", "auth.noAccess");
   }
 
   let wgPrivateKey: string;
   try {
     wgPrivateKey = decrypt(node.wgPrivateKey);
   } catch {
-    return error("INTERNAL_ERROR", "解密私钥失败");
+    return error("INTERNAL_ERROR", "internal.decryptFailed");
   }
 
   const host = request.headers.get("host");

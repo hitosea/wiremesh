@@ -10,17 +10,17 @@ export async function POST(request: Request) {
   const { username, password } = body;
 
   if (!username || !password) {
-    return error("VALIDATION_ERROR", "用户名和密码不能为空");
+    return error("VALIDATION_ERROR", "validation.usernameAndPasswordRequired");
   }
 
   const [user] = await db.select().from(users).where(eq(users.username, username));
   if (!user) {
-    return error("UNAUTHORIZED", "用户名或密码错误");
+    return error("UNAUTHORIZED", "auth.unauthorized");
   }
 
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) {
-    return error("UNAUTHORIZED", "用户名或密码错误");
+    return error("UNAUTHORIZED", "auth.unauthorized");
   }
 
   const token = await signToken({ sub: String(user.id), username: user.username });

@@ -44,10 +44,10 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const { name, rules, domainRules, mode, branchIds, sourceUrl, tags, remark } = body;
 
-  if (!name || !name.trim()) return error("VALIDATION_ERROR", "name 为必填项");
-  if (!rules && !domainRules && !sourceUrl) return error("VALIDATION_ERROR", "IP/CIDR 规则、域名规则和外部规则源至少填写一项");
+  if (!name || !name.trim()) return error("VALIDATION_ERROR", "validation.nameRequired");
+  if (!rules && !domainRules && !sourceUrl) return error("VALIDATION_ERROR", "validation.rulesRequired");
   if (!mode || !["whitelist", "blacklist"].includes(mode)) {
-    return error("VALIDATION_ERROR", "mode 必须是 whitelist 或 blacklist");
+    return error("VALIDATION_ERROR", "validation.modeInvalid");
   }
 
   const filter = db

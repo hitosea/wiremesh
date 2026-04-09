@@ -81,29 +81,29 @@ export async function POST(request: NextRequest) {
 
   // --- Validation ---
   if (!name || !name.trim()) {
-    return error("VALIDATION_ERROR", "name 为必填项");
+    return error("VALIDATION_ERROR", "validation.nameRequired");
   }
   if (!entryNodeId) {
-    return error("VALIDATION_ERROR", "entryNodeId 为必填项");
+    return error("VALIDATION_ERROR", "validation.entryNodeRequired");
   }
   if (!branches || !Array.isArray(branches) || branches.length < 1) {
-    return error("VALIDATION_ERROR", "branches 至少需要 1 个分支");
+    return error("VALIDATION_ERROR", "validation.branchesRequired");
   }
 
   // Validate exactly one default branch
   const defaultCount = branches.filter((b) => b.isDefault).length;
   if (defaultCount !== 1) {
-    return error("VALIDATION_ERROR", "必须恰好有一个默认分支 (isDefault: true)");
+    return error("VALIDATION_ERROR", "validation.exactlyOneDefaultBranch");
   }
 
   // Validate each branch has at least one nodeId
   for (let i = 0; i < branches.length; i++) {
     const branch = branches[i];
     if (!branch.name || !branch.name.trim()) {
-      return error("VALIDATION_ERROR", `分支 ${i + 1} 的 name 为必填项`);
+      return error("VALIDATION_ERROR", "validation.branchNameRequired", { index: i + 1 });
     }
     if (!branch.nodeIds || !Array.isArray(branch.nodeIds) || branch.nodeIds.length < 1) {
-      return error("VALIDATION_ERROR", `分支 "${branch.name}" 至少需要 1 个节点 (出口)`);
+      return error("VALIDATION_ERROR", "validation.branchNeedsNode", { name: branch.name });
     }
   }
 
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
     .where(eq(nodes.id, entryNodeId))
     .get();
   if (!entryNode) {
-    return error("VALIDATION_ERROR", `入口节点 ID ${entryNodeId} 不存在`);
+    return error("VALIDATION_ERROR", "validation.entryNodeNotFound", { id: entryNodeId });
   }
 
   // Collect all nodeIds from branches and verify they exist
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
       .where(eq(nodes.id, nodeId))
       .get();
     if (!node) {
-      return error("VALIDATION_ERROR", `节点 ID ${nodeId} 不存在`);
+      return error("VALIDATION_ERROR", "validation.nodeNotFound", { id: nodeId });
     }
   }
 
@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
       .where(eq(filters.id, filterId))
       .get();
     if (!filter) {
-      return error("VALIDATION_ERROR", `分流规则 ID ${filterId} 不存在`);
+      return error("VALIDATION_ERROR", "validation.filterNotFound", { id: filterId });
     }
   }
 

@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
   } = body;
 
   if (!name || !ip) {
-    return error("VALIDATION_ERROR", "name 和 ip 为必填项");
+    return error("VALIDATION_ERROR", "validation.nameAndIpRequired");
   }
 
   // Check IP uniqueness
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     .where(eq(nodes.ip, ip))
     .get();
   if (existing) {
-    return error("CONFLICT", "该 IP 地址已存在");
+    return error("CONFLICT", "conflict.ipExists");
   }
 
   // Read settings

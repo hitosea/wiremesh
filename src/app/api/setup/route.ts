@@ -7,17 +7,17 @@ import { count } from "drizzle-orm";
 export async function POST(request: Request) {
   const [result] = await db.select({ count: count() }).from(users);
   if (result.count > 0) {
-    return error("CONFLICT", "系统已初始化");
+    return error("CONFLICT", "system.alreadyInitialized");
   }
 
   const body = await request.json();
   const { username, password, wgDefaultSubnet } = body;
 
   if (!username || username.length < 1) {
-    return error("VALIDATION_ERROR", "用户名不能为空");
+    return error("VALIDATION_ERROR", "validation.usernameRequired");
   }
   if (!password || password.length < 6) {
-    return error("VALIDATION_ERROR", "密码至少需要 6 位字符");
+    return error("VALIDATION_ERROR", "validation.passwordMinLength");
   }
 
   const passwordHash = await hashPassword(password);

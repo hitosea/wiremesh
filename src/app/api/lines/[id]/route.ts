@@ -11,14 +11,14 @@ type Params = { params: Promise<{ id: string }> };
 export async function GET(request: NextRequest, { params }: Params) {
   const { id } = await params;
   const lineId = parseInt(id);
-  if (isNaN(lineId)) return error("VALIDATION_ERROR", "无效的线路 ID");
+  if (isNaN(lineId)) return error("VALIDATION_ERROR", "validation.invalidLineId");
 
   const line = db
     .select()
     .from(lines)
     .where(eq(lines.id, lineId))
     .get();
-  if (!line) return error("NOT_FOUND", "线路不存在");
+  if (!line) return error("NOT_FOUND", "notFound.line");
 
   // Join line_nodes + nodes
   const lineNodeRows = db
@@ -115,14 +115,14 @@ export async function GET(request: NextRequest, { params }: Params) {
 export async function PUT(request: NextRequest, { params }: Params) {
   const { id } = await params;
   const lineId = parseInt(id);
-  if (isNaN(lineId)) return error("VALIDATION_ERROR", "无效的线路 ID");
+  if (isNaN(lineId)) return error("VALIDATION_ERROR", "validation.invalidLineId");
 
   const existing = db
     .select({ id: lines.id, name: lines.name })
     .from(lines)
     .where(eq(lines.id, lineId))
     .get();
-  if (!existing) return error("NOT_FOUND", "线路不存在");
+  if (!existing) return error("NOT_FOUND", "notFound.line");
 
   const body = await request.json();
   const { name, status, tags, remark } = body;
@@ -155,14 +155,14 @@ export async function PUT(request: NextRequest, { params }: Params) {
 export async function DELETE(request: NextRequest, { params }: Params) {
   const { id } = await params;
   const lineId = parseInt(id);
-  if (isNaN(lineId)) return error("VALIDATION_ERROR", "无效的线路 ID");
+  if (isNaN(lineId)) return error("VALIDATION_ERROR", "validation.invalidLineId");
 
   const existing = db
     .select({ id: lines.id, name: lines.name })
     .from(lines)
     .where(eq(lines.id, lineId))
     .get();
-  if (!existing) return error("NOT_FOUND", "线路不存在");
+  if (!existing) return error("NOT_FOUND", "notFound.line");
 
   // Collect node IDs before deleting
   const affectedNodeIds = db

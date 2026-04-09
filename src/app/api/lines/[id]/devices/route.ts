@@ -10,7 +10,7 @@ type Params = { params: Promise<{ id: string }> };
 export async function GET(request: NextRequest, { params }: Params) {
   const { id } = await params;
   const lineId = parseInt(id);
-  if (isNaN(lineId)) return error("VALIDATION_ERROR", "无效的线路 ID");
+  if (isNaN(lineId)) return error("VALIDATION_ERROR", "validation.invalidLineId");
 
   const rows = db
     .select({

@@ -11,14 +11,14 @@ type Params = { params: Promise<{ id: string }> };
 export async function PUT(request: NextRequest, { params }: Params) {
   const { id } = await params;
   const filterId = parseInt(id);
-  if (isNaN(filterId)) return error("VALIDATION_ERROR", "无效的过滤规则 ID");
+  if (isNaN(filterId)) return error("VALIDATION_ERROR", "validation.invalidFilterId");
 
   const existing = db
     .select({ id: filters.id, name: filters.name, isEnabled: filters.isEnabled })
     .from(filters)
     .where(eq(filters.id, filterId))
     .get();
-  if (!existing) return error("NOT_FOUND", "过滤规则不存在");
+  if (!existing) return error("NOT_FOUND", "notFound.filter");
 
   const updated = db
     .update(filters)

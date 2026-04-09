@@ -11,7 +11,7 @@ type Params = { params: Promise<{ id: string }> };
 export async function GET(request: NextRequest, { params }: Params) {
   const { id } = await params;
   const filterId = parseInt(id);
-  if (isNaN(filterId)) return error("VALIDATION_ERROR", "无效的过滤规则 ID");
+  if (isNaN(filterId)) return error("VALIDATION_ERROR", "validation.invalidFilterId");
 
   const filter = db
     .select()
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     .where(eq(filters.id, filterId))
     .get();
 
-  if (!filter) return error("NOT_FOUND", "过滤规则不存在");
+  if (!filter) return error("NOT_FOUND", "notFound.filter");
 
   // Fetch associated branches grouped by line
   const associatedBranches = db
@@ -41,20 +41,20 @@ export async function GET(request: NextRequest, { params }: Params) {
 export async function PUT(request: NextRequest, { params }: Params) {
   const { id } = await params;
   const filterId = parseInt(id);
-  if (isNaN(filterId)) return error("VALIDATION_ERROR", "无效的过滤规则 ID");
+  if (isNaN(filterId)) return error("VALIDATION_ERROR", "validation.invalidFilterId");
 
   const existing = db
     .select({ id: filters.id, name: filters.name })
     .from(filters)
     .where(eq(filters.id, filterId))
     .get();
-  if (!existing) return error("NOT_FOUND", "过滤规则不存在");
+  if (!existing) return error("NOT_FOUND", "notFound.filter");
 
   const body = await request.json();
   const { name, rules, domainRules, mode, branchIds, sourceUrl, tags, remark } = body;
 
   if (mode && !["whitelist", "blacklist"].includes(mode)) {
-    return error("VALIDATION_ERROR", "mode 必须是 whitelist 或 blacklist");
+    return error("VALIDATION_ERROR", "validation.modeInvalid");
   }
 
   const updateData: Partial<typeof filters.$inferInsert> = {
@@ -102,14 +102,14 @@ export async function PUT(request: NextRequest, { params }: Params) {
 export async function DELETE(request: NextRequest, { params }: Params) {
   const { id } = await params;
   const filterId = parseInt(id);
-  if (isNaN(filterId)) return error("VALIDATION_ERROR", "无效的过滤规则 ID");
+  if (isNaN(filterId)) return error("VALIDATION_ERROR", "validation.invalidFilterId");
 
   const existing = db
     .select({ id: filters.id, name: filters.name })
     .from(filters)
     .where(eq(filters.id, filterId))
     .get();
-  if (!existing) return error("NOT_FOUND", "过滤规则不存在");
+  if (!existing) return error("NOT_FOUND", "notFound.filter");
 
   // Notify before deleting so branchFilters still exist for lookup
   notifyFilterChange(filterId);

@@ -89,10 +89,10 @@ export async function POST(request: NextRequest) {
   const { name, protocol, lineId, tags, remark } = body;
 
   if (!name) {
-    return error("VALIDATION_ERROR", "name 为必填项");
+    return error("VALIDATION_ERROR", "validation.nameRequired");
   }
   if (!protocol || !["wireguard", "xray"].includes(protocol)) {
-    return error("VALIDATION_ERROR", "protocol 必须为 wireguard 或 xray");
+    return error("VALIDATION_ERROR", "validation.protocolInvalid");
   }
 
   // Read settings

@@ -42,9 +42,13 @@ const STATUS_MAP: Record<ErrorCode, number> = {
   CONFIG_SYNC_FAILED: 502,
 };
 
-export function error(code: ErrorCode, message: string) {
+export function error(
+  code: ErrorCode,
+  message: string,
+  params?: Record<string, string | number>
+) {
   return NextResponse.json(
-    { error: { code, message } },
+    { error: { code, message, ...(params && { params }) } },
     { status: STATUS_MAP[code] }
   );
 }

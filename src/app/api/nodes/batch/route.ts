@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   const { action, ids } = body;
 
   if (!Array.isArray(ids) || ids.length === 0) {
-    return error("VALIDATION_ERROR", "请选择至少一个节点");
+    return error("VALIDATION_ERROR", "validation.selectAtLeastOneNode");
   }
 
   if (action === "delete") {
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
   if (action === "updateTags") {
     const { tags } = body;
     if (typeof tags !== "string") {
-      return error("VALIDATION_ERROR", "标签不能为空");
+      return error("VALIDATION_ERROR", "validation.tagsRequired");
     }
 
     db.update(nodes)
@@ -58,5 +58,5 @@ export async function POST(request: Request) {
     return success({ message: `已更新 ${ids.length} 个节点的标签` });
   }
 
-  return error("VALIDATION_ERROR", "无效的操作类型");
+  return error("VALIDATION_ERROR", "validation.invalidActionType");
 }

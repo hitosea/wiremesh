@@ -10,15 +10,15 @@ type Params = { params: Promise<{ id: string }> };
 export async function POST(request: NextRequest, { params }: Params) {
   const { id } = await params;
   const filterId = parseInt(id);
-  if (isNaN(filterId)) return error("VALIDATION_ERROR", "无效的规则 ID");
+  if (isNaN(filterId)) return error("VALIDATION_ERROR", "validation.invalidRuleId");
 
   const filter = db
     .select()
     .from(filters)
     .where(eq(filters.id, filterId))
     .get();
-  if (!filter) return error("NOT_FOUND", "规则不存在");
-  if (!filter.sourceUrl) return error("VALIDATION_ERROR", "该规则没有配置外部规则源");
+  if (!filter) return error("NOT_FOUND", "notFound.rule");
+  if (!filter.sourceUrl) return error("VALIDATION_ERROR", "validation.noSourceUrl");
 
   // Find entry nodes associated with this filter and notify them
   const branches = db

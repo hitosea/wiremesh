@@ -10,14 +10,14 @@ export async function GET() {
   const token = cookieStore.get("token")?.value;
 
   if (!token) {
-    return error("UNAUTHORIZED", "未登录");
+    return error("UNAUTHORIZED", "auth.notLoggedIn");
   }
 
   let payload: { sub: string; username: string };
   try {
     payload = await verifyToken(token);
   } catch {
-    return error("UNAUTHORIZED", "会话已过期");
+    return error("UNAUTHORIZED", "auth.sessionExpired");
   }
 
   const [user] = await db
@@ -26,7 +26,7 @@ export async function GET() {
     .where(eq(users.id, Number(payload.sub)));
 
   if (!user) {
-    return error("UNAUTHORIZED", "用户不存在");
+    return error("UNAUTHORIZED", "auth.userNotFound");
   }
 
   return success({ user });

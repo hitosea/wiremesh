@@ -11,7 +11,7 @@ type Params = { params: Promise<{ id: string }> };
 export async function GET(request: NextRequest, { params }: Params) {
   const { id } = await params;
   const deviceId = parseInt(id);
-  if (isNaN(deviceId)) return error("VALIDATION_ERROR", "无效的设备 ID");
+  if (isNaN(deviceId)) return error("VALIDATION_ERROR", "validation.invalidDeviceId");
 
   const device = db
     .select()
@@ -19,8 +19,8 @@ export async function GET(request: NextRequest, { params }: Params) {
     .where(eq(devices.id, deviceId))
     .get();
 
-  if (!device) return error("NOT_FOUND", "设备不存在");
-  if (!device.lineId) return error("VALIDATION_ERROR", "设备未绑定线路，无法生成配置");
+  if (!device) return error("NOT_FOUND", "notFound.device");
+  if (!device.lineId) return error("VALIDATION_ERROR", "validation.deviceNotBound");
 
   // Find entry node (hopOrder=0) for device's line
   const entryNodeRow = db
@@ -41,20 +41,20 @@ export async function GET(request: NextRequest, { params }: Params) {
     .where(and(eq(lineNodes.lineId, device.lineId), eq(lineNodes.hopOrder, 0)))
     .get();
 
-  if (!entryNodeRow) return error("NOT_FOUND", "未找到线路入口节点");
+  if (!entryNodeRow) return error("NOT_FOUND", "notFound.entryNode");
 
   const protocol = device.protocol;
 
   if (protocol === "wireguard") {
     if (!device.wgPrivateKey || !device.wgAddress || !device.wgPublicKey) {
-      return error("VALIDATION_ERROR", "设备 WireGuard 配置不完整");
+      return error("VALIDATION_ERROR", "validation.deviceWgIncomplete");
     }
 
     let privateKey: string;
     try {
       privateKey = decrypt(device.wgPrivateKey);
     } catch {
-      return error("INTERNAL_ERROR", "解密设备私钥失败");
+      return error("INTERNAL_ERROR", "internal.decryptDeviceFailed");
     }
 
     // For lines with branch routing (multi-branch), DNS must point to entry node's
@@ -92,11 +92,11 @@ PersistentKeepalive = 25
 
   if (protocol === "xray") {
     if (!device.xrayUuid) {
-      return error("VALIDATION_ERROR", "设备 Xray UUID 不完整");
+      return error("VALIDATION_ERROR", "validation.deviceXrayIncomplete");
     }
 
     if (!entryNodeRow.nodeXrayEnabled) {
-      return error("VALIDATION_ERROR", "入口节点未启用 Xray");
+      return error("VALIDATION_ERROR", "validation.entryNodeNoXray");
     }
 
     const endpoint = entryNodeRow.nodeDomain ?? entryNodeRow.nodeIp;
@@ -125,7 +125,7 @@ PersistentKeepalive = 25
     }
 
     if (!realityPublicKey) {
-      return error("VALIDATION_ERROR", "入口节点 Reality 配置不完整");
+      return error("VALIDATION_ERROR", "validation.realityIncomplete");
     }
 
     const xrayConfig = {
@@ -193,5 +193,5 @@ PersistentKeepalive = 25
     return success({ format: "xray", config, filename, shareLink });
   }
 
-  return error("VALIDATION_ERROR", "不支持的协议类型");
+  return error("VALIDATION_ERROR", "validation.unsupportedProtocol");
 }

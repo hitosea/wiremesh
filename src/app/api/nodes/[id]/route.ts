@@ -14,7 +14,7 @@ type Params = { params: Promise<{ id: string }> };
 export async function GET(request: NextRequest, { params }: Params) {
   const { id } = await params;
   const nodeId = parseInt(id);
-  if (isNaN(nodeId)) return error("VALIDATION_ERROR", "无效的节点 ID");
+  if (isNaN(nodeId)) return error("VALIDATION_ERROR", "validation.invalidNodeId");
 
   const node = db
     .select({
@@ -42,21 +42,21 @@ export async function GET(request: NextRequest, { params }: Params) {
     .where(eq(nodes.id, nodeId))
     .get();
 
-  if (!node) return error("NOT_FOUND", "节点不存在");
+  if (!node) return error("NOT_FOUND", "notFound.node");
   return success(node);
 }
 
 export async function PUT(request: NextRequest, { params }: Params) {
   const { id } = await params;
   const nodeId = parseInt(id);
-  if (isNaN(nodeId)) return error("VALIDATION_ERROR", "无效的节点 ID");
+  if (isNaN(nodeId)) return error("VALIDATION_ERROR", "validation.invalidNodeId");
 
   const existing = db
     .select({ id: nodes.id, name: nodes.name })
     .from(nodes)
     .where(eq(nodes.id, nodeId))
     .get();
-  if (!existing) return error("NOT_FOUND", "节点不存在");
+  if (!existing) return error("NOT_FOUND", "notFound.node");
 
   const body = await request.json();
   const {
@@ -79,7 +79,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
       .from(nodes)
       .where(and(eq(nodes.ip, ip), ne(nodes.id, nodeId)))
       .get();
-    if (ipConflict) return error("CONFLICT", "该 IP 地址已存在");
+    if (ipConflict) return error("CONFLICT", "conflict.ipExists");
   }
 
   const updateData: Partial<typeof nodes.$inferInsert> = {
@@ -173,14 +173,14 @@ export async function PUT(request: NextRequest, { params }: Params) {
 export async function DELETE(request: NextRequest, { params }: Params) {
   const { id } = await params;
   const nodeId = parseInt(id);
-  if (isNaN(nodeId)) return error("VALIDATION_ERROR", "无效的节点 ID");
+  if (isNaN(nodeId)) return error("VALIDATION_ERROR", "validation.invalidNodeId");
 
   const existing = db
     .select({ id: nodes.id, name: nodes.name })
     .from(nodes)
     .where(eq(nodes.id, nodeId))
     .get();
-  if (!existing) return error("NOT_FOUND", "节点不存在");
+  if (!existing) return error("NOT_FOUND", "notFound.node");
 
   db.delete(nodes).where(eq(nodes.id, nodeId)).run();
 

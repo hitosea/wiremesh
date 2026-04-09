@@ -17,14 +17,14 @@ type Params = { params: Promise<{ id: string }> };
 export async function PUT(request: NextRequest, { params }: Params) {
   const { id } = await params;
   const deviceId = parseInt(id);
-  if (isNaN(deviceId)) return error("VALIDATION_ERROR", "无效的设备 ID");
+  if (isNaN(deviceId)) return error("VALIDATION_ERROR", "validation.invalidDeviceId");
 
   const existing = db
     .select({ id: devices.id, name: devices.name, lineId: devices.lineId })
     .from(devices)
     .where(eq(devices.id, deviceId))
     .get();
-  if (!existing) return error("NOT_FOUND", "设备不存在");
+  if (!existing) return error("NOT_FOUND", "notFound.device");
 
   const body = await request.json();
   const { lineId } = body;
@@ -36,7 +36,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
       .from(lines)
       .where(eq(lines.id, lineId))
       .get();
-    if (!line) return error("NOT_FOUND", "线路不存在");
+    if (!line) return error("NOT_FOUND", "notFound.line");
   }
 
   const updated = db

@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   const { action, ids } = body;
 
   if (!Array.isArray(ids) || ids.length === 0) {
-    return error("VALIDATION_ERROR", "请选择至少一个设备");
+    return error("VALIDATION_ERROR", "validation.selectAtLeastOneDevice");
   }
 
   if (action === "delete") {
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
 
     if (lineId !== null) {
       const line = db.select({ id: lines.id }).from(lines).where(eq(lines.id, lineId)).get();
-      if (!line) return error("NOT_FOUND", "线路不存在");
+      if (!line) return error("NOT_FOUND", "notFound.line");
     }
 
     const existing = db
@@ -105,5 +105,5 @@ export async function POST(request: Request) {
     return success({ message: `已更新 ${ids.length} 个设备的线路` });
   }
 
-  return error("VALIDATION_ERROR", "无效的操作类型");
+  return error("VALIDATION_ERROR", "validation.invalidActionType");
 }

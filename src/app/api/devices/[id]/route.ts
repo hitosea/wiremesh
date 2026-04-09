@@ -18,7 +18,7 @@ type Params = { params: Promise<{ id: string }> };
 export async function GET(request: NextRequest, { params }: Params) {
   const { id } = await params;
   const deviceId = parseInt(id);
-  if (isNaN(deviceId)) return error("VALIDATION_ERROR", "无效的设备 ID");
+  if (isNaN(deviceId)) return error("VALIDATION_ERROR", "validation.invalidDeviceId");
 
   const device = db
     .select({
@@ -41,21 +41,21 @@ export async function GET(request: NextRequest, { params }: Params) {
     .where(eq(devices.id, deviceId))
     .get();
 
-  if (!device) return error("NOT_FOUND", "设备不存在");
+  if (!device) return error("NOT_FOUND", "notFound.device");
   return success({ ...device, status: computeDeviceStatus(device.lastHandshake) });
 }
 
 export async function PUT(request: NextRequest, { params }: Params) {
   const { id } = await params;
   const deviceId = parseInt(id);
-  if (isNaN(deviceId)) return error("VALIDATION_ERROR", "无效的设备 ID");
+  if (isNaN(deviceId)) return error("VALIDATION_ERROR", "validation.invalidDeviceId");
 
   const existing = db
     .select({ id: devices.id, name: devices.name })
     .from(devices)
     .where(eq(devices.id, deviceId))
     .get();
-  if (!existing) return error("NOT_FOUND", "设备不存在");
+  if (!existing) return error("NOT_FOUND", "notFound.device");
 
   const body = await request.json();
   const { name, tags, remark } = body;
@@ -101,14 +101,14 @@ export async function PUT(request: NextRequest, { params }: Params) {
 export async function DELETE(request: NextRequest, { params }: Params) {
   const { id } = await params;
   const deviceId = parseInt(id);
-  if (isNaN(deviceId)) return error("VALIDATION_ERROR", "无效的设备 ID");
+  if (isNaN(deviceId)) return error("VALIDATION_ERROR", "validation.invalidDeviceId");
 
   const existing = db
     .select({ id: devices.id, name: devices.name, lineId: devices.lineId })
     .from(devices)
     .where(eq(devices.id, deviceId))
     .get();
-  if (!existing) return error("NOT_FOUND", "设备不存在");
+  if (!existing) return error("NOT_FOUND", "notFound.device");
 
   db.delete(devices).where(eq(devices.id, deviceId)).run();
 
