@@ -10,6 +10,7 @@ import (
 
 const (
 	routeTableStart         = 100   // WG device routes: tables 101-199
+	relayTableStart         = 200   // Relay forwarding routes: tables 201-299
 	xrayRouteTableStart     = 42001 // Xray fwmark routes: tables 42001+
 	xrayRulePriorityStart   = 31000 // ip rule priority for Xray fwmark rules (must be < 32766 main table)
 )
@@ -18,6 +19,7 @@ const (
 // Each route has a type:
 //   "entry" → source-based policy routing (ip rule from X lookup tableN)
 //   "exit"  → destination-based route (ip route replace X dev tunN)
+//   "relay" → iif-based forwarding (ip rule iif tunX lookup tableN → tunY)
 func SyncRouting(deviceRoutes []api.DeviceRoute) error {
 	cleanRouting()
 
@@ -26,6 +28,7 @@ func SyncRouting(deviceRoutes []api.DeviceRoute) error {
 	}
 
 	entryIdx := 0
+	relayIdx := 0
 	for _, route := range deviceRoutes {
 		switch route.Type {
 		case "entry":
@@ -51,6 +54,25 @@ func SyncRouting(deviceRoutes []api.DeviceRoute) error {
 				continue
 			}
 			log.Printf("[routing] Exit: %s → %s", route.Destination, route.Tunnel)
+
+		case "relay":
+			// Destination = upstream iface (where traffic comes in)
+			// Tunnel = downstream iface (where traffic goes out)
+			tableNum := relayTableStart + relayIdx + 1 // 201, 202, ...
+			table := fmt.Sprintf("%d", tableNum)
+
+			if _, err := Run("ip", "route", "replace", "default", "dev", route.Tunnel, "table", table); err != nil {
+				log.Printf("[routing] Error adding relay route table %s: %v", table, err)
+				continue
+			}
+			if _, err := Run("ip", "rule", "add", "iif", route.Destination, "lookup", table, "priority", table); err != nil {
+				if !strings.Contains(err.Error(), "File exists") {
+					log.Printf("[routing] Error adding relay rule iif %s: %v", route.Destination, err)
+					continue
+				}
+			}
+			log.Printf("[routing] Relay: iif %s → %s (table %s)", route.Destination, route.Tunnel, table)
+			relayIdx++
 		}
 	}
 
@@ -96,6 +118,16 @@ func SyncXrayRouting(routes []api.XrayLineRoute) error {
 func cleanRouting() {
 	// Clean WG device routes (tables 101-199)
 	for i := routeTableStart + 1; i <= routeTableStart+99; i++ {
+		table := fmt.Sprintf("%d", i)
+		_, err := RunSilent("ip", "rule", "del", "lookup", table, "priority", table)
+		if err != nil {
+			break
+		}
+		RunSilent("ip", "route", "flush", "table", table)
+	}
+
+	// Clean relay routes (tables 201-299)
+	for i := relayTableStart + 1; i <= relayTableStart+99; i++ {
 		table := fmt.Sprintf("%d", i)
 		_, err := RunSilent("ip", "rule", "del", "lookup", table, "priority", table)
 		if err != nil {

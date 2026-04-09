@@ -174,6 +174,8 @@ export async function GET(request: NextRequest) {
   // Skip for lines with branch routing — traffic routing is handled by fwmark-based branch routing instead
   for (const [lineId, ifaceName] of lineToDownstreamIface) {
     if (linesWithBranchRouting.has(lineId)) continue;
+    const myRole = myLineNodes.find((ln) => ln.lineId === lineId)?.role;
+    if (myRole !== "entry") continue; // only entry nodes use source-based routing
     const lineDevices = db
       .select({ wgAddress: devices.wgAddress })
       .from(devices)
@@ -188,6 +190,8 @@ export async function GET(request: NextRequest) {
 
   // Exit node routes (destination-based: return traffic TO this IP)
   for (const [lineId, ifaceName] of lineToUpstreamIface) {
+    const myRole = myLineNodes.find((ln) => ln.lineId === lineId)?.role;
+    if (myRole !== "exit") continue; // only exit nodes use destination-based routing
     const lineDevices = db
       .select({ wgAddress: devices.wgAddress })
       .from(devices)
@@ -197,6 +201,17 @@ export async function GET(request: NextRequest) {
       if (d.wgAddress) {
         deviceRoutes.push({ destination: d.wgAddress.split("/")[0] + "/32", tunnel: ifaceName, type: "exit" });
       }
+    }
+  }
+
+  // Relay node routes (iif-based: forward traffic from upstream tunnel to downstream tunnel)
+  for (const lineId of lineIds) {
+    const myRole = myLineNodes.find((ln) => ln.lineId === lineId)?.role;
+    if (myRole !== "relay") continue;
+    const upstreamIface = lineToUpstreamIface.get(lineId);
+    const downstreamIface = lineToDownstreamIface.get(lineId);
+    if (upstreamIface && downstreamIface) {
+      deviceRoutes.push({ destination: upstreamIface, tunnel: downstreamIface, type: "relay" });
     }
   }
 

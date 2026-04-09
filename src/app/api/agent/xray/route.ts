@@ -16,12 +16,12 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const filename = `wiremesh-agent-linux-${arch}.tar.gz`;
-  const filePath = path.join(process.cwd(), "public", "agent", filename);
+  const filename = `xray-linux-${arch}.tar.gz`;
+  const filePath = path.join(process.cwd(), "public", "xray", filename);
 
   if (!fs.existsSync(filePath)) {
     return Response.json(
-      { error: { code: "NOT_FOUND", message: `Agent binary not found: ${filename}` } },
+      { error: { code: "NOT_FOUND", message: `Xray binary not found: ${filename}` } },
       { status: 404 }
     );
   }

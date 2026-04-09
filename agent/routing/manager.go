@@ -103,7 +103,6 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes []api.XrayLineRoute) e
 			if len(route.Branches) <= 1 {
 				continue // no split tunneling for single-branch lines
 			}
-			// Find this line's default branch mark
 			var defaultMarkHex string
 			for _, branch := range route.Branches {
 				if branch.IsDefault {
@@ -114,24 +113,22 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes []api.XrayLineRoute) e
 			if defaultMarkHex == "" {
 				continue
 			}
-
-			// Non-default branches: remark from default mark to branch mark
 			for _, branch := range route.Branches {
 				if branch.IsDefault {
 					continue
 				}
 				if ipsetName, ok := markToIpset[branch.Mark]; ok {
-					branchMarkHex := markHex(branch.Mark)
 					addMangleRule(fmt.Sprintf(
 						"-A OUTPUT -m mark --mark %s -m set --match-set %s dst -j MARK --set-mark %s -m comment --comment wm-xray-line-%d",
-						defaultMarkHex, ipsetName, branchMarkHex, route.LineID,
+						defaultMarkHex, ipsetName, markHex(branch.Mark), route.LineID,
 					))
 				}
 			}
 		}
 
-		// MASQUERADE for Xray traffic going through tunnels
+		// MASQUERADE for all Xray traffic going through tunnels
 		// (Xray packets have eth0 source IP; needs conversion to tunnel IP)
+		// This must be added for ANY node with Xray entry role, not just multi-branch
 		addNatRule("-A POSTROUTING -o wm-tun+ -j MASQUERADE -m comment --comment wm-xray-masq")
 	}
 

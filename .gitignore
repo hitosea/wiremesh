@@ -44,4 +44,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-public/agent/wiremesh-agent-linux-amd64
+public/agent/wiremesh-agent-linux-amd64*
+public/agent/wiremesh-agent-linux-arm64*
+public/xray/
+
+# claude skills (project-local, contains credentials)
+.claude/

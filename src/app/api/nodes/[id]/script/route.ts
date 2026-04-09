@@ -304,28 +304,55 @@ else
 fi
 ok "WireGuard interface wm-wg0 is up"
 
-# 3.5 Install Xray
+# 3.5 Install Xray (download from management platform)
 if command -v xray &>/dev/null; then
   ok "Xray already installed"
 else
   info "Installing Xray..."
-  bash <(curl -fsSL https://github.com/XTLS/Xray-install/raw/main/install-release.sh) install >/dev/null 2>&1
-  if ! command -v xray &>/dev/null; then
-    warn "Xray installation failed (non-fatal, can be installed later)"
+  curl -fsSL "${serverUrl}/api/agent/xray?arch=$AGENT_ARCH" -o /tmp/xray.tar.gz
+  if [ -f /tmp/xray.tar.gz ] && [ -s /tmp/xray.tar.gz ]; then
+    tar -xzf /tmp/xray.tar.gz -C /usr/local/bin/
+    chmod +x /usr/local/bin/xray
+    rm -f /tmp/xray.tar.gz
+    if command -v xray &>/dev/null; then
+      ok "Xray installed"
+    else
+      warn "Xray installation failed (non-fatal, can be installed later)"
+    fi
   else
-    ok "Xray installed"
+    warn "Xray download failed (non-fatal, can be installed later)"
   fi
 fi
 
 # 3.6 Configure Xray service for WireMesh
 mkdir -p /etc/wiremesh/xray
-mkdir -p /etc/systemd/system/xray.service.d
-cat > /etc/systemd/system/xray.service.d/wiremesh.conf << 'XRAYEOF'
+if [ ! -f /etc/systemd/system/xray.service ]; then
+  cat > /etc/systemd/system/xray.service << 'XRAYSVCEOF'
+[Unit]
+Description=Xray Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/xray run -config /etc/wiremesh/xray/config.json
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+XRAYSVCEOF
+else
+  # Existing xray service — override config path
+  mkdir -p /etc/systemd/system/xray.service.d
+  cat > /etc/systemd/system/xray.service.d/wiremesh.conf << 'XRAYEOF'
 [Service]
 ExecStart=
 ExecStart=/usr/local/bin/xray run -config /etc/wiremesh/xray/config.json
 XRAYEOF
+fi
 systemctl daemon-reload
+systemctl enable xray >/dev/null 2>&1
 # Do not start xray here — Agent will start it after pulling config
 systemctl stop xray 2>/dev/null || true
 ok "Xray service configured"
@@ -344,10 +371,12 @@ if [ "$UPGRADE" = true ]; then
   ok "Existing agent stopped"
 fi
 
-# 4.2 Download agent binary
+# 4.2 Download and extract agent binary
 info "Downloading agent binary ($AGENT_ARCH)..."
-curl -fsSL "${serverUrl}/api/agent/binary?arch=$AGENT_ARCH" -o /usr/local/bin/wiremesh-agent
+curl -fsSL "${serverUrl}/api/agent/binary?arch=$AGENT_ARCH" -o /tmp/wiremesh-agent.tar.gz
+tar -xzf /tmp/wiremesh-agent.tar.gz -C /usr/local/bin/
 chmod +x /usr/local/bin/wiremesh-agent
+rm -f /tmp/wiremesh-agent.tar.gz
 ok "Agent binary downloaded"
 
 # 4.3 Write agent config
