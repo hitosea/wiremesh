@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -26,11 +27,6 @@ type Filter = {
   remark: string | null;
 };
 
-const MODE_LABELS: Record<string, string> = {
-  whitelist: "白名单",
-  blacklist: "黑名单",
-};
-
 const MODE_VARIANTS: Record<
   string,
   "default" | "secondary" | "destructive" | "outline"
@@ -41,6 +37,8 @@ const MODE_VARIANTS: Record<
 
 export default function FiltersPage() {
   const router = useRouter();
+  const t = useTranslations("filters");
+  const tc = useTranslations("common");
   const [data, setData] = useState<Filter[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
@@ -64,7 +62,7 @@ export default function FiltersPage() {
       setData(json.data ?? []);
       if (json.pagination) setPagination(json.pagination);
     } catch {
-      toast.error("加载过滤规则列表失败");
+      toast.error(t("loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -97,12 +95,12 @@ export default function FiltersPage() {
             f.id === filter.id ? { ...f, isEnabled: json.data.isEnabled } : f
           )
         );
-        toast.success(json.data.isEnabled ? "规则已启用" : "规则已停用");
+        toast.success(json.data.isEnabled ? t("enabled") : t("disabled"));
       } else {
-        toast.error(json.error?.message ?? "操作失败");
+        toast.error(json.error?.message ?? t("toggleFailed"));
       }
     } catch {
-      toast.error("操作失败，请重试");
+      toast.error(t("toggleFailedRetry"));
     } finally {
       setTogglingId(null);
     }
@@ -114,15 +112,15 @@ export default function FiltersPage() {
     try {
       const res = await fetch(`/api/filters/${deleteId}`, { method: "DELETE" });
       if (res.ok) {
-        toast.success("过滤规则已删除");
+        toast.success(t("deleted"));
         setDeleteId(null);
         fetchFilters(pagination.page);
       } else {
         const json = await res.json();
-        toast.error(json.error?.message ?? "删除失败");
+        toast.error(json.error?.message ?? tc("deleteFailed"));
       }
     } catch {
-      toast.error("删除失败，请重试");
+      toast.error(tc("deleteFailedRetry"));
     } finally {
       setDeleting(false);
     }
@@ -131,7 +129,7 @@ export default function FiltersPage() {
   const columns: Column<Filter>[] = [
     {
       key: "name",
-      label: "名称",
+      label: t("name"),
       render: (row) => (
         <Link
           href={`/filters/${row.id}`}
@@ -143,26 +141,26 @@ export default function FiltersPage() {
     },
     {
       key: "mode",
-      label: "模式",
+      label: t("mode"),
       render: (row) => (
         <Badge variant={MODE_VARIANTS[row.mode] ?? "secondary"}>
-          {MODE_LABELS[row.mode] ?? row.mode}
+          {t(`mode.${row.mode}`)}
         </Badge>
       ),
     },
     {
       key: "rulesCount",
-      label: "规则数",
-      render: (row) => <span>{row.rulesCount} 条</span>,
+      label: t("ruleCount"),
+      render: (row) => <span>{row.rulesCount} {t("countSuffix")}</span>,
     },
     {
       key: "branchCount",
-      label: "关联分支",
-      render: (row) => <span>{row.branchCount} 个</span>,
+      label: t("linkedBranches"),
+      render: (row) => <span>{row.branchCount} {t("branchSuffix")}</span>,
     },
     {
       key: "isEnabled",
-      label: "状态",
+      label: t("status"),
       render: (row) => (
         <div className="flex items-center gap-2">
           <Switch
@@ -171,7 +169,7 @@ export default function FiltersPage() {
             onCheckedChange={() => handleToggle(row)}
           />
           <Badge variant={row.isEnabled ? "default" : "secondary"}>
-            {row.isEnabled ? "已启用" : "已停用"}
+            {row.isEnabled ? t("statusEnabled") : t("statusDisabled")}
           </Badge>
         </div>
       ),
@@ -187,14 +185,14 @@ export default function FiltersPage() {
             size="sm"
             onClick={() => router.push(`/filters/${row.id}`)}
           >
-            编辑
+            {tc("edit")}
           </Button>
           <Button
             variant="destructive"
             size="sm"
             onClick={() => setDeleteId(row.id)}
           >
-            删除
+            {tc("delete")}
           </Button>
         </div>
       ),
@@ -204,12 +202,12 @@ export default function FiltersPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-end">
-        <Button onClick={() => router.push("/filters/new")}>新增规则</Button>
+        <Button onClick={() => router.push("/filters/new")}>{t("addRule")}</Button>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center h-48 text-muted-foreground">
-          加载中...
+          {tc("loading")}
         </div>
       ) : (
         <DataTable
@@ -219,26 +217,26 @@ export default function FiltersPage() {
           onPageChange={handlePageChange}
           onSearch={handleSearch}
           onRefresh={() => fetchFilters(pagination.page)}
-          searchPlaceholder="搜索规则名称..."
+          searchPlaceholder={t("searchPlaceholder")}
         />
       )}
 
       <Dialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>确认删除</DialogTitle>
+            <DialogTitle>{tc("confirmDelete")}</DialogTitle>
           </DialogHeader>
-          <p className="text-muted-foreground">确定要删除该过滤规则吗？此操作不可恢复。</p>
+          <p className="text-muted-foreground">{t("confirmDeleteFilter")}</p>
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={() => setDeleteId(null)}>
-              取消
+              {tc("cancel")}
             </Button>
             <Button
               variant="destructive"
               onClick={handleDelete}
               disabled={deleting}
             >
-              {deleting ? "删除中..." : "确认删除"}
+              {deleting ? tc("deleting") : tc("confirmDelete")}
             </Button>
           </div>
         </DialogContent>

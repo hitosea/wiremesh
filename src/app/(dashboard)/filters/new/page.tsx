@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,6 +37,8 @@ type LineWithBranches = {
 
 export default function NewFilterPage() {
   const router = useRouter();
+  const t = useTranslations("filterNew");
+  const tc = useTranslations("common");
   const [saving, setSaving] = useState(false);
   const [linesWithBranches, setLinesWithBranches] = useState<LineWithBranches[]>([]);
 
@@ -64,11 +67,11 @@ export default function NewFilterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      toast.error("规则名称不能为空");
+      toast.error(t("nameRequired"));
       return;
     }
     if (!rules.trim() && !domainRules.trim() && !sourceUrl.trim()) {
-      toast.error("IP/CIDR 规则、域名规则至少填写一项，或设置外部规则源");
+      toast.error(t("rulesRequired"));
       return;
     }
     setSaving(true);
@@ -89,13 +92,13 @@ export default function NewFilterPage() {
       });
       const json = await res.json();
       if (res.ok) {
-        toast.success("过滤规则已创建");
+        toast.success(t("created"));
         router.push("/filters");
       } else {
-        toast.error(json.error?.message ?? "创建失败");
+        toast.error(json.error?.message ?? tc("createFailed"));
       }
     } catch {
-      toast.error("创建失败，请重试");
+      toast.error(tc("createFailedRetry"));
     } finally {
       setSaving(false);
     }
@@ -104,88 +107,88 @@ export default function NewFilterPage() {
   return (
     <div className="space-y-6 w-full max-w-2xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">新增过滤规则</h1>
+        <h1 className="text-2xl font-semibold">{t("title")}</h1>
         <Button variant="outline" onClick={() => router.back()}>
-          返回
+          {tc("back")}
         </Button>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>规则配置</CardTitle>
+          <CardTitle>{t("ruleConfig")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">
-              规则名称 <span className="text-destructive">*</span>
+              {t("ruleName")} <span className="text-destructive">*</span>
             </Label>
             <Input
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="例如：国内直连"
+              placeholder={t("ruleNamePlaceholder")}
             />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="mode">
-              模式 <span className="text-destructive">*</span>
+              {t("mode")} <span className="text-destructive">*</span>
             </Label>
             <Select value={mode} onValueChange={setMode}>
               <SelectTrigger id="mode">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="whitelist">白名单（仅允许列表中的 IP/CIDR）</SelectItem>
-                <SelectItem value="blacklist">黑名单（阻止列表中的 IP/CIDR）</SelectItem>
+                <SelectItem value="whitelist">{t("whitelist")}</SelectItem>
+                <SelectItem value="blacklist">{t("blacklist")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="rules">
-              IP/CIDR 规则
+              {t("ipRules")}
             </Label>
             <Textarea
               id="rules"
               value={rules}
               onChange={(e) => setRules(e.target.value)}
               rows={8}
-              placeholder={"每行一条规则，例如：\n192.168.1.0/24\n10.0.0.0/8\n172.16.0.1"}
+              placeholder={t("ipRulesPlaceholder")}
               className="font-mono text-sm"
             />
-            <p className="text-xs text-muted-foreground">每行填写一个 IP 地址或 CIDR 网段</p>
+            <p className="text-xs text-muted-foreground">{t("ipRulesHint")}</p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="domainRules">域名规则</Label>
+            <Label htmlFor="domainRules">{t("domainRules")}</Label>
             <Textarea
               id="domainRules"
               value={domainRules}
               onChange={(e) => setDomainRules(e.target.value)}
               rows={6}
-              placeholder={"每行一条域名，例如：\ngoogle.com\nyoutube.com\n*.netflix.com"}
+              placeholder={t("domainRulesPlaceholder")}
               className="font-mono text-sm"
             />
-            <p className="text-xs text-muted-foreground">匹配域名及其所有子域名</p>
+            <p className="text-xs text-muted-foreground">{t("domainRulesHint")}</p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="sourceUrl">外部规则源（可选）</Label>
+            <Label htmlFor="sourceUrl">{t("sourceUrl")}</Label>
             <Input
               id="sourceUrl"
               value={sourceUrl}
               onChange={(e) => setSourceUrl(e.target.value)}
-              placeholder="https://example.com/ip-list.txt"
+              placeholder={t("sourceUrlPlaceholder")}
             />
-            <p className="text-xs text-muted-foreground">定期从该 URL 拉取规则，自动分类 IP 和域名</p>
+            <p className="text-xs text-muted-foreground">{t("sourceUrlHint")}</p>
           </div>
 
           <div className="space-y-2">
-            <Label>关联分支</Label>
+            <Label>{t("linkedBranches")}</Label>
             {linesWithBranches.length === 0 ? (
-              <p className="text-sm text-muted-foreground">暂无线路</p>
+              <p className="text-sm text-muted-foreground">{t("noLines")}</p>
             ) : (
               <div className="space-y-3 border rounded-md p-3">
                 {linesWithBranches.map((line) => (
@@ -204,12 +207,12 @@ export default function NewFilterPage() {
                               htmlFor={`branch-${branch.id}`}
                               className="text-sm cursor-pointer"
                             >
-                              {branch.name}{branch.isDefault ? "（默认）" : ""}
+                              {branch.name}{branch.isDefault ? ` (${t("defaultLabel")})` : ""}
                             </label>
                           </div>
                         ))
                       ) : (
-                        <p className="text-xs text-muted-foreground">暂无分支</p>
+                        <p className="text-xs text-muted-foreground">{t("noBranches")}</p>
                       )}
                     </div>
                   </div>
@@ -219,17 +222,17 @@ export default function NewFilterPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="tags">标签（逗号分隔）</Label>
+            <Label htmlFor="tags">{t("tagsComma")}</Label>
             <Input
               id="tags"
               value={tags}
               onChange={(e) => setTags(e.target.value)}
-              placeholder="例如：国内,直连"
+              placeholder={t("tagsPlaceholder")}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="remark">备注</Label>
+            <Label htmlFor="remark">{t("notes")}</Label>
             <Textarea
               id="remark"
               value={remark}
@@ -242,10 +245,10 @@ export default function NewFilterPage() {
 
       <div className="flex flex-col sm:flex-row gap-2">
         <Button type="submit" disabled={saving}>
-          {saving ? "创建中..." : "创建规则"}
+          {saving ? tc("creating") : t("createRule")}
         </Button>
         <Button type="button" variant="outline" onClick={() => router.back()}>
-          取消
+          {tc("cancel")}
         </Button>
       </div>
       </form>

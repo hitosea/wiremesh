@@ -433,6 +433,7 @@
     "tagsComma": "Tags (comma-separated)",
     "tagsPlaceholder": "e.g., China, Direct",
     "notes": "Notes",
+    "defaultLabel": "Default",
     "createRule": "Create Rule"
   },
   "filterDetail": {

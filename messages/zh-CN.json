@@ -433,6 +433,7 @@
     "tagsComma": "标签（逗号分隔）",
     "tagsPlaceholder": "例如：国内,直连",
     "notes": "备注",
+    "defaultLabel": "默认",
     "createRule": "创建规则"
   },
   "filterDetail": {

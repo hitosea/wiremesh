@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -52,6 +53,9 @@ export default function EditFilterPage() {
   const router = useRouter();
   const params = useParams();
   const filterId = params.id as string;
+  const t = useTranslations("filterDetail");
+  const tf = useTranslations("filterNew");
+  const tc = useTranslations("common");
 
   const [filter, setFilter] = useState<FilterDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -75,7 +79,7 @@ export default function EditFilterPage() {
       .then(([filterJson, linesJson]) => {
         const f = filterJson.data;
         if (!f) {
-          toast.error("过滤规则不存在");
+          toast.error(t("notFound"));
           router.push("/filters");
           return;
         }
@@ -90,7 +94,7 @@ export default function EditFilterPage() {
         setRemark(f.remark ?? "");
         setLinesWithBranches(linesJson.data ?? []);
       })
-      .catch(() => toast.error("加载失败"))
+      .catch(() => toast.error(t("loadFailed")))
       .finally(() => setLoading(false));
   }, [filterId, router]);
 
@@ -102,11 +106,11 @@ export default function EditFilterPage() {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      toast.error("规则名称不能为空");
+      toast.error(tf("nameRequired"));
       return;
     }
     if (!rules.trim() && !domainRules.trim() && !sourceUrl.trim()) {
-      toast.error("IP/CIDR 规则、域名规则至少填写一项，或设置外部规则源");
+      toast.error(tf("rulesRequired"));
       return;
     }
     setSaving(true);
@@ -127,13 +131,13 @@ export default function EditFilterPage() {
       });
       const json = await res.json();
       if (res.ok) {
-        toast.success("过滤规则已保存");
+        toast.success(t("saved"));
         setFilter(json.data);
       } else {
-        toast.error(json.error?.message ?? "保存失败");
+        toast.error(json.error?.message ?? tc("saveFailed"));
       }
     } catch {
-      toast.error("保存失败，请重试");
+      toast.error(tc("saveFailedRetry"));
     } finally {
       setSaving(false);
     }
@@ -142,7 +146,7 @@ export default function EditFilterPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-48 text-muted-foreground">
-        加载中...
+        {tc("loading")}
       </div>
     );
   }
@@ -152,20 +156,20 @@ export default function EditFilterPage() {
   return (
     <div className="space-y-6 w-full max-w-2xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">编辑过滤规则</h1>
+        <h1 className="text-2xl font-semibold">{t("title")}</h1>
         <Button variant="outline" onClick={() => router.push("/filters")}>
-          返回
+          {tc("back")}
         </Button>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>规则配置</CardTitle>
+          <CardTitle>{tf("ruleConfig")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">
-              规则名称 <span className="text-destructive">*</span>
+              {tf("ruleName")} <span className="text-destructive">*</span>
             </Label>
             <Input
               id="name"
@@ -175,21 +179,21 @@ export default function EditFilterPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="mode">模式</Label>
+            <Label htmlFor="mode">{tf("mode")}</Label>
             <Select value={mode} onValueChange={setMode}>
               <SelectTrigger id="mode">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="whitelist">白名单（仅允许列表中的 IP/CIDR）</SelectItem>
-                <SelectItem value="blacklist">黑名单（阻止列表中的 IP/CIDR）</SelectItem>
+                <SelectItem value="whitelist">{tf("whitelist")}</SelectItem>
+                <SelectItem value="blacklist">{tf("blacklist")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="rules">
-              IP/CIDR 规则
+              {tf("ipRules")}
             </Label>
             <Textarea
               id="rules"
@@ -198,35 +202,35 @@ export default function EditFilterPage() {
               rows={8}
               className="font-mono text-sm"
             />
-            <p className="text-xs text-muted-foreground">每行填写一个 IP 地址或 CIDR 网段</p>
+            <p className="text-xs text-muted-foreground">{tf("ipRulesHint")}</p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="domainRules">域名规则</Label>
+            <Label htmlFor="domainRules">{tf("domainRules")}</Label>
             <Textarea
               id="domainRules"
               value={domainRules}
               onChange={(e) => setDomainRules(e.target.value)}
               rows={6}
-              placeholder={"每行一条域名，例如：\ngoogle.com\nyoutube.com\n*.netflix.com"}
+              placeholder={tf("domainRulesPlaceholder")}
               className="font-mono text-sm"
             />
-            <p className="text-xs text-muted-foreground">匹配域名及其所有子域名</p>
+            <p className="text-xs text-muted-foreground">{tf("domainRulesHint")}</p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="sourceUrl">外部规则源（可选）</Label>
+            <Label htmlFor="sourceUrl">{tf("sourceUrl")}</Label>
             <Input
               id="sourceUrl"
               value={sourceUrl}
               onChange={(e) => setSourceUrl(e.target.value)}
-              placeholder="https://example.com/ip-list.txt"
+              placeholder={tf("sourceUrlPlaceholder")}
             />
-            <p className="text-xs text-muted-foreground">定期从该 URL 拉取规则，自动分类 IP 和域名</p>
+            <p className="text-xs text-muted-foreground">{tf("sourceUrlHint")}</p>
             {filter.sourceUrl && (
               <div className="flex items-center gap-2 mt-1">
                 <p className="text-xs text-muted-foreground">
-                  上次同步：{filter.sourceUpdatedAt ?? "从未同步"}
+                  {t("lastSync")}{filter.sourceUpdatedAt ?? t("neverSynced")}
                 </p>
                 <Button
                   type="button"
@@ -234,20 +238,20 @@ export default function EditFilterPage() {
                   size="sm"
                   onClick={async () => {
                     const res = await fetch(`/api/filters/${filterId}/sync`, { method: "POST" });
-                    if (res.ok) toast.success("同步通知已发送");
-                    else toast.error("同步失败");
+                    if (res.ok) toast.success(t("syncNow"));
+                    else toast.error(tc("operationFailed"));
                   }}
                 >
-                  立即同步
+                  {t("syncNow")}
                 </Button>
               </div>
             )}
           </div>
 
           <div className="space-y-2">
-            <Label>关联分支</Label>
+            <Label>{tf("linkedBranches")}</Label>
             {linesWithBranches.length === 0 ? (
-              <p className="text-sm text-muted-foreground">暂无线路</p>
+              <p className="text-sm text-muted-foreground">{tf("noLines")}</p>
             ) : (
               <div className="space-y-3 border rounded-md p-3">
                 {linesWithBranches.map((line) => (
@@ -266,12 +270,12 @@ export default function EditFilterPage() {
                               htmlFor={`branch-${branch.id}`}
                               className="text-sm cursor-pointer"
                             >
-                              {branch.name}{branch.isDefault ? "（默认）" : ""}
+                              {branch.name}{branch.isDefault ? ` (${tf("defaultLabel")})` : ""}
                             </label>
                           </div>
                         ))
                       ) : (
-                        <p className="text-xs text-muted-foreground">暂无分支</p>
+                        <p className="text-xs text-muted-foreground">{tf("noBranches")}</p>
                       )}
                     </div>
                   </div>
@@ -281,7 +285,7 @@ export default function EditFilterPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="tags">标签（逗号分隔）</Label>
+            <Label htmlFor="tags">{tf("tagsComma")}</Label>
             <Input
               id="tags"
               value={tags}
@@ -290,7 +294,7 @@ export default function EditFilterPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="remark">备注</Label>
+            <Label htmlFor="remark">{tf("notes")}</Label>
             <Textarea
               id="remark"
               value={remark}
@@ -303,10 +307,10 @@ export default function EditFilterPage() {
 
       <div className="flex flex-col sm:flex-row gap-2">
         <Button onClick={handleSave} disabled={saving}>
-          {saving ? "保存中..." : "保存"}
+          {saving ? tc("saving") : tc("save")}
         </Button>
         <Button variant="outline" onClick={() => router.push("/filters")}>
-          返回
+          {tc("back")}
         </Button>
       </div>
     </div>
