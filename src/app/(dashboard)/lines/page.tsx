@@ -49,7 +49,7 @@ export default function LinesPage() {
 
   const renderNodeChain = (nodes: LineNode[]): string => {
     return nodes
-      .map((n) => `${n.nodeName}(${t(`role.${n.role}` as "role.entry" | "role.transit" | "role.exit") ?? n.role})`)
+      .map((n) => `${n.nodeName}(${t(`role.${n.role}` as "role.entry" | "role.relay" | "role.exit") ?? n.role})`)
       .join(" \u2192 ");
   };
 

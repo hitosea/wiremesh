@@ -298,7 +298,7 @@
     },
     "role": {
       "entry": "入口",
-      "transit": "中转",
+      "relay": "中转",
       "exit": "出口"
     },
     "loadFailed": "加载线路列表失败",

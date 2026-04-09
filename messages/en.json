@@ -298,7 +298,7 @@
     },
     "role": {
       "entry": "Entry",
-      "transit": "Transit",
+      "relay": "Relay",
       "exit": "Exit"
     },
     "loadFailed": "Failed to load lines",
