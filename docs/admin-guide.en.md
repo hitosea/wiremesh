@@ -1,6 +1,6 @@
 ## Overview
 
-WireMesh is a WireGuard mesh VPN management platform for single-admin internal use. It lets you manage VPN infrastructure from a central web UI without manually editing WireGuard configuration files on each server.
+WireMesh is a WireGuard mesh VPN management platform for internal use. It lets you manage VPN infrastructure from a central web UI without manually editing WireGuard configuration files on each server.
 
 **Core concepts:**
 

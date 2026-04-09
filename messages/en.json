@@ -529,8 +529,8 @@
     "en": "English"
   },
   "help": {
-    "title": "Admin Guide",
-    "description": "Platform administrator operation guide",
+    "title": "User Guide",
+    "description": "Platform operation guide",
     "toc": "Table of Contents"
   },
   "errors": {
