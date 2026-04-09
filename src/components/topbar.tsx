@@ -1,44 +1,49 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Menu, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LocaleToggle } from "@/components/locale-toggle";
 import { useSidebarMobile } from "@/components/sidebar";
 import { toast } from "sonner";
 
-const PAGE_TITLES: Record<string, string> = {
-  "/dashboard": "仪表盘",
-  "/nodes": "节点管理",
-  "/devices": "设备管理",
-  "/lines": "线路管理",
-  "/filters": "分流规则",
-  "/settings": "系统设置",
-  "/settings/logs": "审计日志",
+const TITLE_KEYS: Record<string, string> = {
+  "/dashboard": "nav.dashboard",
+  "/nodes": "nav.nodes",
+  "/devices": "nav.devices",
+  "/lines": "nav.lines",
+  "/filters": "nav.filters",
+  "/settings": "nav.settings",
+  "/settings/logs": "nav.auditLogs",
 };
 
-function getPageTitle(pathname: string): string {
-  if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname];
-  for (const [path, title] of Object.entries(PAGE_TITLES)) {
-    if (pathname.startsWith(path + "/")) return title;
-    if (pathname.startsWith(path)) return title;
+function getPageTitleKey(pathname: string): string {
+  if (TITLE_KEYS[pathname]) return TITLE_KEYS[pathname];
+  for (const [path, key] of Object.entries(TITLE_KEYS)) {
+    if (pathname.startsWith(path + "/")) return key;
+    if (pathname.startsWith(path)) return key;
   }
-  return "WireMesh";
+  return "";
 }
 
 export default function Topbar() {
   const router = useRouter();
   const pathname = usePathname();
   const { setMobileOpen } = useSidebarMobile();
+  const t = useTranslations();
 
   async function handleLogout() {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
       router.push("/login");
     } catch {
-      toast.error("退出失败，请重试");
+      toast.error(t("auth.logoutFailed"));
     }
   }
+
+  const titleKey = getPageTitleKey(pathname);
 
   return (
     <header className="h-14 flex-shrink-0 bg-background border-b flex items-center justify-between px-4 lg:px-6">
@@ -51,16 +56,19 @@ export default function Topbar() {
         >
           <Menu className="h-4 w-4" />
         </Button>
-        <h1 className="text-sm font-semibold">{getPageTitle(pathname)}</h1>
+        <h1 className="text-sm font-semibold">
+          {titleKey ? t(titleKey) : "WireMesh"}
+        </h1>
       </div>
       <div className="flex items-center gap-1">
+        <LocaleToggle />
         <ThemeToggle />
         <Button
           variant="ghost"
           size="icon"
           className="h-8 w-8 text-muted-foreground"
           onClick={handleLogout}
-          title="退出登录"
+          title={t("auth.logout")}
         >
           <LogOut className="h-4 w-4" />
         </Button>
