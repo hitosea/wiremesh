@@ -145,7 +145,7 @@ func (a *Agent) pullAndApplyConfigForce(force bool) error {
 		log.Printf("[agent] xray sync error: %v", err)
 	}
 
-	// 6. Sync Xray fwmark routing
+	// 6. Sync Xray fwmark routing (each Sync cleans its own range, order-independent)
 	if cfgData.Xray != nil && len(cfgData.Xray.Routes) > 0 {
 		if err := wg.SyncXrayRouting(cfgData.Xray.Routes); err != nil {
 			log.Printf("[agent] xray routing sync error: %v", err)

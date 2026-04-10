@@ -10,14 +10,20 @@ import (
 // Create creates a hash:ip ipset with the given name.
 // If it already exists, it is flushed.
 func Create(name string) error {
-	out, err := exec.Command("ipset", "create", name, "hash:ip", "timeout", "0").CombinedOutput()
+	return CreateHash(name, "ip")
+}
+
+// CreateHash creates a hash:<hashType> ipset with the given name.
+// hashType can be "ip" or "net". If it already exists, it is flushed.
+func CreateHash(name, hashType string) error {
+	out, err := exec.Command("ipset", "create", name, "hash:"+hashType, "timeout", "0").CombinedOutput()
 	if err != nil {
 		if strings.Contains(string(out), "already exists") {
 			return Flush(name)
 		}
 		return fmt.Errorf("ipset create %s: %w: %s", name, err, string(out))
 	}
-	log.Printf("[ipset] Created set: %s", name)
+	log.Printf("[ipset] Created set: %s (hash:%s)", name, hashType)
 	return nil
 }
 

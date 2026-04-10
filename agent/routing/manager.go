@@ -35,45 +35,80 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes []api.XrayLineRoute) e
 	m.cleanIPRules()
 	m.cleanMangleRules()
 
-	// 2. Set up each branch
+	// 2. Create per-line source ipsets (all branches of a line share device IPs)
+	srcIpsets := make(map[string]bool) // ipset name → created successfully
+	for _, branch := range cfg.Branches {
+		if len(branch.DeviceIPs) == 0 {
+			continue
+		}
+		srcName := fmt.Sprintf("wm-line-src-%d", branch.ID)
+		if _, exists := srcIpsets[srcName]; exists {
+			continue
+		}
+		if err := ipset.CreateHash(srcName, "net"); err != nil {
+			log.Printf("[routing] Failed to create source ipset %s: %v", srcName, err)
+			srcIpsets[srcName] = false
+			continue
+		}
+		for _, ip := range branch.DeviceIPs {
+			ipset.Add(srcName, ip, 0)
+		}
+		srcIpsets[srcName] = true
+	}
+
+	// Helper: build "-m set --match-set <name> src " clause if source ipset exists
+	srcMatchFor := func(branch api.RoutingBranch) string {
+		if len(branch.DeviceIPs) == 0 {
+			return ""
+		}
+		srcName := fmt.Sprintf("wm-line-src-%d", branch.ID)
+		if ok := srcIpsets[srcName]; !ok {
+			return ""
+		}
+		return fmt.Sprintf("-m set --match-set %s src ", srcName)
+	}
+
+	// 3. Set up each branch
 	domainRules := make(map[string]string) // domain -> ipset name
 
 	for _, branch := range cfg.Branches {
 		table := fmt.Sprintf("%d", branch.Mark)
 		markHex := markHex(branch.Mark)
 		ipsetName := fmt.Sprintf("wm-branch-%d", branch.ID)
+		srcMatch := srcMatchFor(branch)
 
-		// Create routing table and ip rule
 		run("ip", "route", "replace", "default", "dev", branch.Tunnel, "table", table)
 
 		if branch.IsDefault {
-			// Default branch: lowest priority (32000), match unmarked traffic
 			run("ip", "rule", "add", "fwmark", markHex, "lookup", table, "priority", "32000")
-			// Mark all unmarked traffic from wm-wg0
-			addMangleRule(fmt.Sprintf(
-				"-A PREROUTING -i wm-wg0 -m mark --mark 0 -j MARK --set-mark %s -m comment --comment wm-branch-default",
-				markHex,
-			))
+			if srcMatch != "" {
+				addMangleRule(fmt.Sprintf(
+					"-A PREROUTING -i wm-wg0 %s-m mark --mark 0 -j MARK --set-mark %s -m comment --comment wm-branch-default-%d",
+					srcMatch, markHex, branch.ID,
+				))
+			} else {
+				addMangleRule(fmt.Sprintf(
+					"-A PREROUTING -i wm-wg0 -m mark --mark 0 -j MARK --set-mark %s -m comment --comment wm-branch-default",
+					markHex,
+				))
+			}
 		} else {
-			// Non-default branch: priority == table number (both from branch mark, < 32000)
 			run("ip", "rule", "add", "fwmark", markHex, "lookup", table, "priority", table)
 
-			// IP/CIDR rules: iptables mangle PREROUTING
 			for _, cidr := range branch.IPRules {
 				addMangleRule(fmt.Sprintf(
-					"-A PREROUTING -i wm-wg0 -d %s -j MARK --set-mark %s -m comment --comment wm-branch-%d",
-					cidr, markHex, branch.ID,
+					"-A PREROUTING -i wm-wg0 %s-d %s -j MARK --set-mark %s -m comment --comment wm-branch-%d",
+					srcMatch, cidr, markHex, branch.ID,
 				))
 			}
 
-			// Domain rules: create ipset + iptables match
 			if len(branch.DomainRules) > 0 {
 				if err := ipset.Create(ipsetName); err != nil {
 					log.Printf("[routing] Failed to create ipset %s: %v (skipping ipset-based rules for branch %d)", ipsetName, err, branch.ID)
 				} else {
 					addMangleRule(fmt.Sprintf(
-						"-A PREROUTING -i wm-wg0 -m set --match-set %s dst -j MARK --set-mark %s -m comment --comment wm-branch-%d-dns",
-						ipsetName, markHex, branch.ID,
+						"-A PREROUTING -i wm-wg0 %s-m set --match-set %s dst -j MARK --set-mark %s -m comment --comment wm-branch-%d-dns",
+						srcMatch, ipsetName, markHex, branch.ID,
 					))
 				}
 				for _, domain := range branch.DomainRules {
@@ -100,16 +135,10 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes []api.XrayLineRoute) e
 			if len(route.Branches) <= 1 {
 				continue // no split tunneling for single-branch lines
 			}
-			var defaultMarkHex string
-			for _, branch := range route.Branches {
-				if branch.IsDefault {
-					defaultMarkHex = markHex(branch.Mark)
-					break
-				}
-			}
-			if defaultMarkHex == "" {
-				continue
-			}
+			// Use route.Mark (per-line Xray mark, 31001+ range) for matching.
+			// Xray sets sockopt.mark to this value. OUTPUT rules remark to branch marks
+			// when destination matches a filter ipset.
+			perLineMarkHex := markHex(route.Mark)
 			for _, branch := range route.Branches {
 				if branch.IsDefault {
 					continue
@@ -117,7 +146,7 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes []api.XrayLineRoute) e
 				if ipsetName, ok := markToIpset[branch.Mark]; ok {
 					addMangleRule(fmt.Sprintf(
 						"-A OUTPUT -m mark --mark %s -m set --match-set %s dst -j MARK --set-mark %s -m comment --comment wm-xray-line-%d",
-						defaultMarkHex, ipsetName, markHex(branch.Mark), route.LineID,
+						perLineMarkHex, ipsetName, markHex(branch.Mark), route.LineID,
 					))
 				}
 			}

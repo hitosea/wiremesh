@@ -104,6 +104,7 @@ type RoutingBranch struct {
 	IPRules     []string     `json:"ip_rules"`
 	DomainRules []string     `json:"domain_rules"`
 	RuleSources []RuleSource `json:"rule_sources"`
+	DeviceIPs   []string     `json:"device_ips"` // WG device source IPs for this line (scopes PREROUTING rules)
 }
 
 type RuleSource struct {

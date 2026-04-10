@@ -173,15 +173,16 @@ export async function GET(request: NextRequest) {
   // Exit nodes: return traffic TO this IP goes back through the upstream tunnel.
   const deviceRoutes: { destination: string; tunnel: string; type: string }[] = [];
 
+  // Cache lineBranches per entry line — queried once, reused by device routes, Xray, and routing configs
+  const lineBranchCache = new Map<number, (typeof lineBranches.$inferSelect)[]>();
+  for (const lineId of entryLineIds) {
+    lineBranchCache.set(lineId, db.select().from(lineBranches).where(eq(lineBranches.lineId, lineId)).all());
+  }
+
   // Determine which lines have multi-branch routing (skip old entry device routes for those)
   const linesWithBranchRouting = new Set<number>();
-  for (const lineId of entryLineIds) {
-    const branchCount = db
-      .select({ count: count() })
-      .from(lineBranches)
-      .where(eq(lineBranches.lineId, lineId))
-      .get()?.count ?? 0;
-    if (branchCount > 1) {
+  for (const [lineId, branches] of lineBranchCache) {
+    if (branches.length > 1) {
       linesWithBranchRouting.add(lineId);
     }
   }
@@ -247,6 +248,17 @@ export async function GET(request: NextRequest) {
     dnsProxy?: string;
   } | null = null;
 
+  // Precompute branch marks — single source of truth for both routing and Xray configs.
+  // Branch marks are allocated sequentially from BRANCH_MARK_START (30001).
+  // Single-branch lines still get marks allocated (for Xray) but routing skips them.
+  const branchMarkMap = new Map<number, number>(); // branchId → mark
+  let branchMarkSeq = BRANCH_MARK_START;
+  for (const lineId of entryLineIds) {
+    for (const branch of lineBranchCache.get(lineId) ?? []) {
+      branchMarkMap.set(branch.id, branchMarkSeq++);
+    }
+  }
+
   if (node.xrayEnabled && node.xrayConfig) {
     let realitySettings: {
       realityPrivateKey?: string;
@@ -276,7 +288,7 @@ export async function GET(request: NextRequest) {
       lineId: number; uuids: string[]; port: number; tunnel: string; mark: number;
       branches: { mark: number; tunnel: string; is_default: boolean; domain_rules: string[] }[];
     }[] = [];
-    let xrayBranchMarkCounter = BRANCH_MARK_START;
+    let xrayPerLineMarkCounter = XRAY_MARK_START;
 
     for (const lineId of entryLineIds) {
       const xrayDevices = db
@@ -301,8 +313,7 @@ export async function GET(request: NextRequest) {
       const xrayBranches: { mark: number; tunnel: string; is_default: boolean; domain_rules: string[] }[] = [];
       let defaultMark = 0;
 
-      const branchRows = db.select().from(lineBranches).where(eq(lineBranches.lineId, lineId)).all();
-      for (const branch of branchRows) {
+      for (const branch of lineBranchCache.get(lineId) ?? []) {
         let tunnelIfaceName = "";
         if (isSingleNode) {
           tunnelIfaceName = extIface;
@@ -320,8 +331,7 @@ export async function GET(request: NextRequest) {
         }
         if (!tunnelIfaceName) continue;
 
-        // The mark must match the routing config's branch marks (same counter)
-        const branchMark = xrayBranchMarkCounter++;
+        const branchMark = branchMarkMap.get(branch.id) ?? 0;
 
         let domainRules: string[] = [];
         if (!branch.isDefault) {
@@ -343,7 +353,7 @@ export async function GET(request: NextRequest) {
         uuids,
         port: getXrayPortForLine(nodeId, lineId, xrayBasePort),
         tunnel,
-        mark: defaultMark || XRAY_MARK_START,
+        mark: xrayPerLineMarkCounter++,
         branches: xrayBranches,
       });
     }
@@ -443,12 +453,25 @@ export async function GET(request: NextRequest) {
       ip_rules: string[];
       domain_rules: string[];
       rule_sources: { filter_id: number; url: string; sync_interval: number }[];
+      device_ips: string[];
     }[] = [];
-    let branchMarkCounter = BRANCH_MARK_START;
-
     for (const lineId of entryLineIds) {
-      // Fetch branches for this line
-      const lineBranchRows = db.select().from(lineBranches).where(eq(lineBranches.lineId, lineId)).all();
+      const lineBranchRows = lineBranchCache.get(lineId) ?? [];
+
+      // Lines with a single branch don't need branch-based split-routing.
+      // Device-level routing (ip rule from <device_ip>) already handles them.
+      if (lineBranchRows.length <= 1) {
+        continue;
+      }
+
+      // Collect device WG IPs for this line — used to scope PREROUTING rules per line
+      const lineDeviceIPs = db
+        .select({ wgAddress: devices.wgAddress })
+        .from(devices)
+        .where(eq(devices.lineId, lineId))
+        .all()
+        .map((d) => d.wgAddress?.split("/")[0])
+        .filter((ip): ip is string => !!ip);
 
       for (const branch of lineBranchRows) {
         // Find tunnel from this entry node for this branch
@@ -524,10 +547,11 @@ export async function GET(request: NextRequest) {
           name: branch.name,
           is_default: branch.isDefault,
           tunnel: tunnelIfaceName,
-          mark: branchMarkCounter++,
+          mark: branchMarkMap.get(branch.id) ?? 0,
           ip_rules: ipRules,
           domain_rules: domainRules,
           rule_sources: ruleSources,
+          device_ips: lineDeviceIPs,
         });
       }
     }

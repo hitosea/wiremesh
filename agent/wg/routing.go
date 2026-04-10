@@ -5,9 +5,58 @@ import (
 	"log"
 	"os/exec"
 	"strings"
+	"sync"
 
 	"github.com/wiremesh/agent/api"
 )
+
+var (
+	defaultGateway     string
+	defaultGatewayOnce sync.Once
+)
+
+// getDefaultGateway returns the system default gateway IP.
+// Cached after first call since the gateway doesn't change during runtime.
+func getDefaultGateway() string {
+	defaultGatewayOnce.Do(func() {
+		out, err := exec.Command("ip", "route", "show", "default").CombinedOutput()
+		if err != nil {
+			log.Printf("[routing] Warning: cannot get default gateway: %v", err)
+			return
+		}
+		// Parse "default via 172.17.63.253 dev eth0 ..."
+		fields := strings.Fields(strings.TrimSpace(string(out)))
+		for i, f := range fields {
+			if f == "via" && i+1 < len(fields) {
+				defaultGateway = fields[i+1]
+				break
+			}
+		}
+		if defaultGateway != "" {
+			log.Printf("[routing] Default gateway: %s", defaultGateway)
+		}
+	})
+	return defaultGateway
+}
+
+// addDefaultRoute adds a default route in the given table.
+// For wm-* tunnel interfaces: "ip route replace default dev <iface> table <table>"
+// For external interfaces (eth0 etc.): adds "via <gateway>" to ensure proper routing.
+func addDefaultRoute(iface, table string) error {
+	if strings.HasPrefix(iface, "wm-") {
+		_, err := Run("ip", "route", "replace", "default", "dev", iface, "table", table)
+		return err
+	}
+	// External interface — need gateway
+	gw := getDefaultGateway()
+	if gw == "" {
+		log.Printf("[routing] Warning: no default gateway found, route via %s may not work", iface)
+		_, err := Run("ip", "route", "replace", "default", "dev", iface, "table", table)
+		return err
+	}
+	_, err := Run("ip", "route", "replace", "default", "via", gw, "dev", iface, "table", table)
+	return err
+}
 
 // Routing table/priority constants.
 // Source of truth: src/lib/routing-constants.ts — keep in sync.
@@ -28,7 +77,8 @@ const (
 //   "exit"  → destination-based route (ip route replace X dev tunN)
 //   "relay" → iif-based forwarding (ip rule iif tunX lookup tableN → tunY)
 func SyncRouting(deviceRoutes []api.DeviceRoute) error {
-	cleanRouting()
+	cleanPolicyRange(routeTableStart, routeTableEnd, false)
+	cleanPolicyRange(relayTableStart, relayTableEnd, false)
 
 	if len(deviceRoutes) == 0 {
 		return nil
@@ -42,7 +92,7 @@ func SyncRouting(deviceRoutes []api.DeviceRoute) error {
 			tableNum := routeTableStart + entryIdx // 20001, 20002, ...
 			table := fmt.Sprintf("%d", tableNum)
 
-			if _, err := Run("ip", "route", "replace", "default", "dev", route.Tunnel, "table", table); err != nil {
+			if err := addDefaultRoute(route.Tunnel, table); err != nil {
 				log.Printf("[routing] Error adding route table %s: %v", table, err)
 				continue
 			}
@@ -68,7 +118,7 @@ func SyncRouting(deviceRoutes []api.DeviceRoute) error {
 			tableNum := relayTableStart + relayIdx // 21001, 21002, ...
 			table := fmt.Sprintf("%d", tableNum)
 
-			if _, err := Run("ip", "route", "replace", "default", "dev", route.Tunnel, "table", table); err != nil {
+			if err := addDefaultRoute(route.Tunnel, table); err != nil {
 				log.Printf("[routing] Error adding relay route table %s: %v", table, err)
 				continue
 			}
@@ -91,6 +141,8 @@ func SyncRouting(deviceRoutes []api.DeviceRoute) error {
 // Each XrayLineRoute has a mark value — packets marked by Xray are routed
 // to the correct tunnel via policy routing.
 func SyncXrayRouting(routes []api.XrayLineRoute) error {
+	cleanPolicyRange(xrayRouteTableStart, xrayRouteTableEnd, true)
+
 	if len(routes) == 0 {
 		return nil
 	}
@@ -101,7 +153,7 @@ func SyncXrayRouting(routes []api.XrayLineRoute) error {
 		priority := table // unified: priority == table number
 
 		// Add route: default via tunnel in this table
-		if _, err := Run("ip", "route", "replace", "default", "dev", route.Tunnel, "table", table); err != nil {
+		if err := addDefaultRoute(route.Tunnel, table); err != nil {
 			log.Printf("[routing] Error adding xray route table %s: %v", table, err)
 			continue
 		}
@@ -124,6 +176,8 @@ func SyncXrayRouting(routes []api.XrayLineRoute) error {
 
 // SyncSocks5Routing applies fwmark-based routing for SOCKS5 traffic.
 func SyncSocks5Routing(routes []api.Socks5Route) error {
+	cleanPolicyRange(socks5RouteTableStart, socks5RouteTableEnd, true)
+
 	if len(routes) == 0 {
 		return nil
 	}
@@ -133,7 +187,7 @@ func SyncSocks5Routing(routes []api.Socks5Route) error {
 		markHex := fmt.Sprintf("0x%x", route.Mark)
 		priority := table
 
-		if _, err := Run("ip", "route", "replace", "default", "dev", route.Tunnel, "table", table); err != nil {
+		if err := addDefaultRoute(route.Tunnel, table); err != nil {
 			log.Printf("[routing] Error adding socks5 route table %s: %v", table, err)
 			continue
 		}
@@ -153,53 +207,30 @@ func SyncSocks5Routing(routes []api.Socks5Route) error {
 	return nil
 }
 
-func cleanRouting() {
-	// Clean WG device routes (tables 20001-20999)
-	// Source of truth: src/lib/routing-constants.ts
-	for i := routeTableStart; i <= routeTableEnd; i++ {
+// cleanPolicyRange deletes ip rules and flushes routing tables in the given range.
+// For fwmark-based rules (Xray/SOCKS5): deletes "ip rule del fwmark 0x<mark>".
+// For lookup-based rules (device/relay): deletes "ip rule del lookup <table> priority <table>".
+func cleanPolicyRange(start, end int, useFwmark bool) {
+	for i := start; i <= end; i++ {
 		table := fmt.Sprintf("%d", i)
-		_, err := RunSilent("ip", "rule", "del", "lookup", table, "priority", table)
+		var err error
+		if useFwmark {
+			_, err = RunSilent("ip", "rule", "del", "fwmark", fmt.Sprintf("0x%x", i), "lookup", table)
+		} else {
+			_, err = RunSilent("ip", "rule", "del", "lookup", table, "priority", table)
+		}
 		if err != nil {
 			break
 		}
 		RunSilent("ip", "route", "flush", "table", table)
-	}
-
-	// Clean relay routes (tables 21001-21999)
-	// Source of truth: src/lib/routing-constants.ts
-	for i := relayTableStart; i <= relayTableEnd; i++ {
-		table := fmt.Sprintf("%d", i)
-		_, err := RunSilent("ip", "rule", "del", "lookup", table, "priority", table)
-		if err != nil {
-			break
-		}
-		RunSilent("ip", "route", "flush", "table", table)
-	}
-
-	// Clean Xray fwmark routes (31001-31999)
-	// Source of truth: src/lib/routing-constants.ts
-	for i := xrayRouteTableStart; i <= xrayRouteTableEnd; i++ {
-		table := fmt.Sprintf("%d", i)
-		markHex := fmt.Sprintf("0x%x", i)
-		_, err := RunSilent("ip", "rule", "del", "fwmark", markHex, "lookup", table)
-		if err != nil {
-			break
-		}
-		RunSilent("ip", "route", "flush", "table", table)
-	}
-
-	// Clean SOCKS5 route tables (32001-32999)
-	// Source of truth: src/lib/routing-constants.ts
-	for i := socks5RouteTableStart; i <= socks5RouteTableEnd; i++ {
-		if _, err := exec.Command("ip", "rule", "del", "fwmark", fmt.Sprintf("0x%x", i)).CombinedOutput(); err != nil {
-			break
-		}
-		exec.Command("ip", "route", "flush", "table", fmt.Sprintf("%d", i)).CombinedOutput()
 	}
 }
 
-// CleanupRouting is called during shutdown
+// CleanupRouting cleans all routing ranges. Called during shutdown.
 func CleanupRouting() {
-	cleanRouting()
+	cleanPolicyRange(routeTableStart, routeTableEnd, false)
+	cleanPolicyRange(relayTableStart, relayTableEnd, false)
+	cleanPolicyRange(xrayRouteTableStart, xrayRouteTableEnd, true)
+	cleanPolicyRange(socks5RouteTableStart, socks5RouteTableEnd, true)
 	log.Println("[routing] Routing cleaned up")
 }
