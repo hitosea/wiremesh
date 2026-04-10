@@ -151,6 +151,8 @@
     "enableXray": "Enable Xray Entry Proxy",
     "xrayStartPort": "Xray Start Port",
     "xrayPortHint": "Each line gets a unique port (e.g., 41443, 41444, 41445...). Ensure your firewall allows these ports.",
+    "externalInterface": "External Interface",
+    "externalInterfaceHint": "Network interface for external traffic, default eth0 (e.g., ens3, bond0)",
     "realityTarget": "Reality Target",
     "realityTargetHint": "Camouflage target, must support TLS 1.3, e.g., www.microsoft.com:443",
     "createNode": "Create Node"

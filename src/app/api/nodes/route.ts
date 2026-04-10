@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
     xrayTransport,
     xrayPort,
     xrayConfig,
+    externalInterface,
     remark,
   } = body;
 
@@ -150,6 +151,7 @@ export async function POST(request: NextRequest) {
       xrayTransport: xrayEnabled ? "tcp" : null,
       xrayPort: xrayPort ?? null,
       xrayConfig: resolvedXrayConfig,
+      externalInterface: externalInterface ?? "eth0",
       remark: remark ?? null,
     })
     .returning({
@@ -166,6 +168,7 @@ export async function POST(request: NextRequest) {
       xrayTransport: nodes.xrayTransport,
       xrayPort: nodes.xrayPort,
       xrayConfig: nodes.xrayConfig,
+      externalInterface: nodes.externalInterface,
       status: nodes.status,
       remark: nodes.remark,
       createdAt: nodes.createdAt,

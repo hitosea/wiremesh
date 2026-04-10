@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
   }
 
   const nodeId = node.id;
+  const extIface = node.externalInterface;
 
   // Decrypt WG private key
   let wgPrivateKey: string;
@@ -102,9 +103,9 @@ export async function GET(request: NextRequest) {
         singleNodeLineIds.add(lineId);
         const lineTag = `wm-line-${lineId}`;
         // Direct forwarding: wm-wg0 → eth0 (no tunnel needed)
-        iptablesRules.push(`-A FORWARD -i wm-wg0 -o eth0 -m comment --comment ${lineTag} -j ACCEPT`);
-        iptablesRules.push(`-A FORWARD -i eth0 -o wm-wg0 -m state --state RELATED,ESTABLISHED -m comment --comment ${lineTag} -j ACCEPT`);
-        iptablesRules.push(`-t nat -A POSTROUTING -s 10.0.0.0/8 -o eth0 -m comment --comment ${lineTag} -j MASQUERADE`);
+        iptablesRules.push(`-A FORWARD -i wm-wg0 -o ${extIface} -m comment --comment ${lineTag} -j ACCEPT`);
+        iptablesRules.push(`-A FORWARD -i ${extIface} -o wm-wg0 -m state --state RELATED,ESTABLISHED -m comment --comment ${lineTag} -j ACCEPT`);
+        iptablesRules.push(`-t nat -A POSTROUTING -s 10.0.0.0/8 -o ${extIface} -m comment --comment ${lineTag} -j MASQUERADE`);
         continue;
       }
 
@@ -158,9 +159,9 @@ export async function GET(request: NextRequest) {
           iptablesRules.push(`-A FORWARD -i ${ifaceName} -m comment --comment ${lineTag} -j ACCEPT`);
           iptablesRules.push(`-A FORWARD -o ${ifaceName} -m comment --comment ${lineTag} -j ACCEPT`);
         } else if (myRole === "exit") {
-          iptablesRules.push(`-A FORWARD -i ${ifaceName} -o eth0 -m comment --comment ${lineTag} -j ACCEPT`);
-          iptablesRules.push(`-A FORWARD -i eth0 -o ${ifaceName} -m state --state RELATED,ESTABLISHED -m comment --comment ${lineTag} -j ACCEPT`);
-          iptablesRules.push(`-t nat -A POSTROUTING -s 10.0.0.0/8 -o eth0 -m comment --comment ${lineTag} -j MASQUERADE`);
+          iptablesRules.push(`-A FORWARD -i ${ifaceName} -o ${extIface} -m comment --comment ${lineTag} -j ACCEPT`);
+          iptablesRules.push(`-A FORWARD -i ${extIface} -o ${ifaceName} -m state --state RELATED,ESTABLISHED -m comment --comment ${lineTag} -j ACCEPT`);
+          iptablesRules.push(`-t nat -A POSTROUTING -s 10.0.0.0/8 -o ${extIface} -m comment --comment ${lineTag} -j MASQUERADE`);
         }
       }
     }
@@ -293,7 +294,7 @@ export async function GET(request: NextRequest) {
 
       // Find the downstream tunnel for this line (default branch)
       const isSingleNode = singleNodeLineIds.has(lineId);
-      const tunnel = isSingleNode ? "eth0" : lineToDownstreamIface.get(lineId);
+      const tunnel = isSingleNode ? extIface : lineToDownstreamIface.get(lineId);
       if (!tunnel) continue;
 
       // Build branch info for this line's Xray routing
@@ -304,7 +305,7 @@ export async function GET(request: NextRequest) {
       for (const branch of branchRows) {
         let tunnelIfaceName = "";
         if (isSingleNode) {
-          tunnelIfaceName = "eth0";
+          tunnelIfaceName = extIface;
         } else {
           const branchTunnel = db
             .select()
@@ -417,7 +418,7 @@ export async function GET(request: NextRequest) {
         // Match to interface name via fromWgPort
         let tunnelIfaceName = "";
         if (singleNodeLineIds.has(lineId)) {
-          tunnelIfaceName = "eth0";
+          tunnelIfaceName = extIface;
         } else if (branchTunnel) {
           const matchedIface = interfaces.find((iface) => iface.listenPort === branchTunnel.fromWgPort && iface.role === "from");
           if (matchedIface) {

@@ -43,6 +43,7 @@ export const nodes = sqliteTable("nodes", {
   xrayTransport: text("xray_transport"),
   xrayPort: integer("xray_port"),
   xrayConfig: text("xray_config"),
+  externalInterface: text("external_interface").notNull().default("eth0"),
   status: text("status").notNull().default("offline"),
   errorMessage: text("error_message"),
   remark: text("remark"),

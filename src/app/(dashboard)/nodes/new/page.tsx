@@ -30,6 +30,7 @@ export default function NewNodePage() {
   const [domain, setDomain] = useState("");
   const [port, setPort] = useState("");
   const [remark, setRemark] = useState("");
+  const [externalInterface, setExternalInterface] = useState("eth0");
   const [xrayEnabled, setXrayEnabled] = useState(false);
   const [xrayPort, setXrayPort] = useState("");
   const [realityDest, setRealityDest] = useState(DEFAULT_REALITY_DEST);
@@ -53,6 +54,7 @@ export default function NewNodePage() {
         domain: domain.trim() || null,
         port: port ? parseInt(port) : undefined,
         remark: remark.trim() || null,
+        externalInterface: externalInterface.trim() || "eth0",
         xrayEnabled,
       };
       if (xrayEnabled) {
@@ -135,6 +137,18 @@ export default function NewNodePage() {
                 onChange={(e) => setPort(e.target.value)}
                 placeholder="41820"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="externalInterface">{t("externalInterface")}</Label>
+              <Input
+                id="externalInterface"
+                value={externalInterface}
+                onChange={(e) => setExternalInterface(e.target.value)}
+                placeholder="eth0"
+              />
+              <p className="text-xs text-muted-foreground">
+                {t("externalInterfaceHint")}
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="remark">{t("notes")}</Label>

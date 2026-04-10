@@ -1,0 +1,1 @@
+ALTER TABLE `nodes` ADD `external_interface` text NOT NULL DEFAULT 'eth0';

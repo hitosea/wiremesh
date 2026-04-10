@@ -35,6 +35,7 @@ type NodeDetail = {
   xrayConfig: string | null;
   status: string;
   errorMessage: string | null;
+  externalInterface: string;
   remark: string | null;
 };
 
@@ -58,6 +59,7 @@ export default function NodeDetailPage() {
   const [domain, setDomain] = useState("");
   const [port, setPort] = useState("");
   const [remark, setRemark] = useState("");
+  const [externalInterface, setExternalInterface] = useState("eth0");
   const [xrayEnabled, setXrayEnabled] = useState(false);
   const [xrayPort, setXrayPort] = useState("");
   const [realityDest, setRealityDest] = useState("");
@@ -80,6 +82,7 @@ export default function NodeDetailPage() {
         setDomain(n.domain ?? "");
         setPort(n.port ? String(n.port) : "");
         setRemark(n.remark ?? "");
+        setExternalInterface(n.externalInterface ?? "eth0");
         setXrayEnabled(n.xrayEnabled ?? false);
         setXrayPort(n.xrayPort ? String(n.xrayPort) : "");
         if (n.xrayConfig) {
@@ -108,6 +111,7 @@ export default function NodeDetailPage() {
         domain: domain.trim() || null,
         port: port ? parseInt(port) : undefined,
         remark: remark.trim() || null,
+        externalInterface: externalInterface.trim() || "eth0",
         xrayEnabled,
         xrayPort: xrayEnabled && xrayPort ? parseInt(xrayPort) : null,
         realityDest: xrayEnabled ? realityDest || undefined : undefined,
@@ -227,6 +231,19 @@ export default function NodeDetailPage() {
               onChange={(e) => setPort(e.target.value)}
               placeholder="41820"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="externalInterface">{tn("externalInterface")}</Label>
+            <Input
+              id="externalInterface"
+              value={externalInterface}
+              onChange={(e) => setExternalInterface(e.target.value)}
+              placeholder="eth0"
+            />
+            <p className="text-xs text-muted-foreground">
+              {tn("externalInterfaceHint")}
+            </p>
           </div>
 
           <div className="border-t pt-4 space-y-4">
