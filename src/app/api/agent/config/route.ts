@@ -78,6 +78,9 @@ export async function GET(request: NextRequest) {
 
   const iptablesRules: string[] = [];
 
+  // Track single-node lines (entry with no tunnels = entry+exit on same node)
+  const singleNodeLineIds = new Set<number>();
+
   if (lineIds.length > 0) {
     for (const lineId of lineIds) {
       const tunnels = db
@@ -93,6 +96,17 @@ export async function GET(request: NextRequest) {
         .filter((t) => t.lineId === lineId);
 
       const myRole = myLineNodes.find((ln) => ln.lineId === lineId)?.role;
+
+      // Single-node line: this node is entry and there are no tunnels
+      if (myRole === "entry" && tunnels.length === 0) {
+        singleNodeLineIds.add(lineId);
+        const lineTag = `wm-line-${lineId}`;
+        // Direct forwarding: wm-wg0 → eth0 (no tunnel needed)
+        iptablesRules.push(`-A FORWARD -i wm-wg0 -o eth0 -m comment --comment ${lineTag} -j ACCEPT`);
+        iptablesRules.push(`-A FORWARD -i eth0 -o wm-wg0 -m state --state RELATED,ESTABLISHED -m comment --comment ${lineTag} -j ACCEPT`);
+        iptablesRules.push(`-t nat -A POSTROUTING -s 10.0.0.0/8 -o eth0 -m comment --comment ${lineTag} -j MASQUERADE`);
+        continue;
+      }
 
       for (let i = 0; i < tunnels.length; i++) {
         const tunnel = tunnels[i];
@@ -173,8 +187,10 @@ export async function GET(request: NextRequest) {
 
   // Entry node routes (source-based: traffic FROM this IP)
   // Skip for lines with branch routing — traffic routing is handled by fwmark-based branch routing instead
+  // Skip for single-node lines — no tunnel, traffic uses default route
   for (const [lineId, ifaceName] of lineToDownstreamIface) {
     if (linesWithBranchRouting.has(lineId)) continue;
+    if (singleNodeLineIds.has(lineId)) continue;
     const myRole = myLineNodes.find((ln) => ln.lineId === lineId)?.role;
     if (myRole !== "entry") continue; // only entry nodes use source-based routing
     const lineDevices = db
@@ -276,7 +292,8 @@ export async function GET(request: NextRequest) {
       if (uuids.length === 0) continue;
 
       // Find the downstream tunnel for this line (default branch)
-      const tunnel = lineToDownstreamIface.get(lineId);
+      const isSingleNode = singleNodeLineIds.has(lineId);
+      const tunnel = isSingleNode ? "eth0" : lineToDownstreamIface.get(lineId);
       if (!tunnel) continue;
 
       // Build branch info for this line's Xray routing
@@ -285,16 +302,20 @@ export async function GET(request: NextRequest) {
 
       const branchRows = db.select().from(lineBranches).where(eq(lineBranches.lineId, lineId)).all();
       for (const branch of branchRows) {
-        const branchTunnel = db
-          .select()
-          .from(lineTunnels)
-          .where(and(eq(lineTunnels.branchId, branch.id), eq(lineTunnels.fromNodeId, nodeId)))
-          .get();
-
         let tunnelIfaceName = "";
-        if (branchTunnel) {
-          const matchedIface = interfaces.find((iface) => iface.listenPort === branchTunnel.fromWgPort && iface.role === "from");
-          if (matchedIface) tunnelIfaceName = matchedIface.name;
+        if (isSingleNode) {
+          tunnelIfaceName = "eth0";
+        } else {
+          const branchTunnel = db
+            .select()
+            .from(lineTunnels)
+            .where(and(eq(lineTunnels.branchId, branch.id), eq(lineTunnels.fromNodeId, nodeId)))
+            .get();
+
+          if (branchTunnel) {
+            const matchedIface = interfaces.find((iface) => iface.listenPort === branchTunnel.fromWgPort && iface.role === "from");
+            if (matchedIface) tunnelIfaceName = matchedIface.name;
+          }
         }
         if (!tunnelIfaceName) continue;
 
@@ -395,7 +416,9 @@ export async function GET(request: NextRequest) {
 
         // Match to interface name via fromWgPort
         let tunnelIfaceName = "";
-        if (branchTunnel) {
+        if (singleNodeLineIds.has(lineId)) {
+          tunnelIfaceName = "eth0";
+        } else if (branchTunnel) {
           const matchedIface = interfaces.find((iface) => iface.listenPort === branchTunnel.fromWgPort && iface.role === "from");
           if (matchedIface) {
             tunnelIfaceName = matchedIface.name;

@@ -222,7 +222,10 @@ export default function LineDetailPage() {
                 const chainParts = entryNode
                   ? [entryNode.nodeName, ...branchNodeNames]
                   : branchNodeNames;
-                const chainStr = chainParts.join(" \u2192 ");
+                const isSingleNode = branchNodeNames.length === 0;
+                const chainStr = isSingleNode
+                  ? `${chainParts[0]} (${t("directExit")})`
+                  : chainParts.join(" \u2192 ");
 
                 return (
                   <div

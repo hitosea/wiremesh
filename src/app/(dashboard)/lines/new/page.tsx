@@ -166,8 +166,14 @@ export default function NewLinePage() {
     return found ? found.name : "?";
   };
 
+  const isSingleNodeBranch = (branch: BranchInput) =>
+    branch.nodeIds.length === 0;
+
   const branchChainPreview = (branch: BranchInput) => {
     const entryName = entryNodeId ? getNodeName(entryNodeId) : "?";
+    if (isSingleNodeBranch(branch)) {
+      return `${entryName} (${t("directExit")})`;
+    }
     const rest = branch.nodeIds.map((id) => (id ? getNodeName(id) : "?"));
     return [entryName, ...rest].join(" \u2192 ");
   };
@@ -200,11 +206,7 @@ export default function NewLinePage() {
         toast.error(t("branchName"));
         return;
       }
-      if (branch.nodeIds.length < 1) {
-        toast.error(t("branchExitRequired", { name: branch.name }));
-        return;
-      }
-      if (branch.nodeIds.some((id) => !id)) {
+      if (branch.nodeIds.length > 0 && branch.nodeIds.some((id) => !id)) {
         toast.error(t("branchNodeMissing", { name: branch.name }));
         return;
       }
@@ -361,57 +363,72 @@ export default function NewLinePage() {
                 {/* Node chain: relay nodes + exit node */}
                 <div className="space-y-3">
                   <Label>{t("nodeChain")}</Label>
-                  <div className="rounded-md border border-border p-3 space-y-2">
-                    {branch.nodeIds.map((nodeId, nodeIdx) => (
-                      <div key={nodeIdx} className="flex items-center gap-2">
-                        <span className="shrink-0 text-sm text-muted-foreground w-16">
-                          {getBranchNodeLabel(branch, nodeIdx)}
-                        </span>
-                        <div className="flex-1">
-                          <Select
-                            value={nodeId}
-                            onValueChange={(val) =>
-                              setBranchNodeAt(branchIdx, nodeIdx, val)
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue
-                                placeholder={t("selectNode", { label: getBranchNodeLabel(branch, nodeIdx) })}
-                              />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {nodeOptions.map((n) => (
-                                <SelectItem key={n.id} value={String(n.id)}>
-                                  {n.name} ({n.ip})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={isSingleNodeBranch(branch)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          updateBranch(branchIdx, { nodeIds: [] });
+                        } else {
+                          updateBranch(branchIdx, { nodeIds: [""] });
+                        }
+                      }}
+                    />
+                    <span className="text-sm">{t("directExit")}</span>
+                  </label>
+                  {!isSingleNodeBranch(branch) && (
+                    <div className="rounded-md border border-border p-3 space-y-2">
+                      {branch.nodeIds.map((nodeId, nodeIdx) => (
+                        <div key={nodeIdx} className="flex items-center gap-2">
+                          <span className="shrink-0 text-sm text-muted-foreground w-16">
+                            {getBranchNodeLabel(branch, nodeIdx)}
+                          </span>
+                          <div className="flex-1">
+                            <Select
+                              value={nodeId}
+                              onValueChange={(val) =>
+                                setBranchNodeAt(branchIdx, nodeIdx, val)
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue
+                                  placeholder={t("selectNode", { label: getBranchNodeLabel(branch, nodeIdx) })}
+                                />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {nodeOptions.map((n) => (
+                                  <SelectItem key={n.id} value={String(n.id)}>
+                                    {n.name} ({n.ip})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {/* Only relay nodes (not the last = exit) can be removed */}
+                          {nodeIdx < branch.nodeIds.length - 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-muted-foreground hover:text-destructive"
+                              onClick={() => removeBranchRelay(branchIdx, nodeIdx)}
+                            >
+                              {tc("remove")}
+                            </Button>
+                          )}
                         </div>
-                        {/* Only relay nodes (not the last = exit) can be removed */}
-                        {nodeIdx < branch.nodeIds.length - 1 && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="text-muted-foreground hover:text-destructive"
-                            onClick={() => removeBranchRelay(branchIdx, nodeIdx)}
-                          >
-                            {tc("remove")}
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="w-full border-dashed"
-                      onClick={() => addBranchRelay(branchIdx)}
-                    >
-                      {t("addTransit")}
-                    </Button>
-                  </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full border-dashed"
+                        onClick={() => addBranchRelay(branchIdx)}
+                      >
+                        {t("addTransit")}
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Filter multi-select */}

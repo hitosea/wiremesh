@@ -95,13 +95,13 @@ export async function POST(request: NextRequest) {
     return error("VALIDATION_ERROR", "validation.exactlyOneDefaultBranch");
   }
 
-  // Validate each branch has at least one nodeId
+  // Validate each branch
   for (let i = 0; i < branches.length; i++) {
     const branch = branches[i];
     if (!branch.name || !branch.name.trim()) {
       return error("VALIDATION_ERROR", "validation.branchNameRequired", { index: i + 1 });
     }
-    if (!branch.nodeIds || !Array.isArray(branch.nodeIds) || branch.nodeIds.length < 1) {
+    if (!branch.nodeIds || !Array.isArray(branch.nodeIds)) {
       return error("VALIDATION_ERROR", "validation.branchNeedsNode", { name: branch.name });
     }
   }
@@ -217,64 +217,67 @@ export async function POST(request: NextRequest) {
       .get();
 
     // 3b. Insert branch nodes into lineNodes
-    for (let i = 0; i < branch.nodeIds.length; i++) {
-      const nodeId = branch.nodeIds[i];
-      const isLast = i === branch.nodeIds.length - 1;
-      const role = isLast ? "exit" : "relay";
-      const hopOrder = i + 1; // entry is 0, branch nodes start from 1
+    // When nodeIds is empty, entry node serves as both entry and exit (no tunnels needed)
+    if (branch.nodeIds.length > 0) {
+      for (let i = 0; i < branch.nodeIds.length; i++) {
+        const nodeId = branch.nodeIds[i];
+        const isLast = i === branch.nodeIds.length - 1;
+        const role = isLast ? "exit" : "relay";
+        const hopOrder = i + 1; // entry is 0, branch nodes start from 1
 
-      db.insert(lineNodes)
-        .values({
-          lineId: line.id,
-          nodeId,
-          branchId: branchRecord.id,
-          hopOrder,
-          role,
-        })
-        .run();
+        db.insert(lineNodes)
+          .values({
+            lineId: line.id,
+            nodeId,
+            branchId: branchRecord.id,
+            hopOrder,
+            role,
+          })
+          .run();
 
-      affectedNodeIds.add(nodeId);
-    }
+        affectedNodeIds.add(nodeId);
+      }
 
-    // 3c. Create lineTunnels for the chain: entry → first branch node, then sequential
-    const chainNodeIds = [entryNodeId, ...branch.nodeIds];
-    for (let i = 0; i < chainNodeIds.length - 1; i++) {
-      const fromNodeId = chainNodeIds[i];
-      const toNodeId = chainNodeIds[i + 1];
+      // 3c. Create lineTunnels for the chain: entry → first branch node, then sequential
+      const chainNodeIds = [entryNodeId, ...branch.nodeIds];
+      for (let i = 0; i < chainNodeIds.length - 1; i++) {
+        const fromNodeId = chainNodeIds[i];
+        const toNodeId = chainNodeIds[i + 1];
 
-      const { fromAddress, toAddress } = allocateTunnelSubnet(
-        usedAddresses,
-        tunnelSubnet
-      );
-      usedAddresses.push(fromAddress, toAddress);
+        const { fromAddress, toAddress } = allocateTunnelSubnet(
+          usedAddresses,
+          tunnelSubnet
+        );
+        usedAddresses.push(fromAddress, toAddress);
 
-      const fromPort = allocateTunnelPort(usedPorts, tunnelPortStart);
-      usedPorts.push(fromPort);
-      const toPort = allocateTunnelPort(usedPorts, tunnelPortStart);
-      usedPorts.push(toPort);
+        const fromPort = allocateTunnelPort(usedPorts, tunnelPortStart);
+        usedPorts.push(fromPort);
+        const toPort = allocateTunnelPort(usedPorts, tunnelPortStart);
+        usedPorts.push(toPort);
 
-      const fromKeyPair = generateKeyPair();
-      const toKeyPair = generateKeyPair();
+        const fromKeyPair = generateKeyPair();
+        const toKeyPair = generateKeyPair();
 
-      db.insert(lineTunnels)
-        .values({
-          lineId: line.id,
-          hopIndex: globalHopIndex,
-          fromNodeId,
-          toNodeId,
-          fromWgPrivateKey: encrypt(fromKeyPair.privateKey),
-          fromWgPublicKey: fromKeyPair.publicKey,
-          fromWgAddress: fromAddress,
-          fromWgPort: fromPort,
-          toWgPrivateKey: encrypt(toKeyPair.privateKey),
-          toWgPublicKey: toKeyPair.publicKey,
-          toWgAddress: toAddress,
-          toWgPort: toPort,
-          branchId: branchRecord.id,
-        })
-        .run();
+        db.insert(lineTunnels)
+          .values({
+            lineId: line.id,
+            hopIndex: globalHopIndex,
+            fromNodeId,
+            toNodeId,
+            fromWgPrivateKey: encrypt(fromKeyPair.privateKey),
+            fromWgPublicKey: fromKeyPair.publicKey,
+            fromWgAddress: fromAddress,
+            fromWgPort: fromPort,
+            toWgPrivateKey: encrypt(toKeyPair.privateKey),
+            toWgPublicKey: toKeyPair.publicKey,
+            toWgAddress: toAddress,
+            toWgPort: toPort,
+            branchId: branchRecord.id,
+          })
+          .run();
 
-      globalHopIndex++;
+        globalHopIndex++;
+      }
     }
 
     // 3d. Insert branchFilters associations

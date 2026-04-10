@@ -330,6 +330,7 @@
     "transitNode": "Transit Node",
     "selectNode": "Select {label}",
     "addTransit": "+ Add Transit",
+    "directExit": "Direct exit from entry node (no other nodes)",
     "filterRules": "Filter Rules",
     "chainLabel": "Chain:",
     "addBranch": "Add Branch",
@@ -365,7 +366,8 @@
     "lineName": "Line Name",
     "status": "Status",
     "active": "Active",
-    "disabled": "Disabled"
+    "disabled": "Disabled",
+    "directExit": "Direct exit"
   },
   "filters": {
     "mode": {
