@@ -1,8 +1,14 @@
 import { db } from "@/lib/db";
-import { devices, lineNodes } from "@/lib/db/schema";
+import { devices, lineNodes, settings } from "@/lib/db/schema";
 import { eq, and, inArray, or } from "drizzle-orm";
 
 export const DEFAULT_PROXY_PORT = 41443;
+
+/** Read xray_default_port from settings, falling back to DEFAULT_PROXY_PORT. */
+export function getXrayDefaultPort(): number {
+  const row = db.select().from(settings).where(eq(settings.key, "xray_default_port")).get();
+  return row?.value ? parseInt(row.value) || DEFAULT_PROXY_PORT : DEFAULT_PROXY_PORT;
+}
 
 /**
  * Compute the proxy inbound port for a given line and protocol on a node.

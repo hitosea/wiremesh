@@ -4,7 +4,7 @@ import { nodes, lineNodes, lineTunnels, devices, lineBranches, branchFilters, fi
 import { eq, or, and, count } from "drizzle-orm";
 import { decrypt } from "@/lib/crypto";
 import { authenticateAgent } from "@/lib/agent-auth";
-import { getXrayPortForLine, DEFAULT_XRAY_PORT, getProxyPortForLine, DEFAULT_PROXY_PORT } from "@/lib/proxy-port";
+import { getXrayPortForLine, getProxyPortForLine, getXrayDefaultPort } from "@/lib/proxy-port";
 import { BRANCH_MARK_START, XRAY_MARK_START, SOCKS5_MARK_START } from "@/lib/routing-constants";
 
 function getNodePublicHost(nodeId: number): string {
@@ -278,6 +278,8 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  const xrayDefaultPort = getXrayDefaultPort();
+
   if (node.xrayEnabled && node.xrayConfig) {
     let realitySettings: {
       realityPrivateKey?: string;
@@ -302,7 +304,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Build per-line routes — each line gets a dedicated Xray inbound port
-    const xrayBasePort = node.xrayPort ?? DEFAULT_XRAY_PORT;
+    const xrayBasePort = node.xrayPort ?? xrayDefaultPort;
     const xrayRoutes: {
       lineId: number; uuids: string[]; port: number; tunnel: string; mark: number;
       branches: { mark: number; tunnel: string; is_default: boolean; domain_rules: string[] }[];
@@ -368,7 +370,7 @@ export async function GET(request: NextRequest) {
     xrayConfig = {
       enabled: true,
       protocol: "vless",
-      port: node.xrayPort ?? DEFAULT_XRAY_PORT,
+      port: xrayBasePort,
       realityPrivateKey,
       realityShortId: realitySettings.realityShortId ?? "",
       realityDest: realitySettings.realityDest ?? "www.microsoft.com:443",
@@ -386,7 +388,7 @@ export async function GET(request: NextRequest) {
   if (entryLineIds.length > 0) {
     const socks5Routes: { lineId: number; port: number; mark: number; tunnel: string; users: { username: string; password: string }[] }[] = [];
     let socks5MarkCounter = SOCKS5_MARK_START;
-    const proxyBasePort = node.xrayPort ?? DEFAULT_PROXY_PORT;
+    const proxyBasePort = node.xrayPort ?? xrayDefaultPort;
 
     for (const lineId of entryLineIds) {
       const socks5Devices = db

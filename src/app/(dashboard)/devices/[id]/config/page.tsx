@@ -208,7 +208,7 @@ export default function DeviceConfigPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               <pre className="code-block p-4 rounded-lg text-xs w-full overflow-x-auto max-h-[500px] whitespace-pre-wrap break-all">
-                {configData.config}
+                {configData.config || configData.proxyUrl}
               </pre>
             </CardContent>
           </Card>

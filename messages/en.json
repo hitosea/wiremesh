@@ -150,7 +150,7 @@
     "xraySettings": "Xray Settings",
     "enableXray": "Enable Xray Entry Proxy",
     "xrayStartPort": "Proxy Base Port",
-    "xrayPortHint": "Each line gets a unique port (e.g., 41443, 41444, 41445...). Xray and SOCKS5 share the same port pool. Ensure your firewall allows these ports.",
+    "xrayPortHint": "Each line gets a unique port (e.g., {port0}, {port1}, {port2}...). Xray and SOCKS5 share the same port pool. Ensure your firewall allows these ports.",
     "externalInterface": "External Interface",
     "externalInterfaceHint": "Network interface for external traffic, default eth0 (e.g., ens3, bond0)",
     "realityTarget": "Reality Target",
@@ -191,7 +191,8 @@
     },
     "protocol": {
       "wireguard": "WireGuard",
-      "xray": "Xray"
+      "xray": "Xray",
+      "socks5": "SOCKS5"
     },
     "loadFailed": "Failed to load devices",
     "deleted": "Device deleted",
@@ -465,6 +466,9 @@
       "title": "WireGuard",
       "description": "These settings only apply to new nodes/devices, existing resources are not affected"
     },
+    "xray": {
+      "title": "Xray"
+    },
     "tunnel": {
       "title": "Tunnels"
     },
@@ -478,6 +482,7 @@
     "wg_default_dns": { "label": "Default DNS", "hint": "DNS server pushed to client devices" },
     "wg_node_ip_start": { "label": "Node IP Start", "hint": "Starting IP suffix for nodes in subnet" },
     "wg_device_ip_start": { "label": "Device IP Start", "hint": "Starting IP suffix for devices in subnet" },
+    "xray_default_port": { "label": "Default Port", "hint": "Starting port for Xray/SOCKS5 proxy listeners" },
     "tunnel_subnet": { "label": "Tunnel Subnet", "hint": "Internal subnet for inter-node tunnels, CIDR format" },
     "tunnel_port_start": { "label": "Tunnel Port Start", "hint": "WireGuard listen port for tunnels, increments from this value" },
     "filter_sync_interval": { "label": "Sync Interval (sec)", "hint": "Interval for fetching external rule sources" },

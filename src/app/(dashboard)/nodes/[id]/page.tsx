@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/card";
 import { StatusDot } from "@/components/status-dot";
 import { NodeStatusChart } from "@/components/node-status-chart";
+import { xrayPortHintParams } from "@/lib/port-hint";
 
 type NodeDetail = {
   id: number;
@@ -65,6 +66,7 @@ export default function NodeDetailPage() {
   const [realityDest, setRealityDest] = useState("");
   const [realityPublicKey, setRealityPublicKey] = useState("");
   const [realityShortId, setRealityShortId] = useState("");
+  const [defaults, setDefaults] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetch(`/api/nodes/${nodeId}`)
@@ -96,6 +98,7 @@ export default function NodeDetailPage() {
       })
       .catch(() => toast.error(ts("loadNodeFailed")))
       .finally(() => setLoading(false));
+    fetch("/api/settings").then(r => r.json()).then(j => setDefaults(j.data ?? {})).catch(() => {});
   }, [nodeId, router]);
 
   const handleSave = async () => {
@@ -229,7 +232,7 @@ export default function NodeDetailPage() {
               type="number"
               value={port}
               onChange={(e) => setPort(e.target.value)}
-              placeholder="41820"
+              placeholder={defaults.wg_default_port || "41820"}
             />
           </div>
 
@@ -264,10 +267,10 @@ export default function NodeDetailPage() {
                     type="number"
                     value={xrayPort}
                     onChange={(e) => setXrayPort(e.target.value)}
-                    placeholder="41443"
+                    placeholder={defaults.xray_default_port || "41443"}
                   />
                   <p className="text-xs text-muted-foreground">
-                    {tn("xrayPortHint")}
+                    {tn("xrayPortHint", xrayPortHintParams(xrayPort, defaults.xray_default_port))}
                   </p>
                 </div>
                 <div className="space-y-2">

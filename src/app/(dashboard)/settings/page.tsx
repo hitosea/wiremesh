@@ -29,6 +29,13 @@ const SETTING_GROUPS = [
     ],
   },
   {
+    titleKey: "xray.title",
+    descriptionKey: undefined,
+    fields: [
+      { key: "xray_default_port", placeholder: "41443", type: "number" },
+    ],
+  },
+  {
     titleKey: "tunnel.title",
     descriptionKey: undefined,
     fields: [

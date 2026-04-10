@@ -4,7 +4,7 @@ import { devices, lineNodes, nodes, settings, lineBranches } from "@/lib/db/sche
 import { success, error } from "@/lib/api-response";
 import { eq, and, count } from "drizzle-orm";
 import { decrypt } from "@/lib/crypto";
-import { getXrayPortForLine, DEFAULT_XRAY_PORT, getProxyPortForLine } from "@/lib/proxy-port";
+import { getXrayPortForLine, getProxyPortForLine, getXrayDefaultPort } from "@/lib/proxy-port";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -100,7 +100,7 @@ PersistentKeepalive = 25
     }
 
     const endpoint = entryNodeRow.nodeDomain ?? entryNodeRow.nodeIp;
-    const xrayBasePort = entryNodeRow.nodeXrayPort ?? DEFAULT_XRAY_PORT;
+    const xrayBasePort = entryNodeRow.nodeXrayPort ?? getXrayDefaultPort();
     const xrayPort = getXrayPortForLine(entryNodeRow.nodeId, device.lineId!, xrayBasePort);
 
     // Parse Reality settings from node's xrayConfig
@@ -206,7 +206,7 @@ PersistentKeepalive = 25
     }
 
     const endpoint = entryNodeRow.nodeDomain ?? entryNodeRow.nodeIp;
-    const basePort = entryNodeRow.nodeXrayPort ?? DEFAULT_XRAY_PORT;
+    const basePort = entryNodeRow.nodeXrayPort ?? getXrayDefaultPort();
     const socks5Port = getProxyPortForLine(entryNodeRow.nodeId, device.lineId!, "socks5", basePort);
 
     const proxyUrl = `socks5://${device.socks5Username}:${password}@${endpoint}:${socks5Port}`;

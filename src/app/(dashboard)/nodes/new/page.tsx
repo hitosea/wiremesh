@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { translateError } from "@/lib/translate-error";
@@ -17,6 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { DEFAULT_REALITY_DEST } from "@/lib/reality-dest";
+import { xrayPortHintParams } from "@/lib/port-hint";
 
 export default function NewNodePage() {
   const router = useRouter();
@@ -34,6 +35,11 @@ export default function NewNodePage() {
   const [xrayEnabled, setXrayEnabled] = useState(false);
   const [xrayPort, setXrayPort] = useState("");
   const [realityDest, setRealityDest] = useState(DEFAULT_REALITY_DEST);
+  const [defaults, setDefaults] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetch("/api/settings").then(r => r.json()).then(j => setDefaults(j.data ?? {})).catch(() => {});
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,7 +141,7 @@ export default function NewNodePage() {
                 type="number"
                 value={port}
                 onChange={(e) => setPort(e.target.value)}
-                placeholder="41820"
+                placeholder={defaults.wg_default_port || "41820"}
               />
             </div>
             <div className="space-y-2">
@@ -185,10 +191,10 @@ export default function NewNodePage() {
                     type="number"
                     value={xrayPort}
                     onChange={(e) => setXrayPort(e.target.value)}
-                    placeholder="41443"
+                    placeholder={defaults.xray_default_port || "41443"}
                   />
                   <p className="text-xs text-muted-foreground">
-                    {t("xrayPortHint")}
+                    {t("xrayPortHint", xrayPortHintParams(xrayPort, defaults.xray_default_port))}
                   </p>
                 </div>
                 <div className="space-y-2">

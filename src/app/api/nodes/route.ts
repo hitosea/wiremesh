@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { db } from "@/lib/db";
 import { nodes, settings } from "@/lib/db/schema";
 import { success, created, error, paginated } from "@/lib/api-response";
+import { DEFAULT_PROXY_PORT } from "@/lib/proxy-port";
 import { parsePaginationParams, paginationOffset } from "@/lib/pagination";
 import { eq, or, like, count, and, SQL } from "drizzle-orm";
 import { encrypt } from "@/lib/crypto";
@@ -149,7 +150,7 @@ export async function POST(request: NextRequest) {
       xrayEnabled: xrayEnabled ?? false,
       xrayProtocol: xrayEnabled ? "vless" : null,
       xrayTransport: xrayEnabled ? "tcp" : null,
-      xrayPort: xrayPort ?? null,
+      xrayPort: xrayEnabled ? (xrayPort ?? parseInt(settingsMap["xray_default_port"] ?? String(DEFAULT_PROXY_PORT))) : null,
       xrayConfig: resolvedXrayConfig,
       externalInterface: externalInterface ?? "eth0",
       remark: remark ?? null,
