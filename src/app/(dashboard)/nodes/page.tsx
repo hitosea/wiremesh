@@ -14,7 +14,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { DataTable, Column, PaginationInfo } from "@/components/data-table";
 
 type Node = {
@@ -23,7 +22,6 @@ type Node = {
   ip: string;
   wgAddress: string;
   status: string;
-  tags: string | null;
 };
 
 
@@ -46,9 +44,6 @@ export default function NodesPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [batchDeleting, setBatchDeleting] = useState(false);
   const [showBatchDelete, setShowBatchDelete] = useState(false);
-  const [showBatchTags, setShowBatchTags] = useState(false);
-  const [batchTags, setBatchTags] = useState("");
-  const [batchUpdating, setBatchUpdating] = useState(false);
 
   const fetchNodes = async (page = 1, q = search) => {
     setLoading(true);
@@ -127,31 +122,6 @@ export default function NodesPage() {
     }
   };
 
-  const handleBatchUpdateTags = async () => {
-    setBatchUpdating(true);
-    try {
-      const res = await fetch("/api/nodes/batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "updateTags", ids: [...selectedIds], tags: batchTags }),
-      });
-      const json = await res.json();
-      if (res.ok) {
-        toast.success(json.data.message);
-        setSelectedIds(new Set());
-        setShowBatchTags(false);
-        setBatchTags("");
-        fetchNodes(pagination.page);
-      } else {
-        toast.error(translateError(json.error, te, t("batchUpdateFailed")));
-      }
-    } catch {
-      toast.error(t("batchUpdateFailedRetry"));
-    } finally {
-      setBatchUpdating(false);
-    }
-  };
-
   const columns: Column<Node>[] = [
     {
       key: "name",
@@ -172,13 +142,6 @@ export default function NodesPage() {
       label: t("statusCol"),
       render: (row) => (
         <StatusDot status={row.status} label={t(`status.${row.status}`)} />
-      ),
-    },
-    {
-      key: "tags",
-      label: t("tags"),
-      render: (row) => (
-        <span className="text-muted-foreground text-sm">{row.tags ?? "—"}</span>
       ),
     },
     {
@@ -222,9 +185,6 @@ export default function NodesPage() {
       {selectedIds.size > 0 && (
         <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
           <span className="text-sm font-medium">{tc("selectedItems", { count: selectedIds.size })}</span>
-          <Button size="sm" variant="outline" onClick={() => setShowBatchTags(true)}>
-            {t("batchUpdateTags")}
-          </Button>
           <Button size="sm" variant="destructive" onClick={() => setShowBatchDelete(true)}>
             {tc("batchDelete")}
           </Button>
@@ -290,23 +250,6 @@ export default function NodesPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showBatchTags} onOpenChange={() => setShowBatchTags(false)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("batchUpdateTagsTitle")}</DialogTitle>
-          </DialogHeader>
-          <p className="text-muted-foreground text-sm mb-2">
-            {t("batchUpdateTagsDescription", { count: selectedIds.size })}
-          </p>
-          <Input value={batchTags} onChange={(e) => setBatchTags(e.target.value)} placeholder={t("batchUpdateTagsPlaceholder")} />
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setShowBatchTags(false)}>{tc("cancel")}</Button>
-            <Button onClick={handleBatchUpdateTags} disabled={batchUpdating}>
-              {batchUpdating ? t("updating") : t("confirmUpdate")}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

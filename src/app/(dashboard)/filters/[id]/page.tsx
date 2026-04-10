@@ -45,7 +45,6 @@ type FilterDetail = {
   sourceUpdatedAt: string | null;
   mode: string;
   isEnabled: boolean;
-  tags: string | null;
   remark: string | null;
   branches: { branchId: number; branchName: string }[];
 };
@@ -70,7 +69,6 @@ export default function EditFilterPage() {
   const [sourceUrl, setSourceUrl] = useState("");
   const [mode, setMode] = useState("whitelist");
   const [selectedBranchIds, setSelectedBranchIds] = useState<number[]>([]);
-  const [tags, setTags] = useState("");
   const [remark, setRemark] = useState("");
 
   useEffect(() => {
@@ -92,7 +90,6 @@ export default function EditFilterPage() {
         setSourceUrl(f.sourceUrl ?? "");
         setMode(f.mode ?? "whitelist");
         setSelectedBranchIds(f.branches?.map((b: { branchId: number }) => b.branchId) ?? []);
-        setTags(f.tags ?? "");
         setRemark(f.remark ?? "");
         setLinesWithBranches(linesJson.data ?? []);
       })
@@ -127,7 +124,6 @@ export default function EditFilterPage() {
           sourceUrl: sourceUrl.trim() || null,
           mode,
           branchIds: selectedBranchIds,
-          tags: tags.trim() || null,
           remark: remark.trim() || null,
         }),
       });
@@ -284,15 +280,6 @@ export default function EditFilterPage() {
                 ))}
               </div>
             )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="tags">{tf("tagsComma")}</Label>
-            <Input
-              id="tags"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-            />
           </div>
 
           <div className="space-y-2">

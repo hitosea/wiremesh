@@ -38,7 +38,6 @@ type DeviceDetail = {
   lineId: number | null;
   status: string;
   lastHandshake: string | null;
-  tags: string | null;
   remark: string | null;
 };
 
@@ -69,7 +68,6 @@ function DeviceDetailContent() {
   const [saving, setSaving] = useState(false);
 
   const [name, setName] = useState("");
-  const [tags, setTags] = useState("");
   const [remark, setRemark] = useState("");
   const [lineId, setLineId] = useState("");
   const [lineOptions, setLineOptions] = useState<LineOption[]>([]);
@@ -93,7 +91,6 @@ function DeviceDetailContent() {
         }
         setDevice(d);
         setName(d.name ?? "");
-        setTags(d.tags ?? "");
         setRemark(d.remark ?? "");
         setLineId(d.lineId ? String(d.lineId) : "");
       })
@@ -113,7 +110,6 @@ function DeviceDetailContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
-          tags: tags.trim() || null,
           remark: remark.trim() || null,
         }),
       });
@@ -230,15 +226,6 @@ function DeviceDetailContent() {
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="tags">{tn("tagsComma")}</Label>
-            <Input
-              id="tags"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              placeholder={tn("tagsPlaceholder")}
             />
           </div>
           <div className="space-y-2">

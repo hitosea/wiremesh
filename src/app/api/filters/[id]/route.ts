@@ -51,7 +51,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (!existing) return error("NOT_FOUND", "notFound.filter");
 
   const body = await request.json();
-  const { name, rules, domainRules, mode, branchIds, sourceUrl, tags, remark } = body;
+  const { name, rules, domainRules, mode, branchIds, sourceUrl, remark } = body;
 
   if (mode && !["whitelist", "blacklist"].includes(mode)) {
     return error("VALIDATION_ERROR", "validation.modeInvalid");
@@ -65,7 +65,6 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (domainRules !== undefined) updateData.domainRules = domainRules ?? "";
   if (sourceUrl !== undefined) updateData.sourceUrl = sourceUrl;
   if (mode !== undefined) updateData.mode = mode;
-  if (tags !== undefined) updateData.tags = tags;
   if (remark !== undefined) updateData.remark = remark;
 
   const updated = db

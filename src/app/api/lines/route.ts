@@ -71,11 +71,10 @@ interface BranchInput {
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { name, entryNodeId, branches, tags, remark } = body as {
+  const { name, entryNodeId, branches, remark } = body as {
     name?: string;
     entryNodeId?: number;
     branches?: BranchInput[];
-    tags?: string;
     remark?: string;
   };
 
@@ -183,7 +182,6 @@ export async function POST(request: NextRequest) {
     .values({
       name: name.trim(),
       status: "active",
-      tags: tags ?? null,
       remark: remark ?? null,
     })
     .returning()

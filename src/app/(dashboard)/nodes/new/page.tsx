@@ -29,7 +29,6 @@ export default function NewNodePage() {
   const [ip, setIp] = useState("");
   const [domain, setDomain] = useState("");
   const [port, setPort] = useState("");
-  const [tags, setTags] = useState("");
   const [remark, setRemark] = useState("");
   const [xrayEnabled, setXrayEnabled] = useState(false);
   const [xrayPort, setXrayPort] = useState("");
@@ -53,7 +52,6 @@ export default function NewNodePage() {
         ip: ip.trim(),
         domain: domain.trim() || null,
         port: port ? parseInt(port) : undefined,
-        tags: tags.trim() || null,
         remark: remark.trim() || null,
         xrayEnabled,
       };
@@ -136,15 +134,6 @@ export default function NewNodePage() {
                 value={port}
                 onChange={(e) => setPort(e.target.value)}
                 placeholder="41820"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="tags">{t("tagsComma")}</Label>
-              <Input
-                id="tags"
-                value={tags}
-                onChange={(e) => setTags(e.target.value)}
-                placeholder={t("tagsPlaceholder")}
               />
             </div>
             <div className="space-y-2">

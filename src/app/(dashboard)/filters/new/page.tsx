@@ -50,7 +50,6 @@ export default function NewFilterPage() {
   const [sourceUrl, setSourceUrl] = useState("");
   const [mode, setMode] = useState("whitelist");
   const [selectedBranchIds, setSelectedBranchIds] = useState<number[]>([]);
-  const [tags, setTags] = useState("");
   const [remark, setRemark] = useState("");
 
   useEffect(() => {
@@ -88,7 +87,6 @@ export default function NewFilterPage() {
           sourceUrl: sourceUrl.trim() || null,
           mode,
           branchIds: selectedBranchIds,
-          tags: tags.trim() || null,
           remark: remark.trim() || null,
         }),
       });
@@ -221,16 +219,6 @@ export default function NewFilterPage() {
                 ))}
               </div>
             )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="tags">{t("tagsComma")}</Label>
-            <Input
-              id="tags"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              placeholder={t("tagsPlaceholder")}
-            />
           </div>
 
           <div className="space-y-2">

@@ -36,7 +36,6 @@ export default function NewDevicePage() {
   const [name, setName] = useState("");
   const [protocol, setProtocol] = useState<"wireguard" | "xray">("wireguard");
   const [lineId, setLineId] = useState<string>("");
-  const [tags, setTags] = useState("");
   const [remark, setRemark] = useState("");
 
   const [lineOptions, setLineOptions] = useState<LineOption[]>([]);
@@ -70,7 +69,6 @@ export default function NewDevicePage() {
           name: name.trim(),
           protocol,
           lineId: lineId ? parseInt(lineId) : null,
-          tags: tags.trim() || null,
           remark: remark.trim() || null,
         }),
       });
@@ -155,15 +153,6 @@ export default function NewDevicePage() {
                   </SelectContent>
                 </Select>
               )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="tags">{t("tagsComma")}</Label>
-              <Input
-                id="tags"
-                value={tags}
-                onChange={(e) => setTags(e.target.value)}
-                placeholder={t("tagsPlaceholder")}
-              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="remark">{t("notes")}</Label>

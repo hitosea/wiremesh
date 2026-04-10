@@ -50,7 +50,6 @@ export default function NewLinePage() {
   const [submitting, setSubmitting] = useState(false);
 
   const [name, setName] = useState("");
-  const [tags, setTags] = useState("");
   const [remark, setRemark] = useState("");
 
   const [entryNodeId, setEntryNodeId] = useState("");
@@ -229,7 +228,6 @@ export default function NewLinePage() {
             nodeIds: b.nodeIds.map(Number),
             filterIds: b.filterIds,
           })),
-          tags: tags.trim() || null,
           remark: remark.trim() || null,
         }),
       });
@@ -272,15 +270,6 @@ export default function NewLinePage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={t("lineNamePlaceholder")}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="tags">{t("tagsComma")}</Label>
-              <Input
-                id="tags"
-                value={tags}
-                onChange={(e) => setTags(e.target.value)}
-                placeholder={t("tagsPlaceholder")}
               />
             </div>
             <div className="space-y-2">

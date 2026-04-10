@@ -125,14 +125,13 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (!existing) return error("NOT_FOUND", "notFound.line");
 
   const body = await request.json();
-  const { name, status, tags, remark } = body;
+  const { name, status, remark } = body;
 
   const updateData: Partial<typeof lines.$inferInsert> = {
     updatedAt: new Date().toISOString(),
   };
   if (name !== undefined) updateData.name = name;
   if (status !== undefined) updateData.status = status;
-  if (tags !== undefined) updateData.tags = tags;
   if (remark !== undefined) updateData.remark = remark;
 
   const updated = db

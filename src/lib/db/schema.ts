@@ -45,7 +45,6 @@ export const nodes = sqliteTable("nodes", {
   xrayConfig: text("xray_config"),
   status: text("status").notNull().default("offline"),
   errorMessage: text("error_message"),
-  tags: text("tags"),
   remark: text("remark"),
   ...timestamps,
 });
@@ -66,7 +65,6 @@ export const lines = sqliteTable("lines", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   status: text("status").notNull().default("active"),
-  tags: text("tags"),
   remark: text("remark"),
   ...timestamps,
 });
@@ -123,7 +121,6 @@ export const devices = sqliteTable("devices", {
   lastHandshake: text("last_handshake"),
   uploadBytes: integer("upload_bytes").notNull().default(0),
   downloadBytes: integer("download_bytes").notNull().default(0),
-  tags: text("tags"),
   remark: text("remark"),
   ...timestamps,
 });
@@ -135,7 +132,6 @@ export const filters = sqliteTable("filters", {
   rules: text("rules").notNull(),
   mode: text("mode").notNull().default("whitelist"),
   isEnabled: integer("is_enabled", { mode: "boolean" }).notNull().default(true),
-  tags: text("tags"),
   remark: text("remark"),
   domainRules: text("domain_rules"),
   sourceUrl: text("source_url"),

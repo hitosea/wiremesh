@@ -33,7 +33,6 @@ export async function GET(request: NextRequest, { params }: Params) {
       xrayConfig: nodes.xrayConfig,
       status: nodes.status,
       errorMessage: nodes.errorMessage,
-      tags: nodes.tags,
       remark: nodes.remark,
       createdAt: nodes.createdAt,
       updatedAt: nodes.updatedAt,
@@ -68,7 +67,6 @@ export async function PUT(request: NextRequest, { params }: Params) {
     xrayProtocol,
     xrayTransport,
     xrayPort,
-    tags,
     remark,
   } = body;
 
@@ -93,7 +91,6 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (xrayProtocol !== undefined) updateData.xrayProtocol = xrayProtocol;
   if (xrayTransport !== undefined) updateData.xrayTransport = xrayTransport;
   if (xrayPort !== undefined) updateData.xrayPort = xrayPort;
-  if (tags !== undefined) updateData.tags = tags;
   if (remark !== undefined) updateData.remark = remark;
 
   // Auto-generate Reality keys when enabling Xray for the first time
@@ -151,7 +148,6 @@ export async function PUT(request: NextRequest, { params }: Params) {
       xrayConfig: nodes.xrayConfig,
       status: nodes.status,
       errorMessage: nodes.errorMessage,
-      tags: nodes.tags,
       remark: nodes.remark,
       createdAt: nodes.createdAt,
       updatedAt: nodes.updatedAt,

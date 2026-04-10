@@ -3,7 +3,6 @@ import { nodes } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
 import { inArray } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
-import { sql } from "drizzle-orm";
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -33,29 +32,6 @@ export async function POST(request: Request) {
     }
 
     return success({ message: `已删除 ${existing.length} 个节点` });
-  }
-
-  if (action === "updateTags") {
-    const { tags } = body;
-    if (typeof tags !== "string") {
-      return error("VALIDATION_ERROR", "validation.tagsRequired");
-    }
-
-    db.update(nodes)
-      .set({ tags: tags || null, updatedAt: sql`(datetime('now'))` })
-      .where(inArray(nodes.id, ids))
-      .run();
-
-    for (const id of ids) {
-      writeAuditLog({
-        action: "update",
-        targetType: "node",
-        targetId: id,
-        detail: `批量更新标签: ${tags}`,
-      });
-    }
-
-    return success({ message: `已更新 ${ids.length} 个节点的标签` });
   }
 
   return error("VALIDATION_ERROR", "validation.invalidActionType");

@@ -61,7 +61,6 @@ export async function GET(request: NextRequest) {
       lineId: devices.lineId,
       status: devices.status,
       lastHandshake: devices.lastHandshake,
-      tags: devices.tags,
       remark: devices.remark,
       createdAt: devices.createdAt,
       updatedAt: devices.updatedAt,
@@ -86,7 +85,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { name, protocol, lineId, tags, remark } = body;
+  const { name, protocol, lineId, remark } = body;
 
   if (!name) {
     return error("VALIDATION_ERROR", "validation.nameRequired");
@@ -145,7 +144,6 @@ export async function POST(request: NextRequest) {
       wgAddress,
       xrayUuid,
       lineId: lineId ?? null,
-      tags: tags ?? null,
       remark: remark ?? null,
     })
     .returning({
@@ -157,7 +155,6 @@ export async function POST(request: NextRequest) {
       xrayUuid: devices.xrayUuid,
       lineId: devices.lineId,
       status: devices.status,
-      tags: devices.tags,
       remark: devices.remark,
       createdAt: devices.createdAt,
       updatedAt: devices.updatedAt,

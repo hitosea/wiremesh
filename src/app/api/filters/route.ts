@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { name, rules, domainRules, mode, branchIds, sourceUrl, tags, remark } = body;
+  const { name, rules, domainRules, mode, branchIds, sourceUrl, remark } = body;
 
   if (!name || !name.trim()) return error("VALIDATION_ERROR", "validation.nameRequired");
   if (!rules && !domainRules && !sourceUrl) return error("VALIDATION_ERROR", "validation.rulesRequired");
@@ -59,7 +59,6 @@ export async function POST(request: NextRequest) {
       sourceUrl: sourceUrl ?? null,
       mode,
       isEnabled: true,
-      tags: tags ?? null,
       remark: remark ?? null,
     })
     .returning()

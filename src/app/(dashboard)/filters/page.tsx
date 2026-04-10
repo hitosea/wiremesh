@@ -24,7 +24,6 @@ type Filter = {
   isEnabled: boolean;
   rulesCount: number;
   branchCount: number;
-  tags: string | null;
   remark: string | null;
 };
 

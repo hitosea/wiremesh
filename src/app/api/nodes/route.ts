@@ -16,7 +16,6 @@ export async function GET(request: NextRequest) {
   const params = parsePaginationParams(request.nextUrl.searchParams);
   const search = request.nextUrl.searchParams.get("search");
   const status = request.nextUrl.searchParams.get("status");
-  const tags = request.nextUrl.searchParams.get("tags");
 
   const conditions: SQL[] = [];
   if (search) {
@@ -25,7 +24,6 @@ export async function GET(request: NextRequest) {
     );
   }
   if (status) conditions.push(eq(nodes.status, status));
-  if (tags) conditions.push(like(nodes.tags, `%${tags}%`));
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
   const total =
@@ -47,7 +45,6 @@ export async function GET(request: NextRequest) {
       xrayConfig: nodes.xrayConfig,
       status: nodes.status,
       errorMessage: nodes.errorMessage,
-      tags: nodes.tags,
       remark: nodes.remark,
       createdAt: nodes.createdAt,
       updatedAt: nodes.updatedAt,
@@ -77,7 +74,6 @@ export async function POST(request: NextRequest) {
     xrayTransport,
     xrayPort,
     xrayConfig,
-    tags,
     remark,
   } = body;
 
@@ -154,7 +150,6 @@ export async function POST(request: NextRequest) {
       xrayTransport: xrayEnabled ? "tcp" : null,
       xrayPort: xrayPort ?? null,
       xrayConfig: resolvedXrayConfig,
-      tags: tags ?? null,
       remark: remark ?? null,
     })
     .returning({
@@ -172,7 +167,6 @@ export async function POST(request: NextRequest) {
       xrayPort: nodes.xrayPort,
       xrayConfig: nodes.xrayConfig,
       status: nodes.status,
-      tags: nodes.tags,
       remark: nodes.remark,
       createdAt: nodes.createdAt,
       updatedAt: nodes.updatedAt,

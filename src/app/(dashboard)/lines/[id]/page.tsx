@@ -74,7 +74,6 @@ type LineDetail = {
   id: number;
   name: string;
   status: string;
-  tags: string | null;
   remark: string | null;
   nodes: LineNode[];
   tunnels: LineTunnel[];
@@ -98,7 +97,6 @@ export default function LineDetailPage() {
 
   const [name, setName] = useState("");
   const [status, setStatus] = useState("active");
-  const [tags, setTags] = useState("");
   const [remark, setRemark] = useState("");
 
   useEffect(() => {
@@ -114,7 +112,6 @@ export default function LineDetailPage() {
         setLine(l);
         setName(l.name ?? "");
         setStatus(l.status ?? "active");
-        setTags(l.tags ?? "");
         setRemark(l.remark ?? "");
       })
       .catch(() => toast.error(t("loadFailed")))
@@ -134,7 +131,6 @@ export default function LineDetailPage() {
         body: JSON.stringify({
           name: name.trim(),
           status,
-          tags: tags.trim() || null,
           remark: remark.trim() || null,
         }),
       });
@@ -352,15 +348,6 @@ export default function LineDetailPage() {
                 <SelectItem value="inactive">{t("disabled")}</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="tags">{tNew("tagsComma")}</Label>
-            <Input
-              id="tags"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              placeholder={tNew("tagsPlaceholder")}
-            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="remark">{tNew("notes")}</Label>

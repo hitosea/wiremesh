@@ -27,7 +27,6 @@ type Line = {
   id: number;
   name: string;
   status: string;
-  tags: string | null;
   nodes: LineNode[];
 };
 

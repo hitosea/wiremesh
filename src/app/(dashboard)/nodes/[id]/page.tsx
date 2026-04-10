@@ -35,7 +35,6 @@ type NodeDetail = {
   xrayConfig: string | null;
   status: string;
   errorMessage: string | null;
-  tags: string | null;
   remark: string | null;
 };
 
@@ -58,7 +57,6 @@ export default function NodeDetailPage() {
   const [ip, setIp] = useState("");
   const [domain, setDomain] = useState("");
   const [port, setPort] = useState("");
-  const [tags, setTags] = useState("");
   const [remark, setRemark] = useState("");
   const [xrayEnabled, setXrayEnabled] = useState(false);
   const [xrayPort, setXrayPort] = useState("");
@@ -81,7 +79,6 @@ export default function NodeDetailPage() {
         setIp(n.ip ?? "");
         setDomain(n.domain ?? "");
         setPort(n.port ? String(n.port) : "");
-        setTags(n.tags ?? "");
         setRemark(n.remark ?? "");
         setXrayEnabled(n.xrayEnabled ?? false);
         setXrayPort(n.xrayPort ? String(n.xrayPort) : "");
@@ -110,7 +107,6 @@ export default function NodeDetailPage() {
         ip: ip.trim(),
         domain: domain.trim() || null,
         port: port ? parseInt(port) : undefined,
-        tags: tags.trim() || null,
         remark: remark.trim() || null,
         xrayEnabled,
         xrayPort: xrayEnabled && xrayPort ? parseInt(xrayPort) : null,
@@ -289,15 +285,6 @@ export default function NodeDetailPage() {
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="tags">{tn("tagsComma")}</Label>
-            <Input
-              id="tags"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              placeholder={tn("tagsPlaceholder")}
-            />
-          </div>
           <div className="space-y-2">
             <Label htmlFor="remark">{tn("notes")}</Label>
             <Textarea

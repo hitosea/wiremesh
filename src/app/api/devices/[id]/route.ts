@@ -32,7 +32,6 @@ export async function GET(request: NextRequest, { params }: Params) {
       lineId: devices.lineId,
       status: devices.status,
       lastHandshake: devices.lastHandshake,
-      tags: devices.tags,
       remark: devices.remark,
       createdAt: devices.createdAt,
       updatedAt: devices.updatedAt,
@@ -58,13 +57,12 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (!existing) return error("NOT_FOUND", "notFound.device");
 
   const body = await request.json();
-  const { name, tags, remark } = body;
+  const { name, remark } = body;
 
   const updateData: Partial<typeof devices.$inferInsert> = {
     updatedAt: new Date().toISOString(),
   };
   if (name !== undefined) updateData.name = name;
-  if (tags !== undefined) updateData.tags = tags;
   if (remark !== undefined) updateData.remark = remark;
 
   const updated = db
@@ -81,7 +79,6 @@ export async function PUT(request: NextRequest, { params }: Params) {
       xrayConfig: devices.xrayConfig,
       lineId: devices.lineId,
       status: devices.status,
-      tags: devices.tags,
       remark: devices.remark,
       createdAt: devices.createdAt,
       updatedAt: devices.updatedAt,
