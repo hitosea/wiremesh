@@ -129,6 +129,9 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes []api.XrayLineRoute) e
 		addNatRule("-A POSTROUTING -o wm-tun+ -j MASQUERADE -m comment --comment wm-xray-masq")
 	}
 
+	// MASQUERADE for SOCKS5 traffic going through tunnels (independent of Xray)
+	addNatRule("-A POSTROUTING -o wm-tun+ -j MASQUERADE -m comment --comment wm-socks5-masq")
+
 	// 3. Start/update DNS proxy
 	if len(domainRules) > 0 {
 		if m.dnsProxy == nil {
@@ -223,7 +226,7 @@ func addMangleRule(rule string) { addIptablesRule("mangle", rule) }
 func addNatRule(rule string)    { addIptablesRule("nat", rule) }
 
 func (m *Manager) cleanNatRules() {
-	cleanIptablesRules("nat", []string{"POSTROUTING"}, "wm-xray")
+	cleanIptablesRules("nat", []string{"POSTROUTING"}, "wm-xray", "wm-socks5")
 }
 
 // cleanIptablesRules removes rules containing any of the given comment

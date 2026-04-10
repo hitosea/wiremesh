@@ -149,8 +149,8 @@
     "notesPlaceholder": "Notes",
     "xraySettings": "Xray Settings",
     "enableXray": "Enable Xray Entry Proxy",
-    "xrayStartPort": "Xray Start Port",
-    "xrayPortHint": "Each line gets a unique port (e.g., 41443, 41444, 41445...). Ensure your firewall allows these ports.",
+    "xrayStartPort": "Proxy Base Port",
+    "xrayPortHint": "Each line gets a unique port (e.g., 41443, 41444, 41445...). Xray and SOCKS5 share the same port pool. Ensure your firewall allows these ports.",
     "externalInterface": "External Interface",
     "externalInterfaceHint": "Network interface for external traffic, default eth0 (e.g., ens3, bond0)",
     "realityTarget": "Reality Target",
@@ -283,7 +283,11 @@
     "publicKey": "Public Key",
     "shortId": "Short ID",
     "clashHint": "Compatible with Clash Meta / Clash Verge. Copy and add to proxies section.",
-    "copyConfig": "Copy Config"
+    "copyConfig": "Copy Config",
+    "proxyUrl": "Proxy URL",
+    "username": "Username",
+    "password": "Password",
+    "socks5Hint": "Configure SOCKS5 proxy in your browser or system proxy settings"
   },
   "lines": {
     "status": {

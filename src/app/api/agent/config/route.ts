@@ -4,8 +4,8 @@ import { nodes, lineNodes, lineTunnels, devices, lineBranches, branchFilters, fi
 import { eq, or, and, count } from "drizzle-orm";
 import { decrypt } from "@/lib/crypto";
 import { authenticateAgent } from "@/lib/agent-auth";
-import { getXrayPortForLine, DEFAULT_XRAY_PORT } from "@/lib/xray-port";
-import { BRANCH_MARK_START, XRAY_MARK_START } from "@/lib/routing-constants";
+import { getXrayPortForLine, DEFAULT_XRAY_PORT, getProxyPortForLine, DEFAULT_PROXY_PORT } from "@/lib/proxy-port";
+import { BRANCH_MARK_START, XRAY_MARK_START, SOCKS5_MARK_START } from "@/lib/routing-constants";
 
 function getNodePublicHost(nodeId: number): string {
   const n = db.select({ ip: nodes.ip, domain: nodes.domain }).from(nodes).where(eq(nodes.id, nodeId)).get();
@@ -363,6 +363,54 @@ export async function GET(request: NextRequest) {
     };
   }
 
+  // ---- SOCKS5 config ----
+  let socks5Config: {
+    routes: { lineId: number; port: number; mark: number; tunnel: string; users: { username: string; password: string }[] }[];
+  } | null = null;
+
+  if (entryLineIds.length > 0) {
+    const socks5Routes: { lineId: number; port: number; mark: number; tunnel: string; users: { username: string; password: string }[] }[] = [];
+    let socks5MarkCounter = SOCKS5_MARK_START;
+    const proxyBasePort = node.xrayPort ?? DEFAULT_PROXY_PORT;
+
+    for (const lineId of entryLineIds) {
+      const socks5Devices = db
+        .select({ socks5Username: devices.socks5Username, socks5Password: devices.socks5Password })
+        .from(devices)
+        .where(and(eq(devices.lineId, lineId), eq(devices.protocol, "socks5")))
+        .all()
+        .filter((d) => d.socks5Username && d.socks5Password);
+
+      if (socks5Devices.length === 0) continue;
+
+      const users = socks5Devices.map((d) => {
+        let password = "";
+        try { password = decrypt(d.socks5Password!); } catch {}
+        return { username: d.socks5Username!, password };
+      }).filter((u) => u.password);
+
+      if (users.length === 0) continue;
+
+      const isSingleNode = singleNodeLineIds.has(lineId);
+      const tunnel = isSingleNode ? extIface : (lineToDownstreamIface.get(lineId) ?? "");
+      if (!tunnel) continue;
+
+      const port = getProxyPortForLine(nodeId, lineId, "socks5", proxyBasePort);
+
+      socks5Routes.push({
+        lineId,
+        port,
+        mark: socks5MarkCounter++,
+        tunnel,
+        users,
+      });
+    }
+
+    if (socks5Routes.length > 0) {
+      socks5Config = { routes: socks5Routes };
+    }
+  }
+
   // ---- Routing config (entry nodes only) ----
   let routingConfig: {
     enabled: boolean;
@@ -510,6 +558,7 @@ export async function GET(request: NextRequest) {
       deviceRoutes,
     },
     xray: xrayConfig,
+    socks5: socks5Config,
     routing: routingConfig,
     version: node.updatedAt,
   };

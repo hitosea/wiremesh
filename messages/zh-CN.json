@@ -149,8 +149,8 @@
     "notesPlaceholder": "备注信息",
     "xraySettings": "Xray 设置",
     "enableXray": "启用 Xray 入口代理",
-    "xrayStartPort": "Xray 起始端口",
-    "xrayPortHint": "每条线路自动分配独立端口（如 41443、41444、41445...），请确保防火墙放行对应端口",
+    "xrayStartPort": "代理起始端口",
+    "xrayPortHint": "每条线路自动分配独立端口（如 41443、41444、41445...），Xray 和 SOCKS5 共享同一端口池，请确保防火墙放行对应端口",
     "externalInterface": "外网网卡",
     "externalInterfaceHint": "节点的外网网卡名称，默认 eth0，常见如 ens3、bond0 等",
     "realityTarget": "Reality 目标网站",
@@ -283,7 +283,11 @@
     "publicKey": "公钥",
     "shortId": "Short ID",
     "clashHint": "适用于 Clash Meta / Clash Verge，复制后添加到 proxies 配置段",
-    "copyConfig": "复制配置"
+    "copyConfig": "复制配置",
+    "proxyUrl": "代理地址",
+    "username": "用户名",
+    "password": "密码",
+    "socks5Hint": "在浏览器或系统代理设置中配置 SOCKS5 代理"
   },
   "lines": {
     "status": {

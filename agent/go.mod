@@ -3,6 +3,7 @@ module github.com/wiremesh/agent
 go 1.25.0
 
 require (
+	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 // indirect
 	github.com/miekg/dns v1.1.72 // indirect
 	golang.org/x/mod v0.31.0 // indirect
 	golang.org/x/net v0.48.0 // indirect

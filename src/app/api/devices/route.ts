@@ -5,7 +5,7 @@ import { devices, settings, nodes, lineNodes } from "@/lib/db/schema";
 import { success, created, error, paginated } from "@/lib/api-response";
 import { parsePaginationParams, paginationOffset } from "@/lib/pagination";
 import { eq, or, like, count, and, gt, lte, isNull, sql, SQL } from "drizzle-orm";
-import { encrypt } from "@/lib/crypto";
+import { encrypt, generateRandomString } from "@/lib/crypto";
 import { generateKeyPair } from "@/lib/wireguard";
 import { allocateDeviceIp } from "@/lib/ip-allocator";
 import { writeAuditLog } from "@/lib/audit-log";
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
   if (!name) {
     return error("VALIDATION_ERROR", "validation.nameRequired");
   }
-  if (!protocol || !["wireguard", "xray"].includes(protocol)) {
+  if (!protocol || !["wireguard", "xray", "socks5"].includes(protocol)) {
     return error("VALIDATION_ERROR", "validation.protocolInvalid");
   }
 
@@ -105,6 +105,8 @@ export async function POST(request: NextRequest) {
   let wgPrivateKey: string | null = null;
   let wgAddress: string | null = null;
   let xrayUuid: string | null = null;
+  let socks5Username: string | null = null;
+  let socks5Password: string | null = null;
 
   if (protocol === "wireguard") {
     // Generate key pair
@@ -129,9 +131,12 @@ export async function POST(request: NextRequest) {
     const subnet = settingsMap["wg_default_subnet"] ?? "10.210.0.0/24";
     const startPos = parseInt(settingsMap["wg_device_ip_start"] ?? "100");
     wgAddress = allocateDeviceIp(usedAddresses, subnet, startPos);
-  } else {
+  } else if (protocol === "xray") {
     // xray: generate UUID
     xrayUuid = uuidv4();
+  } else if (protocol === "socks5") {
+    socks5Username = generateRandomString(8);
+    socks5Password = encrypt(generateRandomString(16));
   }
 
   const result = db
@@ -143,6 +148,8 @@ export async function POST(request: NextRequest) {
       wgPrivateKey,
       wgAddress,
       xrayUuid,
+      socks5Username,
+      socks5Password,
       lineId: lineId ?? null,
       remark: remark ?? null,
     })
@@ -153,6 +160,7 @@ export async function POST(request: NextRequest) {
       wgPublicKey: devices.wgPublicKey,
       wgAddress: devices.wgAddress,
       xrayUuid: devices.xrayUuid,
+      socks5Username: devices.socks5Username,
       lineId: devices.lineId,
       status: devices.status,
       remark: devices.remark,

@@ -4,7 +4,7 @@ import { devices, lineNodes, nodes, settings, lineBranches } from "@/lib/db/sche
 import { success, error } from "@/lib/api-response";
 import { eq, and, count } from "drizzle-orm";
 import { decrypt } from "@/lib/crypto";
-import { getXrayPortForLine, DEFAULT_XRAY_PORT } from "@/lib/xray-port";
+import { getXrayPortForLine, DEFAULT_XRAY_PORT, getProxyPortForLine } from "@/lib/proxy-port";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -191,6 +191,34 @@ PersistentKeepalive = 25
     const shareLink = `vless://${device.xrayUuid}@${endpoint}:${xrayPort}?${vlessParams.toString()}#${encodeURIComponent(device.name)}`;
 
     return success({ format: "xray", config, filename, shareLink });
+  }
+
+  if (protocol === "socks5") {
+    if (!device.socks5Username || !device.socks5Password) {
+      return error("VALIDATION_ERROR", "validation.deviceSocks5Incomplete");
+    }
+
+    let password: string;
+    try {
+      password = decrypt(device.socks5Password);
+    } catch {
+      return error("INTERNAL_ERROR", "internal.decryptDeviceFailed");
+    }
+
+    const endpoint = entryNodeRow.nodeDomain ?? entryNodeRow.nodeIp;
+    const basePort = entryNodeRow.nodeXrayPort ?? DEFAULT_XRAY_PORT;
+    const socks5Port = getProxyPortForLine(entryNodeRow.nodeId, device.lineId!, "socks5", basePort);
+
+    const proxyUrl = `socks5://${device.socks5Username}:${password}@${endpoint}:${socks5Port}`;
+
+    return success({
+      format: "socks5",
+      proxyUrl,
+      server: endpoint,
+      port: socks5Port,
+      username: device.socks5Username,
+      password,
+    });
   }
 
   return error("VALIDATION_ERROR", "validation.unsupportedProtocol");

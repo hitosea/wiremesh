@@ -1,5 +1,9 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 
+export function generateRandomString(length: number): string {
+  return randomBytes(length).toString("base64url").slice(0, length);
+}
+
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
 const TAG_LENGTH = 16;

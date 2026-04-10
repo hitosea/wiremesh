@@ -3,6 +3,7 @@ package wg
 import (
 	"fmt"
 	"log"
+	"os/exec"
 	"strings"
 
 	"github.com/wiremesh/agent/api"
@@ -15,8 +16,10 @@ const (
 	routeTableEnd       = 20999
 	relayTableStart     = 21001 // Relay forwarding routes: tables 21001-21999
 	relayTableEnd       = 21999
-	xrayRouteTableStart = 31001 // Xray fwmark routes: tables 31001-31999
-	xrayRouteTableEnd   = 31999
+	xrayRouteTableStart   = 31001 // Xray fwmark routes: tables 31001-31999
+	xrayRouteTableEnd     = 31999
+	socks5RouteTableStart = 32001 // SOCKS5 fwmark routes: tables 32001-32999
+	socks5RouteTableEnd   = 32999
 )
 
 // SyncRouting applies per-device routing rules based on deviceRoutes.
@@ -119,6 +122,37 @@ func SyncXrayRouting(routes []api.XrayLineRoute) error {
 	return nil
 }
 
+// SyncSocks5Routing applies fwmark-based routing for SOCKS5 traffic.
+func SyncSocks5Routing(routes []api.Socks5Route) error {
+	if len(routes) == 0 {
+		return nil
+	}
+
+	for _, route := range routes {
+		table := fmt.Sprintf("%d", route.Mark)
+		markHex := fmt.Sprintf("0x%x", route.Mark)
+		priority := table
+
+		if _, err := Run("ip", "route", "replace", "default", "dev", route.Tunnel, "table", table); err != nil {
+			log.Printf("[routing] Error adding socks5 route table %s: %v", table, err)
+			continue
+		}
+
+		if _, err := Run("ip", "rule", "add", "fwmark", markHex, "lookup", table, "priority", priority); err != nil {
+			if !strings.Contains(err.Error(), "File exists") {
+				log.Printf("[routing] Error adding socks5 fwmark rule %s: %v", markHex, err)
+				continue
+			}
+		}
+
+		log.Printf("[routing] SOCKS5: fwmark %s → %s (wm-socks5-line-%d, table %s, priority %s)",
+			markHex, route.Tunnel, route.LineID, table, priority)
+	}
+
+	log.Printf("[routing] SOCKS5 routing configured: %d lines", len(routes))
+	return nil
+}
+
 func cleanRouting() {
 	// Clean WG device routes (tables 20001-20999)
 	// Source of truth: src/lib/routing-constants.ts
@@ -152,6 +186,15 @@ func cleanRouting() {
 			break
 		}
 		RunSilent("ip", "route", "flush", "table", table)
+	}
+
+	// Clean SOCKS5 route tables (32001-32999)
+	// Source of truth: src/lib/routing-constants.ts
+	for i := socks5RouteTableStart; i <= socks5RouteTableEnd; i++ {
+		if _, err := exec.Command("ip", "rule", "del", "fwmark", fmt.Sprintf("0x%x", i)).CombinedOutput(); err != nil {
+			break
+		}
+		exec.Command("ip", "route", "flush", "table", fmt.Sprintf("%d", i)).CombinedOutput()
 	}
 }
 

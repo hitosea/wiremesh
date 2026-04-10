@@ -117,6 +117,8 @@ export const devices = sqliteTable("devices", {
   wgAddress: text("wg_address"),
   xrayUuid: text("xray_uuid"),
   xrayConfig: text("xray_config"),
+  socks5Username: text("socks5_username"),
+  socks5Password: text("socks5_password"),
   lineId: integer("line_id").references(() => lines.id, { onDelete: "set null" }),
   status: text("status").notNull().default("offline"),
   lastHandshake: text("last_handshake"),

@@ -27,6 +27,10 @@ export const BRANCH_MARK_END = 30999;
 export const XRAY_MARK_START = 31001;
 export const XRAY_MARK_END = 31999;
 
+/** SOCKS5 fwmark routing (tables 32001-32999) */
+export const SOCKS5_MARK_START = 32001;
+export const SOCKS5_MARK_END = 32999;
+
 /** Default branch ip rule priority */
 export const DEFAULT_BRANCH_PRIORITY = 32000;
 
@@ -36,4 +40,5 @@ export const WM_TABLE_RANGES = [
   { start: RELAY_TABLE_START, end: RELAY_TABLE_END },
   { start: BRANCH_MARK_START, end: BRANCH_MARK_END },
   { start: XRAY_MARK_START, end: XRAY_MARK_END },
+  { start: SOCKS5_MARK_START, end: SOCKS5_MARK_END },
 ] as const;

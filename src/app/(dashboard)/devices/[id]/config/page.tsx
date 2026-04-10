@@ -15,6 +15,12 @@ type ConfigData = {
   config: string;
   filename: string;
   shareLink?: string;
+  // SOCKS5 fields
+  proxyUrl?: string;
+  server?: string;
+  port?: number;
+  username?: string;
+  password?: string;
 };
 
 type DeviceInfo = {
@@ -144,6 +150,7 @@ export default function DeviceConfigPage() {
   };
 
   const isXray = configData?.format === "xray";
+  const isSocks5 = configData?.format === "socks5";
   const shadowrocketUri = configData ? buildShadowrocketUri(configData) : null;
   const clashConfig = configData ? buildClashMeta(configData) : null;
 
@@ -185,7 +192,7 @@ export default function DeviceConfigPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle>
-                {t("configTitle", { format: configData.format === "wireguard" ? "WireGuard" : configData.format === "xray" ? "Xray" : configData.format })}
+                {t("configTitle", { format: configData.format === "wireguard" ? "WireGuard" : configData.format === "xray" ? "Xray" : configData.format === "socks5" ? "SOCKS5" : configData.format })}
               </CardTitle>
               <div className="flex gap-2">
                 <Button size="sm" onClick={() => handleCopy()}>
@@ -206,8 +213,8 @@ export default function DeviceConfigPage() {
             </CardContent>
           </Card>
 
-          {/* QR code card */}
-          <Card>
+          {/* QR code card — not shown for SOCKS5 */}
+          {!isSocks5 && <Card>
             <CardHeader>
               <CardTitle>{t("qrCode")}</CardTitle>
             </CardHeader>
@@ -232,7 +239,49 @@ export default function DeviceConfigPage() {
                 </div>
               )}
             </CardContent>
-          </Card>
+          </Card>}
+
+          {/* SOCKS5 client config */}
+          {isSocks5 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("clientConfig")}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">{t("socks5Hint")}</p>
+                <div className="code-block rounded-lg p-4 text-xs space-y-1">
+                  {configData.proxyUrl && (
+                    <div className="flex items-center gap-2">
+                      <div className="flex flex-1">
+                        <span className="text-muted-foreground w-24 shrink-0">{t("proxyUrl")}</span>
+                        <span className="font-mono break-all">{configData.proxyUrl}</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0 h-6 px-2 text-xs"
+                        onClick={() => handleCopy(configData.proxyUrl)}
+                      >
+                        {tc("copy")}
+                      </Button>
+                    </div>
+                  )}
+                  {configData.server && (
+                    <ConfigRow label={t("address")} value={configData.server} />
+                  )}
+                  {configData.port !== undefined && (
+                    <ConfigRow label={t("port")} value={String(configData.port)} />
+                  )}
+                  {configData.username && (
+                    <ConfigRow label={t("username")} value={configData.username} />
+                  )}
+                  {configData.password && (
+                    <ConfigRow label={t("password")} value={configData.password} />
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Xray client configs */}
           {isXray && (

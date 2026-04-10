@@ -11,6 +11,7 @@ import (
 	"github.com/wiremesh/agent/config"
 	"github.com/wiremesh/agent/iptables"
 	"github.com/wiremesh/agent/routing"
+	"github.com/wiremesh/agent/socks5"
 	"github.com/wiremesh/agent/wg"
 	"github.com/wiremesh/agent/xray"
 )
@@ -20,6 +21,7 @@ type Agent struct {
 	client        *api.Client
 	sse           *api.SSEClient
 	activeTunnels  map[string]wg.ActiveTunnel
+	socks5Manager  *socks5.Manager
 	routingManager *routing.Manager
 	lastVersion    string
 	ctx            context.Context
@@ -32,6 +34,7 @@ func New(cfg *config.Config) *Agent {
 		cfg:            cfg,
 		client:         api.NewClient(cfg.ServerURL, cfg.Token),
 		activeTunnels:  make(map[string]wg.ActiveTunnel),
+		socks5Manager:  socks5.NewManager(),
 		routingManager: routing.NewManager(),
 		ctx:            ctx,
 		cancel:         cancel,
@@ -149,7 +152,19 @@ func (a *Agent) pullAndApplyConfigForce(force bool) error {
 		}
 	}
 
-	// 7. Sync branch routing (with Xray routes for OUTPUT chain split tunneling)
+	// 7. Sync SOCKS5
+	if a.socks5Manager != nil {
+		a.socks5Manager.Sync(cfgData.Socks5)
+	}
+
+	// 8. Sync SOCKS5 fwmark routing
+	if cfgData.Socks5 != nil && len(cfgData.Socks5.Routes) > 0 {
+		if err := wg.SyncSocks5Routing(cfgData.Socks5.Routes); err != nil {
+			log.Printf("[agent] socks5 routing sync error: %v", err)
+		}
+	}
+
+	// 9. Sync branch routing (with Xray routes for OUTPUT chain split tunneling)
 	var xrayRoutes []api.XrayLineRoute
 	if cfgData.Xray != nil {
 		xrayRoutes = cfgData.Xray.Routes
@@ -167,12 +182,20 @@ func (a *Agent) pullAndApplyConfigForce(force bool) error {
 		}
 		xrayStatus = fmt.Sprintf("enabled (%d clients, %d lines)", clientCount, len(cfgData.Xray.Routes))
 	}
+	socks5Status := "disabled"
+	if cfgData.Socks5 != nil && len(cfgData.Socks5.Routes) > 0 {
+		userCount := 0
+		for _, r := range cfgData.Socks5.Routes {
+			userCount += len(r.Users)
+		}
+		socks5Status = fmt.Sprintf("enabled (%d users, %d lines)", userCount, len(cfgData.Socks5.Routes))
+	}
 	routingStatus := "disabled"
 	if cfgData.Routing != nil && cfgData.Routing.Enabled {
 		routingStatus = fmt.Sprintf("enabled (%d branches)", len(cfgData.Routing.Branches))
 	}
-	log.Printf("[agent] Config applied. Tunnels: %d, iptables: %d, xray: %s, routing: %s",
-		len(a.activeTunnels), len(cfgData.Tunnels.IptablesRules), xrayStatus, routingStatus)
+	log.Printf("[agent] Config applied. Tunnels: %d, iptables: %d, xray: %s, socks5: %s, routing: %s",
+		len(a.activeTunnels), len(cfgData.Tunnels.IptablesRules), xrayStatus, socks5Status, routingStatus)
 	return nil
 }
 
@@ -192,6 +215,7 @@ func (a *Agent) shutdown() {
 		a.sse.Stop()
 	}
 	xray.Stop()
+	a.socks5Manager.Stop()
 	for name := range a.activeTunnels {
 		log.Printf("[agent] Destroying tunnel %s", name)
 		wg.IpLinkSetDown(name)

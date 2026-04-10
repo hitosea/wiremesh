@@ -10,6 +10,7 @@ type ConfigData struct {
 	Peers   []PeerConfig   `json:"peers"`
 	Tunnels TunnelConfig   `json:"tunnels"`
 	Xray    *XrayConfig    `json:"xray"`
+	Socks5  *Socks5Config  `json:"socks5"`
 	Routing *RoutingConfig `json:"routing"`
 	Version string         `json:"version"`
 }
@@ -109,4 +110,21 @@ type RuleSource struct {
 	FilterID     int    `json:"filter_id"`
 	URL          string `json:"url"`
 	SyncInterval int    `json:"sync_interval"` // seconds
+}
+
+type Socks5Config struct {
+	Routes []Socks5Route `json:"routes"`
+}
+
+type Socks5Route struct {
+	LineID int          `json:"lineId"`
+	Port   int          `json:"port"`
+	Mark   int          `json:"mark"`
+	Tunnel string       `json:"tunnel"`
+	Users  []Socks5User `json:"users"`
+}
+
+type Socks5User struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
