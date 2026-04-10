@@ -45,12 +45,15 @@ export function getProxyPortForLine(
   const xrayLineIds = new Set(proxyDevices.filter((d) => d.protocol === "xray").map((d) => d.lineId));
   const socks5LineIds = new Set(proxyDevices.filter((d) => d.protocol === "socks5").map((d) => d.lineId));
 
+  // Allocate all Xray ports first, then SOCKS5 ports, to avoid collisions.
   let port = basePort;
   for (const lid of entryLineIds) {
     if (xrayLineIds.has(lid)) {
       if (lid === lineId && protocol === "xray") return port;
       port++;
     }
+  }
+  for (const lid of entryLineIds) {
     if (socks5LineIds.has(lid)) {
       if (lid === lineId && protocol === "socks5") return port;
       port++;
