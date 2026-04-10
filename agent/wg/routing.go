@@ -113,27 +113,35 @@ func SyncRouting(deviceRoutes []api.DeviceRoute) error {
 			log.Printf("[routing] Exit: %s → %s", route.Destination, route.Tunnel)
 
 		case "relay":
-			// Destination = upstream iface (where traffic comes in)
-			// Tunnel = downstream iface (where traffic goes out)
-			tableNum := relayTableStart + relayIdx // 21001, 21002, ...
-			table := fmt.Sprintf("%d", tableNum)
-
-			if err := addDefaultRoute(route.Tunnel, table); err != nil {
-				log.Printf("[routing] Error adding relay route table %s: %v", table, err)
+			// Forward: upstream → downstream
+			fwdTable := fmt.Sprintf("%d", relayTableStart+relayIdx*2)
+			if err := addIifRoute(route.Destination, route.Tunnel, fwdTable, "Relay"); err != nil {
 				continue
 			}
-			if _, err := Run("ip", "rule", "add", "iif", route.Destination, "lookup", table, "priority", table); err != nil {
-				if !strings.Contains(err.Error(), "File exists") {
-					log.Printf("[routing] Error adding relay rule iif %s: %v", route.Destination, err)
-					continue
-				}
-			}
-			log.Printf("[routing] Relay: iif %s → %s (table %s)", route.Destination, route.Tunnel, table)
+			// Return: downstream → upstream
+			retTable := fmt.Sprintf("%d", relayTableStart+relayIdx*2+1)
+			addIifRoute(route.Tunnel, route.Destination, retTable, "Relay return")
 			relayIdx++
 		}
 	}
 
 	log.Printf("[routing] Routing configured: %d routes", len(deviceRoutes))
+	return nil
+}
+
+// addIifRoute sets up a policy route: packets arriving on inIface are routed to outIface via the given table.
+func addIifRoute(inIface, outIface, table, label string) error {
+	if err := addDefaultRoute(outIface, table); err != nil {
+		log.Printf("[routing] Error adding %s route table %s: %v", label, table, err)
+		return err
+	}
+	if _, err := Run("ip", "rule", "add", "iif", inIface, "lookup", table, "priority", table); err != nil {
+		if !strings.Contains(err.Error(), "File exists") {
+			log.Printf("[routing] Error adding %s rule iif %s: %v", label, inIface, err)
+			return err
+		}
+	}
+	log.Printf("[routing] %s: iif %s → %s (table %s)", label, inIface, outIface, table)
 	return nil
 }
 

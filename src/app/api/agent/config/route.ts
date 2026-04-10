@@ -74,7 +74,8 @@ export async function GET(request: NextRequest) {
   }[] = [];
 
   // Internal tracking: lineId -> interface name, by node role
-  const lineToDownstreamIface = new Map<number, string>(); // entry/relay: line -> "from" tunnel
+  const lineToDownstreamIface = new Map<number, string>(); // entry/relay: line -> default branch "from" tunnel
+  const branchToDownstreamIface = new Map<number, string>(); // branchId -> "from" tunnel (for multi-branch lines)
   const lineToUpstreamIface = new Map<number, string>();   // exit/relay: line -> "to" tunnel
 
   const iptablesRules: string[] = [];
@@ -141,9 +142,15 @@ export async function GET(request: NextRequest) {
 
         interfaces.push({ name: ifaceName, privateKey, address, listenPort, peerPublicKey, peerAddress, peerPort, role });
 
-        // Track line-to-interface mapping for device routes
+        // Track tunnel-to-interface mappings
         if (role === "from") {
-          lineToDownstreamIface.set(lineId, ifaceName); // entry or relay downstream
+          if (tunnel.branchId) {
+            branchToDownstreamIface.set(tunnel.branchId, ifaceName);
+          }
+          // Fallback: first "from" tunnel for this line (overwritten below for default branch)
+          if (!lineToDownstreamIface.has(lineId)) {
+            lineToDownstreamIface.set(lineId, ifaceName);
+          }
         }
         if (role === "to") {
           lineToUpstreamIface.set(lineId, ifaceName); // exit or relay upstream
@@ -158,6 +165,10 @@ export async function GET(request: NextRequest) {
         } else if (myRole === "relay") {
           iptablesRules.push(`-A FORWARD -i ${ifaceName} -m comment --comment ${lineTag} -j ACCEPT`);
           iptablesRules.push(`-A FORWARD -o ${ifaceName} -m comment --comment ${lineTag} -j ACCEPT`);
+          // MASQUERADE on the downstream tunnel so the exit node can route responses back
+          if (role === "from") {
+            iptablesRules.push(`-t nat -A POSTROUTING -o ${ifaceName} -s 10.0.0.0/8 -m comment --comment ${lineTag} -j MASQUERADE`);
+          }
         } else if (myRole === "exit") {
           iptablesRules.push(`-A FORWARD -i ${ifaceName} -o ${extIface} -m comment --comment ${lineTag} -j ACCEPT`);
           iptablesRules.push(`-A FORWARD -i ${extIface} -o ${ifaceName} -m state --state RELATED,ESTABLISHED -m comment --comment ${lineTag} -j ACCEPT`);
@@ -167,17 +178,25 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // Cache lineBranches per entry line — reused by default-branch resolution, device routes, Xray, and routing configs
+  const lineBranchCache = new Map<number, (typeof lineBranches.$inferSelect)[]>();
+  for (const lineId of entryLineIds) {
+    lineBranchCache.set(lineId, db.select().from(lineBranches).where(eq(lineBranches.lineId, lineId)).all());
+  }
+
+  // Resolve lineToDownstreamIface: for multi-branch lines, use the default branch's tunnel
+  for (const [lineId, branches] of lineBranchCache) {
+    const defaultBranch = branches.find((b) => b.isDefault);
+    if (defaultBranch && branchToDownstreamIface.has(defaultBranch.id)) {
+      lineToDownstreamIface.set(lineId, branchToDownstreamIface.get(defaultBranch.id)!);
+    }
+  }
+
   // ---- Device Routes ----
   // Maps each device IP to the tunnel interface it should use.
   // Entry nodes: device traffic FROM this IP goes through the downstream tunnel.
   // Exit nodes: return traffic TO this IP goes back through the upstream tunnel.
   const deviceRoutes: { destination: string; tunnel: string; type: string }[] = [];
-
-  // Cache lineBranches per entry line — queried once, reused by device routes, Xray, and routing configs
-  const lineBranchCache = new Map<number, (typeof lineBranches.$inferSelect)[]>();
-  for (const lineId of entryLineIds) {
-    lineBranchCache.set(lineId, db.select().from(lineBranches).where(eq(lineBranches.lineId, lineId)).all());
-  }
 
   // Determine which lines have multi-branch routing (skip old entry device routes for those)
   const linesWithBranchRouting = new Set<number>();
@@ -314,21 +333,7 @@ export async function GET(request: NextRequest) {
       let defaultMark = 0;
 
       for (const branch of lineBranchCache.get(lineId) ?? []) {
-        let tunnelIfaceName = "";
-        if (isSingleNode) {
-          tunnelIfaceName = extIface;
-        } else {
-          const branchTunnel = db
-            .select()
-            .from(lineTunnels)
-            .where(and(eq(lineTunnels.branchId, branch.id), eq(lineTunnels.fromNodeId, nodeId)))
-            .get();
-
-          if (branchTunnel) {
-            const matchedIface = interfaces.find((iface) => iface.listenPort === branchTunnel.fromWgPort && iface.role === "from");
-            if (matchedIface) tunnelIfaceName = matchedIface.name;
-          }
-        }
+        const tunnelIfaceName = isSingleNode ? extIface : (branchToDownstreamIface.get(branch.id) ?? "");
         if (!tunnelIfaceName) continue;
 
         const branchMark = branchMarkMap.get(branch.id) ?? 0;
