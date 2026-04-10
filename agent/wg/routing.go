@@ -8,11 +8,15 @@ import (
 	"github.com/wiremesh/agent/api"
 )
 
+// Routing table/priority constants.
+// Source of truth: src/lib/routing-constants.ts — keep in sync.
 const (
-	routeTableStart         = 100   // WG device routes: tables 101-199
-	relayTableStart         = 200   // Relay forwarding routes: tables 201-299
-	xrayRouteTableStart     = 42001 // Xray fwmark routes: tables 42001+
-	xrayRulePriorityStart   = 31000 // ip rule priority for Xray fwmark rules (must be < 32766 main table)
+	routeTableStart     = 20001 // WG device routes: tables 20001-20999
+	routeTableEnd       = 20999
+	relayTableStart     = 21001 // Relay forwarding routes: tables 21001-21999
+	relayTableEnd       = 21999
+	xrayRouteTableStart = 31001 // Xray fwmark routes: tables 31001-31999
+	xrayRouteTableEnd   = 31999
 )
 
 // SyncRouting applies per-device routing rules based on deviceRoutes.
@@ -32,7 +36,7 @@ func SyncRouting(deviceRoutes []api.DeviceRoute) error {
 	for _, route := range deviceRoutes {
 		switch route.Type {
 		case "entry":
-			tableNum := routeTableStart + entryIdx + 1 // 101, 102, ...
+			tableNum := routeTableStart + entryIdx // 20001, 20002, ...
 			table := fmt.Sprintf("%d", tableNum)
 
 			if _, err := Run("ip", "route", "replace", "default", "dev", route.Tunnel, "table", table); err != nil {
@@ -58,7 +62,7 @@ func SyncRouting(deviceRoutes []api.DeviceRoute) error {
 		case "relay":
 			// Destination = upstream iface (where traffic comes in)
 			// Tunnel = downstream iface (where traffic goes out)
-			tableNum := relayTableStart + relayIdx + 1 // 201, 202, ...
+			tableNum := relayTableStart + relayIdx // 21001, 21002, ...
 			table := fmt.Sprintf("%d", tableNum)
 
 			if _, err := Run("ip", "route", "replace", "default", "dev", route.Tunnel, "table", table); err != nil {
@@ -88,10 +92,10 @@ func SyncXrayRouting(routes []api.XrayLineRoute) error {
 		return nil
 	}
 
-	for i, route := range routes {
+	for _, route := range routes {
 		table := fmt.Sprintf("%d", route.Mark) // use mark value as table number
 		markHex := fmt.Sprintf("0x%x", route.Mark)
-		priority := fmt.Sprintf("%d", xrayRulePriorityStart+i) // priority < 32766 (main table)
+		priority := table // unified: priority == table number
 
 		// Add route: default via tunnel in this table
 		if _, err := Run("ip", "route", "replace", "default", "dev", route.Tunnel, "table", table); err != nil {
@@ -116,8 +120,9 @@ func SyncXrayRouting(routes []api.XrayLineRoute) error {
 }
 
 func cleanRouting() {
-	// Clean WG device routes (tables 101-199)
-	for i := routeTableStart + 1; i <= routeTableStart+99; i++ {
+	// Clean WG device routes (tables 20001-20999)
+	// Source of truth: src/lib/routing-constants.ts
+	for i := routeTableStart; i <= routeTableEnd; i++ {
 		table := fmt.Sprintf("%d", i)
 		_, err := RunSilent("ip", "rule", "del", "lookup", table, "priority", table)
 		if err != nil {
@@ -126,8 +131,9 @@ func cleanRouting() {
 		RunSilent("ip", "route", "flush", "table", table)
 	}
 
-	// Clean relay routes (tables 201-299)
-	for i := relayTableStart + 1; i <= relayTableStart+99; i++ {
+	// Clean relay routes (tables 21001-21999)
+	// Source of truth: src/lib/routing-constants.ts
+	for i := relayTableStart; i <= relayTableEnd; i++ {
 		table := fmt.Sprintf("%d", i)
 		_, err := RunSilent("ip", "rule", "del", "lookup", table, "priority", table)
 		if err != nil {
@@ -136,27 +142,17 @@ func cleanRouting() {
 		RunSilent("ip", "route", "flush", "table", table)
 	}
 
-	// Clean Xray fwmark routes (42001-42099)
-	for i := xrayRouteTableStart; i <= xrayRouteTableStart+99; i++ {
+	// Clean Xray fwmark routes (31001-31999)
+	// Source of truth: src/lib/routing-constants.ts
+	for i := xrayRouteTableStart; i <= xrayRouteTableEnd; i++ {
 		table := fmt.Sprintf("%d", i)
 		markHex := fmt.Sprintf("0x%x", i)
-		// Try deleting by fwmark (works regardless of priority)
 		_, err := RunSilent("ip", "rule", "del", "fwmark", markHex, "lookup", table)
 		if err != nil {
 			break
 		}
 		RunSilent("ip", "route", "flush", "table", table)
 	}
-	// Also clean legacy rules with old priority=42001+ (from before the fix)
-	for i := xrayRouteTableStart; i <= xrayRouteTableStart+99; i++ {
-		table := fmt.Sprintf("%d", i)
-		RunSilent("ip", "rule", "del", "lookup", table, "priority", table)
-		RunSilent("ip", "route", "flush", "table", table)
-	}
-
-	// Clean legacy table 100
-	RunSilent("ip", "rule", "del", "lookup", "100", "priority", "100")
-	RunSilent("ip", "route", "flush", "table", "100")
 }
 
 // CleanupRouting is called during shutdown

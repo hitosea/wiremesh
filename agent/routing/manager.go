@@ -37,7 +37,6 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes []api.XrayLineRoute) e
 
 	// 2. Set up each branch
 	domainRules := make(map[string]string) // domain -> ipset name
-	nonDefaultIdx := 0
 
 	for _, branch := range cfg.Branches {
 		table := fmt.Sprintf("%d", branch.Mark)
@@ -56,10 +55,8 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes []api.XrayLineRoute) e
 				markHex,
 			))
 		} else {
-			// Non-default branch: higher priority than default (must be < 32000 to match first)
-			priority := fmt.Sprintf("%d", 30000+nonDefaultIdx)
-			nonDefaultIdx++
-			run("ip", "rule", "add", "fwmark", markHex, "lookup", table, "priority", priority)
+			// Non-default branch: priority == table number (both from branch mark, < 32000)
+			run("ip", "rule", "add", "fwmark", markHex, "lookup", table, "priority", table)
 
 			// IP/CIDR rules: iptables mangle PREROUTING
 			for _, cidr := range branch.IPRules {
@@ -173,10 +170,14 @@ func (m *Manager) Cleanup() {
 }
 
 func (m *Manager) cleanIPRules() {
-	for i := 41001; i <= 41100; i++ {
+	// Clean branch fwmark rules (30001-30999)
+	// Source of truth: src/lib/routing-constants.ts
+	for i := 30001; i <= 30999; i++ {
 		table := fmt.Sprintf("%d", i)
 		markHex := fmt.Sprintf("0x%x", i)
-		exec.Command("ip", "rule", "del", "fwmark", markHex).CombinedOutput()
+		if _, err := exec.Command("ip", "rule", "del", "fwmark", markHex).CombinedOutput(); err != nil {
+			break // no more rules — stop early
+		}
 		exec.Command("ip", "route", "flush", "table", table).CombinedOutput()
 	}
 	exec.Command("ip", "rule", "del", "priority", "32000").CombinedOutput()

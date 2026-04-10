@@ -76,7 +76,7 @@ type XrayLineRoute struct {
 
 // XrayBranch defines a branch outbound for Xray domain-based routing.
 type XrayBranch struct {
-	Mark        int      `json:"mark"`         // branch fwmark (e.g. 41001)
+	Mark        int      `json:"mark"`         // branch fwmark (e.g. 30001)
 	Tunnel      string   `json:"tunnel"`       // tunnel interface name
 	IsDefault   bool     `json:"is_default"`
 	DomainRules []string `json:"domain_rules"` // domains routed to this branch

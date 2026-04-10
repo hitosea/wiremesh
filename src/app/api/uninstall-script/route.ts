@@ -1,4 +1,11 @@
 import { NextResponse } from "next/server";
+import {
+  DEVICE_TABLE_START, DEVICE_TABLE_END,
+  RELAY_TABLE_START, RELAY_TABLE_END,
+  BRANCH_MARK_START, BRANCH_MARK_END,
+  XRAY_MARK_START, XRAY_MARK_END,
+  DEFAULT_BRANCH_PRIORITY,
+} from "@/lib/routing-constants";
 
 export async function GET() {
   const script = `#!/bin/bash
@@ -132,43 +139,45 @@ echo ""
 # ============================================================
 info "Phase 5: Cleaning ip rules and routing tables..."
 
-# Helper: flush a routing table if it has any routes
-flush_table() {
-  local TABLE="\$1"
-  if ip route show table "\$TABLE" 2>/dev/null | grep -q .; then
-    ip route flush table "\$TABLE" 2>/dev/null || true
-  fi
+# Remove ip rules FIRST (before flushing tables) to avoid blackholing traffic.
+# Strategy: query actual ip rules, extract table numbers in WireMesh ranges, delete them.
+# This avoids slow brute-force iteration over thousands of table numbers.
+
+# WireMesh table/priority ranges (interpolated from src/lib/routing-constants.ts):
+#   Device:  ${DEVICE_TABLE_START}-${DEVICE_TABLE_END}
+#   Relay:   ${RELAY_TABLE_START}-${RELAY_TABLE_END}
+#   Branch:  ${BRANCH_MARK_START}-${BRANCH_MARK_END}
+#   Xray:    ${XRAY_MARK_START}-${XRAY_MARK_END}
+#   Default: ${DEFAULT_BRANCH_PRIORITY}
+
+is_wm_table() {
+  local T="\$1"
+  if [ "\$T" -ge ${DEVICE_TABLE_START} ] && [ "\$T" -le ${DEVICE_TABLE_END} ]; then return 0; fi
+  if [ "\$T" -ge ${RELAY_TABLE_START} ] && [ "\$T" -le ${RELAY_TABLE_END} ]; then return 0; fi
+  if [ "\$T" -ge ${BRANCH_MARK_START} ] && [ "\$T" -le ${BRANCH_MARK_END} ]; then return 0; fi
+  if [ "\$T" -ge ${XRAY_MARK_START} ] && [ "\$T" -le ${XRAY_MARK_END} ]; then return 0; fi
+  if [ "\$T" -eq ${DEFAULT_BRANCH_PRIORITY} ]; then return 0; fi
+  return 1
 }
 
-# Tables 101-199: device routes
-for T in $(seq 101 199); do flush_table "\$T"; done
-ok "Flushed device route tables (101-199)"
-
-# Tables 201-299: relay routes
-for T in $(seq 201 299); do flush_table "\$T"; done
-ok "Flushed relay route tables (201-299)"
-
-# Tables 41001-41100: branch fwmark
-for T in $(seq 41001 41100); do flush_table "\$T"; done
-ok "Flushed branch fwmark tables (41001-41100)"
-
-# Tables 42001-42099: Xray fwmark
-for T in $(seq 42001 42099); do flush_table "\$T"; done
-ok "Flushed Xray fwmark tables (42001-42099)"
-
-# Remove ip rules for above tables
-for T in $(seq 101 199) $(seq 201 299) $(seq 41001 41100) $(seq 42001 42099); do
-  while ip rule show 2>/dev/null | grep -q "lookup \$T\\b"; do
-    ip rule del lookup "\$T" 2>/dev/null || break
-  done
+# Step 1: Remove ip rules pointing to WireMesh tables
+ip rule show 2>/dev/null | grep -oE 'lookup [0-9]+' | awk '{print \$2}' | sort -un | while read T; do
+  if is_wm_table "\$T"; then
+    while ip rule del lookup "\$T" 2>/dev/null; do true; done
+  fi
 done
-ok "Removed ip rules for WireMesh tables"
 
-# Remove default branch rule at priority 32000
-while ip rule show priority 32000 2>/dev/null | grep -q .; do
-  ip rule del priority 32000 2>/dev/null || break
+# Also remove default branch rule by priority
+while ip rule del priority ${DEFAULT_BRANCH_PRIORITY} 2>/dev/null; do true; done
+ok "Removed WireMesh ip rules"
+
+# Step 2: Flush routing tables (safe now — no ip rules point to them)
+for T in \$(ip route show table all 2>/dev/null | grep -oE 'table [0-9]+' | awk '{print \$2}' | sort -un); do
+  if is_wm_table "\$T"; then
+    ip route flush table "\$T" 2>/dev/null || true
+  fi
 done
-ok "Removed ip rule priority 32000 (default branch)"
+ok "Flushed WireMesh routing tables"
 
 echo ""
 

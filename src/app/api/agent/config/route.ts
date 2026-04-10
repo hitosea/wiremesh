@@ -5,6 +5,7 @@ import { eq, or, and, count } from "drizzle-orm";
 import { decrypt } from "@/lib/crypto";
 import { authenticateAgent } from "@/lib/agent-auth";
 import { getXrayPortForLine, DEFAULT_XRAY_PORT } from "@/lib/xray-port";
+import { BRANCH_MARK_START, XRAY_MARK_START } from "@/lib/routing-constants";
 
 function getNodePublicHost(nodeId: number): string {
   const n = db.select({ ip: nodes.ip, domain: nodes.domain }).from(nodes).where(eq(nodes.id, nodeId)).get();
@@ -258,7 +259,7 @@ export async function GET(request: NextRequest) {
       lineId: number; uuids: string[]; port: number; tunnel: string; mark: number;
       branches: { mark: number; tunnel: string; is_default: boolean; domain_rules: string[] }[];
     }[] = [];
-    let xrayBranchMarkCounter = 41001; // same counter base as routing branches
+    let xrayBranchMarkCounter = BRANCH_MARK_START;
 
     for (const lineId of entryLineIds) {
       const xrayDevices = db
@@ -320,7 +321,7 @@ export async function GET(request: NextRequest) {
         uuids,
         port: getXrayPortForLine(nodeId, lineId, xrayBasePort),
         tunnel,
-        mark: defaultMark || 42001,
+        mark: defaultMark || XRAY_MARK_START,
         branches: xrayBranches,
       });
     }
@@ -373,7 +374,7 @@ export async function GET(request: NextRequest) {
       domain_rules: string[];
       rule_sources: { filter_id: number; url: string; sync_interval: number }[];
     }[] = [];
-    let branchMarkCounter = 41001;
+    let branchMarkCounter = BRANCH_MARK_START;
 
     for (const lineId of entryLineIds) {
       // Fetch branches for this line
