@@ -18,6 +18,7 @@ import {
 import { StatusDot } from "@/components/status-dot";
 import { NodeStatusChart } from "@/components/node-status-chart";
 import { xrayPortHintParams } from "@/lib/port-hint";
+import { NodePortsDetail } from "@/components/node-ports-detail";
 
 type NodeDetail = {
   id: number;
@@ -38,6 +39,12 @@ type NodeDetail = {
   remark: string | null;
   agentVersion: string | null;
   xrayVersion: string | null;
+  ports: {
+    wg: number;
+    xray: number[];
+    tunnels: number[];
+    socks5: number[];
+  };
 };
 
 
@@ -190,6 +197,12 @@ export default function NodeDetailPage() {
             <div className="space-y-2">
               <Label>{ts("xrayVersion")}</Label>
               <p className="text-sm font-medium">{node.xrayVersion}</p>
+            </div>
+          )}
+          {node.ports && (
+            <div className="space-y-2">
+              <Label>{ts("portsCol")}</Label>
+              <NodePortsDetail ports={node.ports} />
             </div>
           )}
           {node.errorMessage && (

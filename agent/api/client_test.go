@@ -21,7 +21,7 @@ func TestFetchConfig(t *testing.T) {
 			Peers: []PeerConfig{
 				{PublicKey: "abc123", AllowedIps: "10.0.0.2/32"},
 			},
-			Version: "v1",
+			Version: "1",
 		},
 	}
 
@@ -57,8 +57,8 @@ func TestFetchConfig(t *testing.T) {
 	if data.Peers[0].PublicKey != "abc123" {
 		t.Errorf("expected peer public key abc123, got %s", data.Peers[0].PublicKey)
 	}
-	if data.Version != "v1" {
-		t.Errorf("expected version v1, got %s", data.Version)
+	if data.Version != "1" {
+		t.Errorf("expected version 1, got %s", data.Version)
 	}
 }
 

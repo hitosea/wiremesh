@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { nodes, settings, lineTunnels, lineNodes, devices } from "@/lib/db/schema";
 import { success, created, error, paginated } from "@/lib/api-response";
 import { DEFAULT_PROXY_PORT, getXrayDefaultPort } from "@/lib/proxy-port";
+import packageJson from "../../../../package.json";
 import { parsePaginationParams, paginationOffset } from "@/lib/pagination";
 import { eq, or, like, count, and, inArray, SQL } from "drizzle-orm";
 import { encrypt } from "@/lib/crypto";
@@ -161,7 +162,7 @@ export async function GET(request: NextRequest) {
     page: params.page,
     pageSize: params.pageSize,
     total,
-  });
+  }, { latestAgentVersion: packageJson.version });
 }
 
 export async function POST(request: NextRequest) {

@@ -10,7 +10,8 @@ export function created(data: unknown) {
 
 export function paginated(
   data: unknown[],
-  pagination: { page: number; pageSize: number; total: number }
+  pagination: { page: number; pageSize: number; total: number },
+  extra?: Record<string, unknown>
 ) {
   return NextResponse.json({
     data,
@@ -18,6 +19,7 @@ export function paginated(
       ...pagination,
       totalPages: Math.ceil(pagination.total / pagination.pageSize),
     },
+    ...extra,
   });
 }
 

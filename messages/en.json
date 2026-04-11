@@ -146,6 +146,8 @@
     "upgradeTriggered": "Upgrade triggered",
     "upgradeOffline": "Node is offline, cannot upgrade",
     "upgradeFailed": "Upgrade trigger failed",
+    "upgradeConfirmTitle": "Confirm Upgrade",
+    "upgradeConfirmMessage": "Current: {current}, Latest: {latest}. Confirm upgrade?",
     "confirmDeleteNode": "This will remotely uninstall all WireMesh components on the node. Are you sure?",
     "deleteOfflinePending": "Node is offline. It will be uninstalled when it comes back online."
   },

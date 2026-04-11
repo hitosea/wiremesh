@@ -8,6 +8,7 @@ import { encrypt } from "@/lib/crypto";
 import { generateRealityKeypair, generateShortId } from "@/lib/reality";
 import { normalizeRealityDest } from "@/lib/reality-dest";
 import { sseManager } from "@/lib/sse-manager";
+import { getNodePorts } from "@/lib/node-ports";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -43,7 +44,9 @@ export async function GET(request: NextRequest, { params }: Params) {
     .get();
 
   if (!node) return error("NOT_FOUND", "notFound.node");
-  return success(node);
+
+  const ports = getNodePorts(node.id, node.port, node.xrayPort);
+  return success({ ...node, ports });
 }
 
 export async function PUT(request: NextRequest, { params }: Params) {

@@ -13,24 +13,26 @@ RUN apk add --no-cache curl unzip && \
     unzip -o /tmp/xray-arm64.zip xray -d /tmp/xray-arm64 && \
     tar czf /out/xray-linux-arm64.tar.gz -C /tmp/xray-arm64 xray && \
     sha256sum /out/xray-linux-arm64.tar.gz > /out/xray-linux-arm64.tar.gz.sha256 && \
-    echo -n "${XRAY_VERSION}" > /out/xray-version.txt
+    echo -n "${XRAY_VERSION}" | sed 's/^v//' > /out/xray-version.txt
 
 # Build Agent (both architectures)
 FROM golang:1.25-alpine AS agent-builder
-ARG AGENT_VERSION=dev
+ARG AGENT_VERSION
 WORKDIR /agent
+COPY package.json /tmp/package.json
 COPY agent/go.mod agent/go.sum ./
 RUN go mod download
 COPY agent/ .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-X main.Version=${AGENT_VERSION}" -o wiremesh-agent . && \
+RUN VERSION="${AGENT_VERSION:-$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' /tmp/package.json)}" && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-X main.Version=${VERSION}" -o wiremesh-agent . && \
     tar czf wiremesh-agent-linux-amd64.tar.gz wiremesh-agent && \
     sha256sum wiremesh-agent-linux-amd64.tar.gz > wiremesh-agent-linux-amd64.tar.gz.sha256 && \
     rm wiremesh-agent && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "-X main.Version=${AGENT_VERSION}" -o wiremesh-agent . && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "-X main.Version=${VERSION}" -o wiremesh-agent . && \
     tar czf wiremesh-agent-linux-arm64.tar.gz wiremesh-agent && \
     sha256sum wiremesh-agent-linux-arm64.tar.gz > wiremesh-agent-linux-arm64.tar.gz.sha256 && \
     rm wiremesh-agent && \
-    echo -n "${AGENT_VERSION}" > agent-version.txt
+    echo -n "${VERSION}" > agent-version.txt
 
 # Build Next.js
 FROM base AS builder

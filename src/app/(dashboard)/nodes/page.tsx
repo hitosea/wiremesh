@@ -20,6 +20,8 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@/components/ui/popover";
+import { AlertCircle } from "lucide-react";
+import { NodePortsDetail } from "@/components/node-ports-detail";
 
 type Node = {
   id: number;
@@ -57,6 +59,9 @@ export default function NodesPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [batchDeleting, setBatchDeleting] = useState(false);
   const [showBatchDelete, setShowBatchDelete] = useState(false);
+  const [latestAgentVersion, setLatestAgentVersion] = useState<string>("");
+  const [upgradeNodeId, setUpgradeNodeId] = useState<number | null>(null);
+  const [upgrading, setUpgrading] = useState(false);
 
   const fetchNodes = async (page = 1, q = search) => {
     setLoading(true);
@@ -70,6 +75,7 @@ export default function NodesPage() {
       const json = await res.json();
       setData(json.data ?? []);
       if (json.pagination) setPagination(json.pagination);
+      if (json.latestAgentVersion) setLatestAgentVersion(json.latestAgentVersion);
     } catch {
       toast.error(t("loadFailed"));
     } finally {
@@ -108,6 +114,26 @@ export default function NodesPage() {
       toast.error(tc("deleteFailedRetry"));
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleUpgrade = async () => {
+    if (!upgradeNodeId) return;
+    setUpgrading(true);
+    try {
+      const res = await fetch(`/api/nodes/${upgradeNodeId}/upgrade`, { method: "POST" });
+      if (res.ok) {
+        toast.success(t("upgradeTriggered"));
+        setUpgradeNodeId(null);
+        fetchNodes(pagination.page);
+      } else {
+        const json = await res.json();
+        toast.error(translateError(json.error, te, t("upgradeFailed")));
+      }
+    } catch {
+      toast.error(t("upgradeFailed"));
+    } finally {
+      setUpgrading(false);
     }
   };
 
@@ -162,9 +188,20 @@ export default function NodesPage() {
       label: t("agentVersion"),
       render: (row) => {
         const node = row as unknown as Node;
+        const needsUpgrade = node.agentVersion && latestAgentVersion && node.agentVersion !== latestAgentVersion;
         return (
-          <span className="text-sm font-mono">
+          <span className="text-sm font-mono inline-flex items-center gap-1">
             {node.agentVersion || t("versionUnknown")}
+            {needsUpgrade && (
+              <button
+                onClick={() => setUpgradeNodeId(node.id)}
+                className="text-amber-500 hover:text-amber-600 cursor-pointer"
+                title={t("upgrade")}
+                disabled={node.status !== "online"}
+              >
+                <AlertCircle className="h-4 w-4" />
+              </button>
+            )}
           </span>
         );
       },
@@ -202,44 +239,7 @@ export default function NodesPage() {
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-64">
-              <div className="space-y-3 text-sm">
-                <div>
-                  <span className="text-muted-foreground text-xs">{t("portsWg")}</span>
-                  <div className="flex flex-wrap gap-1.5 mt-1">
-                    <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{node.ports.wg}</span>
-                  </div>
-                </div>
-                {node.ports.xray.length > 0 && (
-                  <div>
-                    <span className="text-muted-foreground text-xs">{t("portsXray")}</span>
-                    <div className="flex flex-wrap gap-1.5 mt-1">
-                      {node.ports.xray.map((p) => (
-                        <span key={p} className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{p}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {node.ports.tunnels.length > 0 && (
-                  <div>
-                    <span className="text-muted-foreground text-xs">{t("portsTunnel")}</span>
-                    <div className="flex flex-wrap gap-1.5 mt-1">
-                      {node.ports.tunnels.map((p) => (
-                        <span key={p} className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{p}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {node.ports.socks5.length > 0 && (
-                  <div>
-                    <span className="text-muted-foreground text-xs">{t("portsSocks5")}</span>
-                    <div className="flex flex-wrap gap-1.5 mt-1">
-                      {node.ports.socks5.map((p) => (
-                        <span key={p} className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{p}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+              <NodePortsDetail ports={node.ports} />
             </PopoverContent>
           </Popover>
         );
@@ -251,27 +251,6 @@ export default function NodesPage() {
       align: "right",
       render: (row) => (
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={async () => {
-              try {
-                const res = await fetch(`/api/nodes/${row.id}/upgrade`, { method: "POST" });
-                if (res.ok) {
-                  toast.success(t("upgradeTriggered"));
-                  fetchNodes(pagination.page);
-                } else {
-                  const json = await res.json();
-                  toast.error(translateError(json.error, te, t("upgradeFailed")));
-                }
-              } catch {
-                toast.error(t("upgradeFailed"));
-              }
-            }}
-            disabled={(row as unknown as Node).status !== "online"}
-          >
-            {t("upgrade")}
-          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -391,6 +370,27 @@ export default function NodesPage() {
             <Button variant="outline" onClick={() => setShowBatchDelete(false)}>{tc("cancel")}</Button>
             <Button variant="destructive" onClick={handleBatchDelete} disabled={batchDeleting}>
               {batchDeleting ? tc("deleting") : tc("confirmDelete")}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={upgradeNodeId !== null} onOpenChange={() => setUpgradeNodeId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("upgradeConfirmTitle")}</DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground">
+            {t("upgradeConfirmMessage", {
+              current: data.find((n) => n.id === upgradeNodeId)?.agentVersion ?? "?",
+              latest: latestAgentVersion,
+            })}
+          </p>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setUpgradeNodeId(null)}>
+              {tc("cancel")}
+            </Button>
+            <Button onClick={handleUpgrade} disabled={upgrading}>
+              {upgrading ? tc("saving") : t("upgrade")}
             </Button>
           </div>
         </DialogContent>
