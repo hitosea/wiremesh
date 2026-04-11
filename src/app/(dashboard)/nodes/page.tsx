@@ -176,27 +176,41 @@ export default function NodesPage() {
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-64">
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">{t("portsWg")}</span>
-                  <span className="font-mono">{node.ports.wg}</span>
+              <div className="space-y-3 text-sm">
+                <div>
+                  <span className="text-muted-foreground text-xs">{t("portsWg")}</span>
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{node.ports.wg}</span>
+                  </div>
                 </div>
                 {node.ports.xray.length > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">{t("portsXray")}</span>
-                    <span className="font-mono">{node.ports.xray.join(", ")}</span>
+                  <div>
+                    <span className="text-muted-foreground text-xs">{t("portsXray")}</span>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {node.ports.xray.map((p) => (
+                        <span key={p} className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{p}</span>
+                      ))}
+                    </div>
                   </div>
                 )}
                 {node.ports.tunnels.length > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">{t("portsTunnel")}</span>
-                    <span className="font-mono">{node.ports.tunnels.join(", ")}</span>
+                  <div>
+                    <span className="text-muted-foreground text-xs">{t("portsTunnel")}</span>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {node.ports.tunnels.map((p) => (
+                        <span key={p} className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{p}</span>
+                      ))}
+                    </div>
                   </div>
                 )}
                 {node.ports.socks5.length > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">{t("portsSocks5")}</span>
-                    <span className="font-mono">{node.ports.socks5.join(", ")}</span>
+                  <div>
+                    <span className="text-muted-foreground text-xs">{t("portsSocks5")}</span>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {node.ports.socks5.map((p) => (
+                        <span key={p} className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{p}</span>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
