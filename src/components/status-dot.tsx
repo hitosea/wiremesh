@@ -9,6 +9,7 @@ const DOT_COLORS: Record<string, string> = {
   inactive: "bg-muted-foreground/50",
   configuring: "bg-blue-500",
   degraded: "bg-yellow-500",
+  upgrading: "bg-blue-500",
 };
 
 const TEXT_COLORS: Record<string, string> = {
@@ -20,6 +21,7 @@ const TEXT_COLORS: Record<string, string> = {
   inactive: "text-muted-foreground",
   configuring: "text-blue-600 dark:text-blue-400",
   degraded: "text-yellow-600 dark:text-yellow-400",
+  upgrading: "text-blue-600 dark:text-blue-400",
 };
 
 export function StatusDot({

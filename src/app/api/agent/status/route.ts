@@ -21,9 +21,12 @@ export async function POST(request: NextRequest) {
     transfers?: Transfer[];
     handshakes?: Handshake[];
     xray_online_users?: string[];
+    agent_version?: string;
+    xray_version?: string;
+    xray_running?: boolean;
   };
 
-  const { is_online, latency, transfers = [], handshakes = [], xray_online_users = [] } = body;
+  const { is_online, latency, transfers = [], handshakes = [], xray_online_users = [], agent_version, xray_version } = body;
 
   // Sum upload/download bytes from all transfers
   let totalUpload = 0;
@@ -48,6 +51,8 @@ export async function POST(request: NextRequest) {
   db.update(nodes)
     .set({
       status: is_online ? "online" : "offline",
+      ...(agent_version && { agentVersion: agent_version }),
+      ...(xray_version && { xrayVersion: xray_version }),
       updatedAt: new Date().toISOString(),
     })
     .where(eq(nodes.id, node.id))

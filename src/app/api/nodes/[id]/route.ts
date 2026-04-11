@@ -35,6 +35,8 @@ export async function GET(request: NextRequest, { params }: Params) {
       remark: nodes.remark,
       createdAt: nodes.createdAt,
       updatedAt: nodes.updatedAt,
+      agentVersion: nodes.agentVersion,
+      xrayVersion: nodes.xrayVersion,
     })
     .from(nodes)
     .where(eq(nodes.id, nodeId))
@@ -177,7 +179,14 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     .get();
   if (!existing) return error("NOT_FOUND", "notFound.node");
 
-  db.delete(nodes).where(eq(nodes.id, nodeId)).run();
+  // Mark as pending delete (keep record for agent to pull config and see pending_delete)
+  db.update(nodes)
+    .set({ pendingDelete: true, updatedAt: new Date().toISOString() })
+    .where(eq(nodes.id, nodeId))
+    .run();
+
+  // Try to notify agent via SSE
+  const sent = sseManager.sendEvent(nodeId, "node_delete");
 
   writeAuditLog({
     action: "delete",
@@ -186,5 +195,9 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     targetName: existing.name,
   });
 
-  return success({ message: "节点已删除" });
+  if (sent) {
+    return success({ message: "nodes.deleteRemoteUninstall" });
+  } else {
+    return success({ message: "nodes.deleteOfflinePending" });
+  }
 }

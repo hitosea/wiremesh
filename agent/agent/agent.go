@@ -10,6 +10,7 @@ import (
 	"github.com/wiremesh/agent/collector"
 	"github.com/wiremesh/agent/config"
 	"github.com/wiremesh/agent/iptables"
+	"github.com/wiremesh/agent/lifecycle"
 	"github.com/wiremesh/agent/routing"
 	"github.com/wiremesh/agent/socks5"
 	"github.com/wiremesh/agent/wg"
@@ -24,11 +25,12 @@ type Agent struct {
 	socks5Manager  *socks5.Manager
 	routingManager *routing.Manager
 	lastVersion    string
+	version        string
 	ctx            context.Context
 	cancel         context.CancelFunc
 }
 
-func New(cfg *config.Config) *Agent {
+func New(cfg *config.Config, version string) *Agent {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Agent{
 		cfg:            cfg,
@@ -36,6 +38,7 @@ func New(cfg *config.Config) *Agent {
 		activeTunnels:  make(map[string]wg.ActiveTunnel),
 		socks5Manager:  socks5.NewManager(),
 		routingManager: routing.NewManager(),
+		version:        version,
 		ctx:            ctx,
 		cancel:         cancel,
 	}
@@ -98,6 +101,40 @@ func (a *Agent) handleSSEEvent(evt api.SSEEvent) {
 			log.Printf("[agent] Config apply failed: %v", err)
 			a.client.ReportError("Config apply failed: " + err.Error())
 		}
+	case "node_delete":
+		log.Println("[agent] Received node_delete event, starting uninstall...")
+		if err := lifecycle.RunUninstall(a.client); err != nil {
+			log.Printf("[agent] Uninstall failed: %v", err)
+			a.client.ReportError("Uninstall failed: " + err.Error())
+		}
+	case "upgrade":
+		a.handleUpgrade()
+	case "xray_upgrade":
+		a.handleXrayUpgrade()
+	}
+}
+
+func (a *Agent) handleUpgrade() {
+	log.Println("[agent] Received upgrade event, starting agent upgrade...")
+	needRestart, err := lifecycle.UpgradeAgent(a.client, a.version)
+	if err != nil {
+		log.Printf("[agent] Agent upgrade failed: %v", err)
+		a.client.ReportError("Agent upgrade failed: " + err.Error())
+		// Report online status to recover from "upgrading" state on the server
+		a.reportStatus()
+		return
+	}
+	if needRestart {
+		log.Println("[agent] Agent upgrade complete, triggering graceful restart...")
+		a.Stop()
+	}
+}
+
+func (a *Agent) handleXrayUpgrade() {
+	log.Println("[agent] Received xray_upgrade event, starting Xray upgrade...")
+	if err := lifecycle.UpgradeXray(a.client); err != nil {
+		log.Printf("[agent] Xray upgrade failed: %v", err)
+		a.client.ReportError("Xray upgrade failed: " + err.Error())
 	}
 }
 
@@ -109,6 +146,15 @@ func (a *Agent) pullAndApplyConfigForce(force bool) error {
 	cfgData, err := a.client.FetchConfig()
 	if err != nil {
 		return err
+	}
+
+	// Check if node is pending deletion
+	if cfgData.PendingDelete {
+		log.Println("[agent] Node is pending deletion, starting uninstall...")
+		if err := lifecycle.RunUninstall(a.client); err != nil {
+			return fmt.Errorf("uninstall on pending delete: %w", err)
+		}
+		return nil
 	}
 
 	if !force && cfgData.Version == a.lastVersion && a.lastVersion != "" {
@@ -200,7 +246,7 @@ func (a *Agent) pullAndApplyConfigForce(force bool) error {
 }
 
 func (a *Agent) reportStatus() {
-	report := collector.Collect(a.cfg.ServerURL)
+	report := collector.Collect(a.cfg.ServerURL, a.version)
 	if err := a.client.ReportStatus(report); err != nil {
 		log.Printf("[agent] Status report failed: %v", err)
 	} else {

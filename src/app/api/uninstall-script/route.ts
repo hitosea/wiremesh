@@ -36,6 +36,11 @@ echo "  WireMesh Agent Uninstaller"
 echo "======================================"
 echo ""
 
+# Log output
+LOG_FILE="/var/log/wiremesh-uninstall.log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+echo "=== WireMesh uninstall started at $(date) ==="
+
 # ============================================================
 # Phase 1: Root check
 # ============================================================
@@ -53,28 +58,28 @@ echo ""
 # ============================================================
 info "Phase 2: Stopping and disabling services..."
 
-if systemctl is-active wiremesh-agent &>/dev/null; then
-  systemctl stop wiremesh-agent
-  ok "wiremesh-agent stopped"
-else
-  info "wiremesh-agent is not running"
-fi
-
 if systemctl is-enabled wiremesh-agent &>/dev/null 2>&1; then
   systemctl disable wiremesh-agent >/dev/null 2>&1
   ok "wiremesh-agent disabled"
 fi
 
-if systemctl is-active wiremesh-xray &>/dev/null; then
-  systemctl stop wiremesh-xray
-  ok "wiremesh-xray stopped"
+if systemctl is-active wiremesh-agent &>/dev/null; then
+  systemctl stop wiremesh-agent 2>/dev/null || true
+  ok "wiremesh-agent stopped"
 else
-  info "wiremesh-xray is not running"
+  info "wiremesh-agent is not running"
 fi
 
 if systemctl is-enabled wiremesh-xray &>/dev/null 2>&1; then
   systemctl disable wiremesh-xray >/dev/null 2>&1
   ok "wiremesh-xray disabled"
+fi
+
+if systemctl is-active wiremesh-xray &>/dev/null; then
+  systemctl stop wiremesh-xray 2>/dev/null || true
+  ok "wiremesh-xray stopped"
+else
+  info "wiremesh-xray is not running"
 fi
 
 echo ""
@@ -107,30 +112,12 @@ echo ""
 # ============================================================
 info "Phase 4: Cleaning iptables rules..."
 
-clean_iptables_chain() {
-  local TABLE="\$1"
-  local CHAIN="\$2"
-  while iptables -t "\$TABLE" -L "\$CHAIN" --line-numbers -n 2>/dev/null | grep -q 'wm-'; do
-    LINE=$(iptables -t "\$TABLE" -L "\$CHAIN" --line-numbers -n 2>/dev/null | grep 'wm-' | head -1 | awk '{print \$1}')
-    if [ -n "\$LINE" ]; then
-      iptables -t "\$TABLE" -D "\$CHAIN" "\$LINE" 2>/dev/null || break
-    else
-      break
-    fi
-  done
-}
-
-clean_iptables_chain filter FORWARD
-ok "Cleaned filter FORWARD"
-
-clean_iptables_chain nat POSTROUTING
-ok "Cleaned nat POSTROUTING"
-
-clean_iptables_chain mangle PREROUTING
-ok "Cleaned mangle PREROUTING"
-
-clean_iptables_chain mangle OUTPUT
-ok "Cleaned mangle OUTPUT"
+for TABLE in filter nat mangle; do
+  if iptables-save -t "\$TABLE" 2>/dev/null | grep -q 'wm-'; then
+    iptables-save -t "\$TABLE" | grep -v 'wm-' | iptables-restore -T "\$TABLE" 2>/dev/null || true
+    ok "Cleaned wm- rules from \$TABLE table"
+  fi
+done
 
 echo ""
 
@@ -253,6 +240,12 @@ echo ""
 # ============================================================
 # Summary
 # ============================================================
+# Clean up logs (unless --keep-logs)
+if [ "\${1:-}" != "--keep-logs" ]; then
+  rm -f /var/log/wiremesh-install.log
+  rm -f /var/log/wiremesh-uninstall.log
+fi
+
 echo "======================================"
 echo -e "  \${GREEN}Uninstall complete!\${NC}"
 echo "======================================"

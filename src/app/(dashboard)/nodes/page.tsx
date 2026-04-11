@@ -27,6 +27,8 @@ type Node = {
   ip: string;
   wgAddress: string;
   status: string;
+  agentVersion: string | null;
+  xrayVersion: string | null;
   ports: {
     wg: number;
     xray: number[];
@@ -156,6 +158,30 @@ export default function NodesPage() {
       ),
     },
     {
+      key: "agentVersion",
+      label: t("agentVersion"),
+      render: (row) => {
+        const node = row as unknown as Node;
+        return (
+          <span className="text-sm font-mono">
+            {node.agentVersion || t("versionUnknown")}
+          </span>
+        );
+      },
+    },
+    {
+      key: "xrayVersion",
+      label: t("xrayVersion"),
+      render: (row) => {
+        const node = row as unknown as Node;
+        return (
+          <span className="text-sm font-mono">
+            {node.xrayVersion || t("versionUnknown")}
+          </span>
+        );
+      },
+    },
+    {
       key: "ports",
       label: t("portsCol"),
       render: (row) => {
@@ -228,6 +254,27 @@ export default function NodesPage() {
           <Button
             variant="outline"
             size="sm"
+            onClick={async () => {
+              try {
+                const res = await fetch(`/api/nodes/${row.id}/upgrade`, { method: "POST" });
+                if (res.ok) {
+                  toast.success(t("upgradeTriggered"));
+                  fetchNodes(pagination.page);
+                } else {
+                  const json = await res.json();
+                  toast.error(translateError(json.error, te, t("upgradeFailed")));
+                }
+              } catch {
+                toast.error(t("upgradeFailed"));
+              }
+            }}
+            disabled={(row as unknown as Node).status !== "online"}
+          >
+            {t("upgrade")}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => router.push(`/nodes/${row.id}/script`)}
           >
             {t("installScript")}
@@ -260,6 +307,30 @@ export default function NodesPage() {
       {selectedIds.size > 0 && (
         <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
           <span className="text-sm font-medium">{tc("selectedItems", { count: selectedIds.size })}</span>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={async () => {
+              try {
+                const res = await fetch("/api/nodes/batch-upgrade", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ nodeIds: [...selectedIds], type: "agent" }),
+                });
+                const json = await res.json();
+                if (res.ok) {
+                  toast.success(t("upgradeTriggered") + ` (${json.data.sent}/${json.data.total})`);
+                  fetchNodes(pagination.page);
+                } else {
+                  toast.error(translateError(json.error, te, t("upgradeFailed")));
+                }
+              } catch {
+                toast.error(t("upgradeFailed"));
+              }
+            }}
+          >
+            {t("upgradeAll")}
+          </Button>
           <Button size="sm" variant="destructive" onClick={() => setShowBatchDelete(true)}>
             {tc("batchDelete")}
           </Button>

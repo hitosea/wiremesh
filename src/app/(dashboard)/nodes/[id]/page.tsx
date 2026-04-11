@@ -36,6 +36,8 @@ type NodeDetail = {
   errorMessage: string | null;
   externalInterface: string;
   remark: string | null;
+  agentVersion: string | null;
+  xrayVersion: string | null;
 };
 
 
@@ -178,6 +180,18 @@ export default function NodeDetailPage() {
               {node.agentToken}
             </code>
           </div>
+          {node.agentVersion && (
+            <div className="space-y-2">
+              <Label>{ts("agentVersion")}</Label>
+              <p className="text-sm font-medium">{node.agentVersion}</p>
+            </div>
+          )}
+          {node.xrayVersion && (
+            <div className="space-y-2">
+              <Label>{ts("xrayVersion")}</Label>
+              <p className="text-sm font-medium">{node.xrayVersion}</p>
+            </div>
+          )}
           {node.errorMessage && (
             <div className="space-y-2">
               <Label className="text-destructive">{t("errorMessage")}</Label>

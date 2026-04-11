@@ -13,6 +13,7 @@ type ConfigData struct {
 	Socks5  *Socks5Config  `json:"socks5"`
 	Routing *RoutingConfig `json:"routing"`
 	Version string         `json:"version"`
+	PendingDelete bool           `json:"pending_delete"`
 }
 
 type NodeConfig struct {

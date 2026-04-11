@@ -136,7 +136,18 @@
     "portsWg": "WG/UDP",
     "portsXray": "Xray/TCP",
     "portsTunnel": "Tunnel/UDP",
-    "portsSocks5": "SOCKS5/TCP"
+    "portsSocks5": "SOCKS5/TCP",
+    "agentVersion": "Agent",
+    "xrayVersion": "Xray",
+    "versionUnknown": "Unknown",
+    "upgrade": "Upgrade",
+    "upgradeAll": "Upgrade All",
+    "upgradeTriggered": "Upgrade triggered",
+    "upgradeOffline": "Node is offline, cannot upgrade",
+    "upgradeFailed": "Upgrade trigger failed",
+    "confirmDeleteNode": "This will remotely uninstall all WireMesh components on the node. Are you sure?",
+    "deleteOfflinePending": "Node is offline. It will be uninstalled when it comes back online.",
+    "status.upgrading": "Upgrading"
   },
   "nodeNew": {
     "title": "Add Node",

@@ -1,6 +1,9 @@
 services:
   wiremesh:
-    build: .
+    build:
+      context: .
+      args:
+        AGENT_VERSION: ${AGENT_VERSION:-dev}
     ports:
       - "3456:3000"
     volumes:

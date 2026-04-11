@@ -18,14 +18,14 @@ export async function GET(request: NextRequest) {
   const search = request.nextUrl.searchParams.get("search");
   const status = request.nextUrl.searchParams.get("status");
 
-  const conditions: SQL[] = [];
+  const conditions: SQL[] = [eq(nodes.pendingDelete, false)];
   if (search) {
     conditions.push(
       or(like(nodes.name, `%${search}%`), like(nodes.ip, `%${search}%`))!
     );
   }
   if (status) conditions.push(eq(nodes.status, status));
-  const where = conditions.length > 0 ? and(...conditions) : undefined;
+  const where = and(...conditions);
 
   const total =
     db.select({ count: count() }).from(nodes).where(where).get()?.count ?? 0;
@@ -48,6 +48,8 @@ export async function GET(request: NextRequest) {
       remark: nodes.remark,
       createdAt: nodes.createdAt,
       updatedAt: nodes.updatedAt,
+      agentVersion: nodes.agentVersion,
+      xrayVersion: nodes.xrayVersion,
     })
     .from(nodes)
     .where(where)

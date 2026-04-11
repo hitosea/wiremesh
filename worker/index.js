@@ -3,6 +3,7 @@
 const { checkNodes } = require("./node-checker");
 const { syncLines } = require("./line-syncer");
 const { cleanData } = require("./data-cleaner");
+const { cleanPendingDeletes } = require("./pending-delete-cleaner");
 
 const CHECK_INTERVAL = 5 * 60 * 1000;   // 5 minutes
 const CLEAN_INTERVAL = 60 * 60 * 1000;  // 1 hour
@@ -19,6 +20,7 @@ function runChecks() {
 function runClean() {
   console.log("[worker] Running data cleanup...");
   cleanData();
+  cleanPendingDeletes();
 }
 
 // Start after initial delay

@@ -45,6 +45,9 @@ export const nodes = sqliteTable("nodes", {
   externalInterface: text("external_interface").notNull().default("eth0"),
   status: text("status").notNull().default("offline"),
   errorMessage: text("error_message"),
+  agentVersion: text("agent_version"),
+  xrayVersion: text("xray_version"),
+  pendingDelete: integer("pending_delete", { mode: "boolean" }).notNull().default(false),
   remark: text("remark"),
   ...timestamps,
 });

@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/wiremesh/agent/api"
 )
@@ -49,7 +50,7 @@ func Sync(cfg *api.XrayConfig) error {
 	}
 	log.Printf("[xray] Config written to %s (%d lines)", XrayConfigFile, len(cfg.Routes))
 
-	if isRunning() {
+	if IsRunning() {
 		return restart()
 	}
 	return start()
@@ -57,7 +58,7 @@ func Sync(cfg *api.XrayConfig) error {
 
 // Stop stops the Xray service. Called during agent shutdown.
 func Stop() {
-	if isRunning() {
+	if IsRunning() {
 		log.Println("[xray] Stopping service")
 		_ = systemctl("stop", XrayService)
 	}
@@ -68,8 +69,21 @@ func isInstalled() bool {
 	return err == nil
 }
 
-func isRunning() bool {
+func IsRunning() bool {
 	return exec.Command("systemctl", "is-active", "--quiet", XrayService).Run() == nil
+}
+
+func GetVersion() string {
+	out, err := exec.Command("wiremesh-xray", "version").CombinedOutput()
+	if err != nil {
+		return ""
+	}
+	line := strings.SplitN(string(out), "\n", 2)[0]
+	parts := strings.Fields(line)
+	if len(parts) >= 2 {
+		return parts[1]
+	}
+	return strings.TrimSpace(line)
 }
 
 func start() error {
@@ -86,7 +100,7 @@ func restart() error {
 }
 
 func stopIfRunning() error {
-	if isRunning() {
+	if IsRunning() {
 		log.Println("[xray] Disabling: stopping service")
 		return systemctl("stop", XrayService)
 	}
@@ -94,7 +108,7 @@ func stopIfRunning() error {
 }
 
 func ensureRunning() error {
-	if !isRunning() {
+	if !IsRunning() {
 		return start()
 	}
 	return nil

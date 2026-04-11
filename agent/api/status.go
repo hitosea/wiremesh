@@ -6,6 +6,9 @@ type StatusReport struct {
 	Transfers       []TransferReport  `json:"transfers,omitempty"`
 	Handshakes      []HandshakeReport `json:"handshakes,omitempty"`
 	XrayOnlineUsers []string          `json:"xray_online_users,omitempty"`
+	AgentVersion    string            `json:"agent_version,omitempty"`
+	XrayVersion     string            `json:"xray_version,omitempty"`
+	XrayRunning     bool              `json:"xray_running"`
 }
 
 type TransferReport struct {

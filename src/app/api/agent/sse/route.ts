@@ -22,6 +22,20 @@ export async function GET(request: NextRequest) {
     start(controller) {
       sseManager.addConnection(nodeId, controller);
 
+      // Check if this node is pending deletion
+      const current = db
+        .select({ pendingDelete: nodes.pendingDelete })
+        .from(nodes)
+        .where(eq(nodes.id, nodeId))
+        .get();
+
+      if (current?.pendingDelete) {
+        // Node reconnected while pending delete — send delete event immediately
+        const deleteMsg = `event: node_delete\ndata: {}\n\n`;
+        controller.enqueue(new TextEncoder().encode(deleteMsg));
+        return;
+      }
+
       // Mark node online
       db.update(nodes)
         .set({ status: "online", errorMessage: null, updatedAt: new Date().toISOString() })
@@ -35,12 +49,24 @@ export async function GET(request: NextRequest) {
     cancel() {
       sseManager.removeConnection(nodeId);
 
-      // Mark node offline
       try {
-        db.update(nodes)
-          .set({ status: "offline", updatedAt: new Date().toISOString() })
+        const current = db
+          .select({ pendingDelete: nodes.pendingDelete })
+          .from(nodes)
           .where(eq(nodes.id, nodeId))
-          .run();
+          .get();
+
+        if (current?.pendingDelete) {
+          // Delay deletion to allow uninstall script to finish
+          setTimeout(() => {
+            db.delete(nodes).where(eq(nodes.id, nodeId)).run();
+          }, 30000);
+        } else {
+          db.update(nodes)
+            .set({ status: "offline", updatedAt: new Date().toISOString() })
+            .where(eq(nodes.id, nodeId))
+            .run();
+        }
       } catch {
         // ignore
       }

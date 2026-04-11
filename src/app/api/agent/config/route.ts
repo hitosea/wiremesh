@@ -592,6 +592,7 @@ export async function GET(request: NextRequest) {
     socks5: socks5Config,
     routing: routingConfig,
     version: node.updatedAt,
+    pending_delete: !!node.pendingDelete,
   };
 
   return Response.json({ data: config });

@@ -75,19 +75,44 @@ Click a node row to open its detail page. You can see:
 
 You can also edit the node's name, IP, domain, WG port, Xray / SOCKS5 settings, tags, and notes from this page.
 
-### Uninstalling the Agent
+### Version Management
 
-To cleanly remove the Agent from a server, run the uninstall script:
+The **Agent** and **Xray** columns in the node list show the version currently running on each node. The Agent reports version information with every status heartbeat. If the version shows "Unknown", the node is running an older Agent that does not support version reporting — re-run the install script on that server to upgrade.
+
+### Upgrading the Agent
+
+When a new Agent binary is deployed to the management platform, you can remotely upgrade nodes:
+
+- **Single upgrade** — Click the **Upgrade** button next to a node in the list.
+- **Batch upgrade** — Select multiple nodes and click **Upgrade All**. Batch upgrades are sent in waves of 5 nodes with a 3-second interval to avoid overwhelming the platform with concurrent downloads.
+
+During the upgrade, the node status shows **Upgrading**. The Agent automatically downloads the new binary, verifies the SHA256 checksum, backs up the old version to a `.backup` file, replaces the binary, and performs a graceful restart. The node returns to online status once the upgrade completes.
+
+If an upgrade fails, you can SSH to the node and roll back manually:
+
+```
+mv /usr/local/bin/wiremesh-agent.backup /usr/local/bin/wiremesh-agent
+systemctl restart wiremesh-agent
+```
+
+> **Note:** Only online nodes can be remotely upgraded. Offline nodes require re-running the install script on the server.
+
+### Deleting a Node
+
+Delete a single node via the delete button, or select multiple nodes and use **Batch Delete**. Deletion also triggers remote uninstall:
+
+- **Node is online** — The platform notifies the Agent via SSE to run the uninstall script, which cleans up all WireMesh components (services, interfaces, rules, config files, binaries). The database record is removed after cleanup completes.
+- **Node is offline** — The node is marked as "pending delete". The Agent will automatically uninstall when it next comes online. If the node does not come back within 7 days, the record is cleaned up automatically.
+
+### Manual Agent Uninstall
+
+To manually uninstall without going through the management platform (e.g., the node cannot reach the platform), SSH to the server and run:
 
 ```
 curl -fsSL 'https://your-platform/api/uninstall-script' | bash
 ```
 
 This is a generic script that works on any node without requiring authentication. It stops and removes the `wiremesh-agent` and `wiremesh-xray` services, tears down all WireGuard interfaces (`wm-wg0`, `wm-tun*`), cleans up iptables rules, ip rules, routing tables, ipsets, and deletes the `/etc/wiremesh/` directory and agent binaries. System packages (wireguard, iptables, ipset) are not removed as they may be used by other software.
-
-### Deleting a Node
-
-Delete a single node from the list page via the delete button, or select multiple nodes and use **Batch Delete**. A confirmation dialog is shown before deletion. You can also batch-update tags for selected nodes.
 
 ---
 

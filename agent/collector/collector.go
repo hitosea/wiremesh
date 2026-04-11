@@ -23,7 +23,7 @@ var (
 	prevMu           sync.Mutex
 )
 
-func Collect(serverURL string) *api.StatusReport {
+func Collect(serverURL string, agentVersion string) *api.StatusReport {
 	report := &api.StatusReport{IsOnline: true}
 	latency := measureLatency(serverURL)
 	if latency >= 0 {
@@ -32,6 +32,9 @@ func Collect(serverURL string) *api.StatusReport {
 	report.Transfers = collectTransfers()
 	report.Handshakes = collectHandshakes()
 	report.XrayOnlineUsers = collectXrayOnlineUsers()
+	report.AgentVersion = agentVersion
+	report.XrayVersion = xray.GetVersion()
+	report.XrayRunning = xray.IsRunning()
 	return report
 }
 

@@ -64,6 +64,23 @@ ok()    { echo -e "\${GREEN}[OK]\${NC}    $1"; }
 warn()  { echo -e "\${YELLOW}[WARN]\${NC}  $1"; }
 fail()  { echo -e "\${RED}[FAIL]\${NC}  $1"; exit 1; }
 
+download_with_retry() {
+  local url="\$1" output="\$2" max_retries=3 retry=0
+  while [ \$retry -lt \$max_retries ]; do
+    if curl -fsSL "\$url" -o "\$output" && [ -s "\$output" ]; then
+      return 0
+    fi
+    retry=\$((retry + 1))
+    warn "Download failed (attempt \$retry/\$max_retries), retrying in 5s..."
+    sleep 5
+  done
+  return 1
+}
+
+# Log output
+exec > >(tee -a /var/log/wiremesh-install.log) 2>&1
+echo "=== WireMesh install started at \$(date) ==="
+
 echo ""
 echo "======================================"
 echo "  WireMesh Agent Installer"
@@ -317,12 +334,22 @@ fi
 ok "WireGuard interface wm-wg0 is up"
 
 # 3.5 Install Xray (download from management platform)
+XRAY_NEEDS_INSTALL=true
 if [ -f /usr/local/bin/wiremesh-xray ]; then
-  ok "Xray already installed (wiremesh-xray)"
-else
+  CURRENT_XRAY_VER=\$(/usr/local/bin/wiremesh-xray version 2>/dev/null | head -1 | awk '{print \$2}' || echo "unknown")
+  LATEST_XRAY_VER=\$(curl -fsSI "${serverUrl}/api/agent/xray?arch=\$AGENT_ARCH" 2>/dev/null | grep -i 'X-Xray-Version' | awk '{print \$2}' | tr -d '\\r' || echo "unknown")
+  if [ "\$CURRENT_XRAY_VER" = "\$LATEST_XRAY_VER" ] && [ "\$CURRENT_XRAY_VER" != "unknown" ]; then
+    ok "Xray already at latest version (\$CURRENT_XRAY_VER)"
+    XRAY_NEEDS_INSTALL=false
+  else
+    info "Xray version outdated (\$CURRENT_XRAY_VER -> \$LATEST_XRAY_VER), updating..."
+    cp /usr/local/bin/wiremesh-xray /usr/local/bin/wiremesh-xray.backup 2>/dev/null || true
+  fi
+fi
+
+if [ "\$XRAY_NEEDS_INSTALL" = true ]; then
   info "Installing Xray..."
-  curl -fsSL "${serverUrl}/api/agent/xray?arch=\$AGENT_ARCH" -o /tmp/xray.tar.gz
-  if [ -f /tmp/xray.tar.gz ] && [ -s /tmp/xray.tar.gz ]; then
+  if download_with_retry "${serverUrl}/api/agent/xray?arch=\$AGENT_ARCH" /tmp/xray.tar.gz; then
     tar -xzf /tmp/xray.tar.gz -C /tmp/
     mv /tmp/xray /usr/local/bin/wiremesh-xray 2>/dev/null || \\
       cp /tmp/xray /usr/local/bin/wiremesh-xray
@@ -369,18 +396,36 @@ echo ""
 info "Phase 4: Deploying WireMesh Agent..."
 
 # 4.1 Stop existing agent if upgrading
-if [ "$UPGRADE" = true ]; then
+if [ "\$UPGRADE" = true ]; then
   info "Stopping existing agent..."
   systemctl stop wiremesh-agent 2>/dev/null || true
   ok "Existing agent stopped"
 fi
 
+if [ "\$UPGRADE" = true ] && [ -f /usr/local/bin/wiremesh-agent ]; then
+  cp /usr/local/bin/wiremesh-agent /usr/local/bin/wiremesh-agent.backup
+  ok "Backed up current agent binary"
+fi
+
 # 4.2 Download and extract agent binary
-info "Downloading agent binary ($AGENT_ARCH)..."
-curl -fsSL "${serverUrl}/api/agent/binary?arch=$AGENT_ARCH" -o /tmp/wiremesh-agent.tar.gz
-tar -xzf /tmp/wiremesh-agent.tar.gz -C /usr/local/bin/
+info "Downloading agent binary (\$AGENT_ARCH)..."
+if ! download_with_retry "${serverUrl}/api/agent/binary?arch=\$AGENT_ARCH" /tmp/agent.tar.gz; then
+  fail "Failed to download agent binary after 3 attempts"
+fi
+
+# Verify agent checksum
+EXPECTED_CHECKSUM=\$(curl -fsSI "${serverUrl}/api/agent/binary?arch=\$AGENT_ARCH" 2>/dev/null | grep -i 'X-Agent-Checksum' | awk '{print \$2}' | tr -d '\\r' | sed 's/sha256://')
+if [ -n "\$EXPECTED_CHECKSUM" ]; then
+  ACTUAL_CHECKSUM=\$(sha256sum /tmp/agent.tar.gz | awk '{print \$1}')
+  if [ "\$EXPECTED_CHECKSUM" != "\$ACTUAL_CHECKSUM" ]; then
+    fail "Agent binary checksum mismatch"
+  fi
+  ok "Agent binary checksum verified"
+fi
+
+tar -xzf /tmp/agent.tar.gz -C /usr/local/bin/
 chmod +x /usr/local/bin/wiremesh-agent
-rm -f /tmp/wiremesh-agent.tar.gz
+rm -f /tmp/agent.tar.gz
 ok "Agent binary downloaded"
 
 # 4.3 Write agent config
@@ -415,6 +460,29 @@ systemctl daemon-reload
 systemctl enable wiremesh-agent >/dev/null 2>&1
 systemctl start wiremesh-agent
 ok "Agent service started"
+
+# Health check
+info "Waiting for agent to start..."
+HEALTH_OK=false
+for i in \$(seq 1 10); do
+  sleep 3
+  if systemctl is-active --quiet wiremesh-agent; then
+    HEALTH_OK=true
+  else
+    HEALTH_OK=false
+    break
+  fi
+  if [ \$i -ge 3 ] && [ "\$HEALTH_OK" = true ]; then
+    break
+  fi
+done
+
+if [ "\$HEALTH_OK" = true ]; then
+  ok "Agent is running and healthy"
+else
+  warn "Agent may not be running properly. Check with: journalctl -u wiremesh-agent --no-pager -n 20"
+  journalctl -u wiremesh-agent --no-pager -n 20 2>/dev/null || true
+fi
 
 echo ""
 
