@@ -45,7 +45,8 @@ Below the cards, three tables provide quick access to recent status:
    - **WG Port** (optional) — WireGuard listen port, defaults to 41820.
    - **Tags** (optional) — comma-separated tags for organizing nodes.
    - **Notes** (optional) — free-text remarks.
-   - **Enable Xray** (optional toggle) — when enabled, shows Xray Start Port (default 41443) and Reality Target (default `www.microsoft.com:443`).
+   - **Proxy Base Port** (optional) — the starting port for the Xray and SOCKS5 shared port pool, defaults to 41443. Each line is automatically assigned a unique port.
+   - **Reality Target** (optional) — Xray Reality camouflage target, must support TLS 1.3, defaults to `www.microsoft.com:443`.
 3. Click **Save**.
 
 ### Installing the Agent
@@ -72,7 +73,7 @@ Click a node row to open its detail page. You can see:
 - **Latency chart** — round-trip latency from the management platform over time.
 - **Traffic chart** — upload/download bytes over time.
 
-You can also edit the node's name, IP, domain, WG port, Xray settings, tags, and notes from this page.
+You can also edit the node's name, IP, domain, WG port, Xray / SOCKS5 settings, tags, and notes from this page.
 
 ### Uninstalling the Agent
 

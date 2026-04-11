@@ -158,7 +158,7 @@ Xray 设备 ──VLESS──► Xray(入口节点) ──► wm-wg0 ──► w
 | wg_private_key | string | WireGuard 私钥（自动生成，加密存储） |
 | wg_public_key | string | WireGuard 公钥（自动生成） |
 | wg_address | string | WireGuard 内网地址（如 10.0.0.1/24） |
-| xray_enabled | boolean | 是否启用 Xray |
+| ~~xray_enabled~~ | ~~boolean~~ | ~~已废弃，代理服务由线路编排决定~~ |
 | xray_protocol | enum? | VLESS 协议 |
 | xray_transport | enum? | 传输层：ws / grpc |
 | xray_port | number? | Xray 监听端口 |
