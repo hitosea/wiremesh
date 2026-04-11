@@ -130,7 +130,13 @@
     "updating": "更新中...",
     "confirmUpdate": "确认更新",
     "notFound": "节点不存在",
-    "loadNodeFailed": "加载节点失败"
+    "loadNodeFailed": "加载节点失败",
+    "portsCol": "端口",
+    "portsCount": "{count} 个端口",
+    "portsWg": "WG/UDP",
+    "portsXray": "Xray/TCP",
+    "portsTunnel": "隧道/UDP",
+    "portsSocks5": "SOCKS5/TCP"
   },
   "nodeNew": {
     "title": "新增节点",
@@ -147,14 +153,13 @@
     "wgPort": "WireGuard 端口",
     "notes": "备注",
     "notesPlaceholder": "备注信息",
-    "xraySettings": "Xray 设置",
-    "enableXray": "启用 Xray 入口代理",
+    "xraySettings": "Xray / SOCKS5 设置",
     "xrayStartPort": "代理起始端口",
     "xrayPortHint": "每条线路自动分配独立端口（如 {port0}、{port1}、{port2}...），Xray 和 SOCKS5 共享同一端口池，请确保防火墙放行对应端口",
     "externalInterface": "外网网卡",
     "externalInterfaceHint": "节点的外网网卡名称，默认 eth0，常见如 ens3、bond0 等",
     "realityTarget": "Reality 目标网站",
-    "realityTargetHint": "伪装目标，需支持 TLS 1.3，如 www.microsoft.com:443",
+    "realityTargetHint": "Xray Reality 伪装目标，需支持 TLS 1.3，如 www.microsoft.com:443",
     "createNode": "创建节点"
   },
   "nodeDetail": {
@@ -572,7 +577,6 @@
       "deviceNotBound": "设备未绑定线路，无法生成配置",
       "deviceWgIncomplete": "设备 WireGuard 配置不完整",
       "deviceXrayIncomplete": "设备 Xray UUID 不完整",
-      "entryNodeNoXray": "入口节点未启用 Xray",
       "realityIncomplete": "入口节点 Reality 配置不完整",
       "unsupportedProtocol": "不支持的协议类型",
       "wgPortRange": "WireGuard 默认端口必须是 1-65535 的整数",

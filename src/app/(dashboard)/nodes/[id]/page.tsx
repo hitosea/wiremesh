@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import {
   Card,
   CardContent,
@@ -29,7 +28,6 @@ type NodeDetail = {
   agentToken: string;
   wgPublicKey: string;
   wgAddress: string;
-  xrayEnabled: boolean;
   xrayProtocol: string | null;
   xrayTransport: string | null;
   xrayPort: number | null;
@@ -61,7 +59,6 @@ export default function NodeDetailPage() {
   const [port, setPort] = useState("");
   const [remark, setRemark] = useState("");
   const [externalInterface, setExternalInterface] = useState("eth0");
-  const [xrayEnabled, setXrayEnabled] = useState(false);
   const [xrayPort, setXrayPort] = useState("");
   const [realityDest, setRealityDest] = useState("");
   const [realityPublicKey, setRealityPublicKey] = useState("");
@@ -85,7 +82,6 @@ export default function NodeDetailPage() {
         setPort(n.port ? String(n.port) : "");
         setRemark(n.remark ?? "");
         setExternalInterface(n.externalInterface ?? "eth0");
-        setXrayEnabled(n.xrayEnabled ?? false);
         setXrayPort(n.xrayPort ? String(n.xrayPort) : "");
         if (n.xrayConfig) {
           try {
@@ -115,9 +111,8 @@ export default function NodeDetailPage() {
         port: port ? parseInt(port) : undefined,
         remark: remark.trim() || null,
         externalInterface: externalInterface.trim() || "eth0",
-        xrayEnabled,
-        xrayPort: xrayEnabled && xrayPort ? parseInt(xrayPort) : null,
-        realityDest: xrayEnabled ? realityDest || undefined : undefined,
+        xrayPort: xrayPort ? parseInt(xrayPort) : null,
+        realityDest: realityDest || undefined,
       };
 
       const res = await fetch(`/api/nodes/${nodeId}`, {
@@ -250,57 +245,46 @@ export default function NodeDetailPage() {
           </div>
 
           <div className="border-t pt-4 space-y-4">
-            <div className="flex items-center gap-3">
-              <Switch
-                id="xrayEnabled"
-                checked={xrayEnabled}
-                onCheckedChange={setXrayEnabled}
+            <h3 className="text-sm font-medium">{tn("xraySettings")}</h3>
+            <div className="space-y-2">
+              <Label htmlFor="xrayPort">{tn("xrayStartPort")}</Label>
+              <Input
+                id="xrayPort"
+                type="number"
+                value={xrayPort}
+                onChange={(e) => setXrayPort(e.target.value)}
+                placeholder={defaults.xray_default_port || "41443"}
               />
-              <Label htmlFor="xrayEnabled">{tn("enableXray")}</Label>
+              <p className="text-xs text-muted-foreground">
+                {tn("xrayPortHint", xrayPortHintParams(xrayPort, defaults.xray_default_port))}
+              </p>
             </div>
-            {xrayEnabled && (
+            <div className="space-y-2">
+              <Label htmlFor="realityDest">{tn("realityTarget")}</Label>
+              <Input
+                id="realityDest"
+                value={realityDest}
+                onChange={(e) => setRealityDest(e.target.value)}
+                placeholder="www.microsoft.com:443"
+              />
+              <p className="text-xs text-muted-foreground">
+                {tn("realityTargetHint")}
+              </p>
+            </div>
+            {realityPublicKey && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="xrayPort">{tn("xrayStartPort")}</Label>
-                  <Input
-                    id="xrayPort"
-                    type="number"
-                    value={xrayPort}
-                    onChange={(e) => setXrayPort(e.target.value)}
-                    placeholder={defaults.xray_default_port || "41443"}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {tn("xrayPortHint", xrayPortHintParams(xrayPort, defaults.xray_default_port))}
-                  </p>
+                  <Label>Reality Public Key</Label>
+                  <code className="block text-xs bg-muted px-3 py-2 rounded break-all">
+                    {realityPublicKey}
+                  </code>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="realityDest">{tn("realityTarget")}</Label>
-                  <Input
-                    id="realityDest"
-                    value={realityDest}
-                    onChange={(e) => setRealityDest(e.target.value)}
-                    placeholder="www.microsoft.com:443"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {tn("realityTargetHint")}
-                  </p>
+                  <Label>Reality Short ID</Label>
+                  <code className="block text-xs bg-muted px-3 py-2 rounded break-all">
+                    {realityShortId}
+                  </code>
                 </div>
-                {realityPublicKey && (
-                  <>
-                    <div className="space-y-2">
-                      <Label>Reality Public Key</Label>
-                      <code className="block text-xs bg-muted px-3 py-2 rounded break-all">
-                        {realityPublicKey}
-                      </code>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Reality Short ID</Label>
-                      <code className="block text-xs bg-muted px-3 py-2 rounded break-all">
-                        {realityShortId}
-                      </code>
-                    </div>
-                  </>
-                )}
               </>
             )}
           </div>

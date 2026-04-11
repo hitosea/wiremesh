@@ -107,7 +107,6 @@ CREATE TABLE `nodes` (
 	`wg_private_key` text NOT NULL,
 	`wg_public_key` text NOT NULL,
 	`wg_address` text NOT NULL,
-	`xray_enabled` integer DEFAULT false NOT NULL,
 	`xray_protocol` text,
 	`xray_transport` text,
 	`xray_port` integer,

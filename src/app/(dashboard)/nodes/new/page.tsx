@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import {
   Card,
   CardContent,
@@ -32,7 +31,6 @@ export default function NewNodePage() {
   const [port, setPort] = useState("");
   const [remark, setRemark] = useState("");
   const [externalInterface, setExternalInterface] = useState("eth0");
-  const [xrayEnabled, setXrayEnabled] = useState(false);
   const [xrayPort, setXrayPort] = useState("");
   const [realityDest, setRealityDest] = useState(DEFAULT_REALITY_DEST);
   const [defaults, setDefaults] = useState<Record<string, string>>({});
@@ -61,12 +59,9 @@ export default function NewNodePage() {
         port: port ? parseInt(port) : undefined,
         remark: remark.trim() || null,
         externalInterface: externalInterface.trim() || "eth0",
-        xrayEnabled,
+        xrayPort: xrayPort ? parseInt(xrayPort) : null,
+        realityDest: realityDest || undefined,
       };
-      if (xrayEnabled) {
-        body.xrayPort = xrayPort ? parseInt(xrayPort) : null;
-        body.realityDest = realityDest || undefined;
-      }
 
       const res = await fetch("/api/nodes", {
         method: "POST",
@@ -174,43 +169,31 @@ export default function NewNodePage() {
             <CardTitle>{t("xraySettings")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center gap-3">
-              <Switch
-                id="xrayEnabled"
-                checked={xrayEnabled}
-                onCheckedChange={setXrayEnabled}
+            <div className="space-y-2">
+              <Label htmlFor="xrayPort">{t("xrayStartPort")}</Label>
+              <Input
+                id="xrayPort"
+                type="number"
+                value={xrayPort}
+                onChange={(e) => setXrayPort(e.target.value)}
+                placeholder={defaults.xray_default_port || "41443"}
               />
-              <Label htmlFor="xrayEnabled">{t("enableXray")}</Label>
+              <p className="text-xs text-muted-foreground">
+                {t("xrayPortHint", xrayPortHintParams(xrayPort, defaults.xray_default_port))}
+              </p>
             </div>
-            {xrayEnabled && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="xrayPort">{t("xrayStartPort")}</Label>
-                  <Input
-                    id="xrayPort"
-                    type="number"
-                    value={xrayPort}
-                    onChange={(e) => setXrayPort(e.target.value)}
-                    placeholder={defaults.xray_default_port || "41443"}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {t("xrayPortHint", xrayPortHintParams(xrayPort, defaults.xray_default_port))}
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="realityDest">{t("realityTarget")}</Label>
-                  <Input
-                    id="realityDest"
-                    value={realityDest}
-                    onChange={(e) => setRealityDest(e.target.value)}
-                    placeholder="www.microsoft.com:443"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {t("realityTargetHint")}
-                  </p>
-                </div>
-              </>
-            )}
+            <div className="space-y-2">
+              <Label htmlFor="realityDest">{t("realityTarget")}</Label>
+              <Input
+                id="realityDest"
+                value={realityDest}
+                onChange={(e) => setRealityDest(e.target.value)}
+                placeholder="www.microsoft.com:443"
+              />
+              <p className="text-xs text-muted-foreground">
+                {t("realityTargetHint")}
+              </p>
+            </div>
           </CardContent>
         </Card>
 

@@ -280,7 +280,7 @@ export async function GET(request: NextRequest) {
 
   const xrayDefaultPort = getXrayDefaultPort();
 
-  if (node.xrayEnabled && node.xrayConfig) {
+  if (node.xrayConfig) {
     let realitySettings: {
       realityPrivateKey?: string;
       realityPublicKey?: string;

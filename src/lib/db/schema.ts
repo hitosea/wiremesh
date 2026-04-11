@@ -38,7 +38,6 @@ export const nodes = sqliteTable("nodes", {
   wgPrivateKey: text("wg_private_key").notNull(),
   wgPublicKey: text("wg_public_key").notNull(),
   wgAddress: text("wg_address").notNull(),
-  xrayEnabled: integer("xray_enabled", { mode: "boolean" }).notNull().default(false),
   xrayProtocol: text("xray_protocol"),
   xrayTransport: text("xray_transport"),
   xrayPort: integer("xray_port"),

@@ -26,7 +26,6 @@ export async function GET(request: NextRequest, { params }: Params) {
       agentToken: nodes.agentToken,
       wgPublicKey: nodes.wgPublicKey,
       wgAddress: nodes.wgAddress,
-      xrayEnabled: nodes.xrayEnabled,
       xrayProtocol: nodes.xrayProtocol,
       xrayTransport: nodes.xrayTransport,
       xrayPort: nodes.xrayPort,
@@ -63,7 +62,6 @@ export async function PUT(request: NextRequest, { params }: Params) {
     ip,
     domain,
     port,
-    xrayEnabled,
     xrayProtocol,
     xrayTransport,
     xrayPort,
@@ -88,26 +86,26 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (ip !== undefined) updateData.ip = ip;
   if (domain !== undefined) updateData.domain = domain;
   if (port !== undefined) updateData.port = port;
-  if (xrayEnabled !== undefined) updateData.xrayEnabled = xrayEnabled;
   if (xrayProtocol !== undefined) updateData.xrayProtocol = xrayProtocol;
   if (xrayTransport !== undefined) updateData.xrayTransport = xrayTransport;
   if (xrayPort !== undefined) updateData.xrayPort = xrayPort;
   if (externalInterface !== undefined) updateData.externalInterface = externalInterface;
   if (remark !== undefined) updateData.remark = remark;
 
-  // Auto-generate Reality keys when enabling Xray for the first time
-  if (xrayEnabled === true) {
-    const currentNode = db.select({ xrayConfig: nodes.xrayConfig, xrayEnabled: nodes.xrayEnabled }).from(nodes).where(eq(nodes.id, nodeId)).get();
-    let needKeys = true;
+  // Auto-generate Reality keys if missing (legacy data), or update dest if provided
+  {
+    const currentNode = db.select({ xrayConfig: nodes.xrayConfig }).from(nodes).where(eq(nodes.id, nodeId)).get();
+    let hasKeys = false;
     if (currentNode?.xrayConfig) {
       try {
         const parsed = JSON.parse(currentNode.xrayConfig);
-        if (parsed.realityPublicKey) needKeys = false;
+        if (parsed.realityPublicKey) hasKeys = true;
       } catch (e) {
         console.warn(`[nodes/${nodeId}] Failed to parse xrayConfig:`, e);
       }
     }
-    if (needKeys) {
+    if (!hasKeys) {
+      // Legacy node without Reality keys — auto-generate
       const realityKeys = generateRealityKeypair();
       const shortId = generateShortId();
       const { realityDest, realityServerName } = normalizeRealityDest(body.realityDest);
@@ -118,6 +116,8 @@ export async function PUT(request: NextRequest, { params }: Params) {
         realityDest,
         realityServerName,
       });
+      updateData.xrayProtocol = "vless";
+      updateData.xrayTransport = "tcp";
     } else if (body.realityDest !== undefined) {
       // Update dest/serverName without regenerating keys
       const parsed = JSON.parse(currentNode!.xrayConfig!);
@@ -126,8 +126,6 @@ export async function PUT(request: NextRequest, { params }: Params) {
       parsed.realityServerName = normalized.realityServerName;
       updateData.xrayConfig = JSON.stringify(parsed);
     }
-    updateData.xrayProtocol = "vless";
-    updateData.xrayTransport = "tcp";
   }
 
   const updated = db
@@ -143,7 +141,6 @@ export async function PUT(request: NextRequest, { params }: Params) {
       agentToken: nodes.agentToken,
       wgPublicKey: nodes.wgPublicKey,
       wgAddress: nodes.wgAddress,
-      xrayEnabled: nodes.xrayEnabled,
       xrayProtocol: nodes.xrayProtocol,
       xrayTransport: nodes.xrayTransport,
       xrayPort: nodes.xrayPort,

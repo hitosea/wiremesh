@@ -15,6 +15,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DataTable, Column, PaginationInfo } from "@/components/data-table";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
 
 type Node = {
   id: number;
@@ -22,6 +27,12 @@ type Node = {
   ip: string;
   wgAddress: string;
   status: string;
+  ports: {
+    wg: number;
+    xray: number[];
+    tunnels: number[];
+    socks5: number[];
+  };
 };
 
 
@@ -145,6 +156,56 @@ export default function NodesPage() {
       ),
     },
     {
+      key: "ports",
+      label: t("portsCol"),
+      render: (row) => {
+        const node = row as unknown as Node;
+        const allPorts = [
+          node.ports.wg,
+          ...node.ports.xray,
+          ...node.ports.tunnels,
+          ...node.ports.socks5,
+        ];
+        const uniqueCount = new Set(allPorts).size;
+
+        return (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="text-sm text-primary hover:underline cursor-pointer">
+                {t("portsCount", { count: uniqueCount })}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64">
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">{t("portsWg")}</span>
+                  <span className="font-mono">{node.ports.wg}</span>
+                </div>
+                {node.ports.xray.length > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">{t("portsXray")}</span>
+                    <span className="font-mono">{node.ports.xray.join(", ")}</span>
+                  </div>
+                )}
+                {node.ports.tunnels.length > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">{t("portsTunnel")}</span>
+                    <span className="font-mono">{node.ports.tunnels.join(", ")}</span>
+                  </div>
+                )}
+                {node.ports.socks5.length > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">{t("portsSocks5")}</span>
+                    <span className="font-mono">{node.ports.socks5.join(", ")}</span>
+                  </div>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+        );
+      },
+    },
+    {
       key: "actions",
       label: "",
       align: "right",
@@ -153,16 +214,16 @@ export default function NodesPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => router.push(`/nodes/${row.id}`)}
+            onClick={() => router.push(`/nodes/${row.id}/script`)}
           >
-            {tc("edit")}
+            {t("installScript")}
           </Button>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => router.push(`/nodes/${row.id}/script`)}
+            onClick={() => router.push(`/nodes/${row.id}`)}
           >
-            {t("installScript")}
+            {tc("edit")}
           </Button>
           <Button
             variant="destructive"

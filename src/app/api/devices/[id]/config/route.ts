@@ -31,7 +31,6 @@ export async function GET(request: NextRequest, { params }: Params) {
       nodeDomain: nodes.domain,
       nodePort: nodes.port,
       nodeWgPublicKey: nodes.wgPublicKey,
-      nodeXrayEnabled: nodes.xrayEnabled,
       nodeXrayProtocol: nodes.xrayProtocol,
       nodeXrayTransport: nodes.xrayTransport,
       nodeXrayPort: nodes.xrayPort,
@@ -93,10 +92,6 @@ PersistentKeepalive = 25
   if (protocol === "xray") {
     if (!device.xrayUuid) {
       return error("VALIDATION_ERROR", "validation.deviceXrayIncomplete");
-    }
-
-    if (!entryNodeRow.nodeXrayEnabled) {
-      return error("VALIDATION_ERROR", "validation.entryNodeNoXray");
     }
 
     const endpoint = entryNodeRow.nodeDomain ?? entryNodeRow.nodeIp;
