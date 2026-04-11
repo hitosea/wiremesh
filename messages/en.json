@@ -109,7 +109,8 @@
       "online": "Online",
       "offline": "Offline",
       "installing": "Installing",
-      "error": "Error"
+      "error": "Error",
+      "upgrading": "Upgrading"
     },
     "loadFailed": "Failed to load nodes",
     "deleted": "Node deleted",
@@ -146,8 +147,7 @@
     "upgradeOffline": "Node is offline, cannot upgrade",
     "upgradeFailed": "Upgrade trigger failed",
     "confirmDeleteNode": "This will remotely uninstall all WireMesh components on the node. Are you sure?",
-    "deleteOfflinePending": "Node is offline. It will be uninstalled when it comes back online.",
-    "status.upgrading": "Upgrading"
+    "deleteOfflinePending": "Node is offline. It will be uninstalled when it comes back online."
   },
   "nodeNew": {
     "title": "Add Node",
