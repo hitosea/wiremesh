@@ -22,12 +22,14 @@ export async function POST(request: NextRequest) {
     const batch = nodeIds.slice(i, i + BATCH_SIZE);
     for (const nodeId of batch) {
       if (sseManager.sendEvent(nodeId, event, {})) {
-        if (type === "agent") {
-          db.update(nodes)
-            .set({ status: "upgrading", updatedAt: new Date().toISOString() })
-            .where(eq(nodes.id, nodeId))
-            .run();
-        }
+        const now = new Date().toISOString();
+        const field = type === "xray"
+          ? { xrayUpgradeTriggeredAt: now }
+          : { upgradeTriggeredAt: now };
+        db.update(nodes)
+          .set({ ...field, updatedAt: now })
+          .where(eq(nodes.id, nodeId))
+          .run();
         sent++;
       } else {
         offline++;

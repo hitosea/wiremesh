@@ -38,6 +38,8 @@ export async function GET(request: NextRequest, { params }: Params) {
       updatedAt: nodes.updatedAt,
       agentVersion: nodes.agentVersion,
       xrayVersion: nodes.xrayVersion,
+      upgradeTriggeredAt: nodes.upgradeTriggeredAt,
+      xrayUpgradeTriggeredAt: nodes.xrayUpgradeTriggeredAt,
     })
     .from(nodes)
     .where(eq(nodes.id, nodeId))

@@ -20,5 +20,10 @@ export async function POST(request: NextRequest, { params }: Params) {
     return error("CONFLICT", "nodes.upgradeOffline");
   }
 
+  db.update(nodes)
+    .set({ xrayUpgradeTriggeredAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+    .where(eq(nodes.id, nodeId))
+    .run();
+
   return success({ message: "nodes.xrayUpgradeTriggered" });
 }

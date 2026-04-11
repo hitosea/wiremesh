@@ -47,6 +47,8 @@ export const nodes = sqliteTable("nodes", {
   errorMessage: text("error_message"),
   agentVersion: text("agent_version"),
   xrayVersion: text("xray_version"),
+  upgradeTriggeredAt: text("upgrade_triggered_at"),
+  xrayUpgradeTriggeredAt: text("xray_upgrade_triggered_at"),
   pendingDelete: integer("pending_delete", { mode: "boolean" }).notNull().default(false),
   remark: text("remark"),
   ...timestamps,

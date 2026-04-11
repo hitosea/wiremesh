@@ -21,7 +21,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   db.update(nodes)
-    .set({ status: "upgrading", updatedAt: new Date().toISOString() })
+    .set({ upgradeTriggeredAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
     .where(eq(nodes.id, nodeId))
     .run();
 

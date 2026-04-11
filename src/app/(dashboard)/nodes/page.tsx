@@ -31,6 +31,8 @@ type Node = {
   status: string;
   agentVersion: string | null;
   xrayVersion: string | null;
+  upgradeTriggeredAt: string | null;
+  xrayUpgradeTriggeredAt: string | null;
   ports: {
     wg: number;
     xray: number[];
@@ -38,6 +40,13 @@ type Node = {
     socks5: number[];
   };
 };
+
+const UPGRADE_TIMEOUT_MS = 15 * 60 * 1000;
+
+function isUpgrading(triggeredAt: string | null, currentVersion: string | null, latestVersion: string): boolean {
+  if (!triggeredAt || !currentVersion || currentVersion === latestVersion) return false;
+  return Date.now() - new Date(triggeredAt).getTime() < UPGRADE_TIMEOUT_MS;
+}
 
 
 export default function NodesPage() {
@@ -179,16 +188,20 @@ export default function NodesPage() {
     {
       key: "status",
       label: t("statusCol"),
-      render: (row) => (
-        <StatusDot status={row.status} label={t(`status.${row.status}`)} />
-      ),
+      render: (row) => {
+        const node = row as unknown as Node;
+        const agentUpgrading = isUpgrading(node.upgradeTriggeredAt, node.agentVersion, latestAgentVersion);
+        const displayStatus = agentUpgrading ? "upgrading" : node.status;
+        return <StatusDot status={displayStatus} label={t(`status.${displayStatus}`)} />;
+      },
     },
     {
       key: "agentVersion",
       label: t("agentVersion"),
       render: (row) => {
         const node = row as unknown as Node;
-        const needsUpgrade = node.agentVersion && latestAgentVersion && node.agentVersion !== latestAgentVersion;
+        const agentUpgrading = isUpgrading(node.upgradeTriggeredAt, node.agentVersion, latestAgentVersion);
+        const needsUpgrade = !agentUpgrading && node.agentVersion && latestAgentVersion && node.agentVersion !== latestAgentVersion;
         return (
           <span className="text-sm font-mono inline-flex items-center gap-1">
             {node.agentVersion || t("versionUnknown")}
@@ -390,7 +403,7 @@ export default function NodesPage() {
               {tc("cancel")}
             </Button>
             <Button onClick={handleUpgrade} disabled={upgrading}>
-              {upgrading ? tc("saving") : t("upgrade")}
+              {upgrading ? t("status.upgrading") : t("upgrade")}
             </Button>
           </div>
         </DialogContent>

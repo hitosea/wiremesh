@@ -51,6 +51,8 @@ export async function GET(request: NextRequest) {
       updatedAt: nodes.updatedAt,
       agentVersion: nodes.agentVersion,
       xrayVersion: nodes.xrayVersion,
+      upgradeTriggeredAt: nodes.upgradeTriggeredAt,
+      xrayUpgradeTriggeredAt: nodes.xrayUpgradeTriggeredAt,
     })
     .from(nodes)
     .where(where)

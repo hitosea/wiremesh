@@ -43,6 +43,13 @@
       "when": 1744336800000,
       "tag": "0005_add_agent_lifecycle_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1744400400000,
+      "tag": "0006_add_upgrade_triggered_fields",
+      "breakpoints": true
     }
   ]
 }
