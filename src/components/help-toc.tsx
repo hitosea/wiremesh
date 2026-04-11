@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
 import { type Heading } from "@/types/help";
@@ -14,6 +14,7 @@ export function HelpToc({
 }) {
   const [activeId, setActiveId] = useState<string>("");
   const [isOpen, setIsOpen] = useState(false);
+  const tocRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -35,6 +36,14 @@ export function HelpToc({
     return () => observer.disconnect();
   }, [headings]);
 
+  useEffect(() => {
+    if (!activeId) return;
+    const btn = tocRefs.current.get(activeId);
+    if (btn) {
+      btn.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [activeId]);
+
   function handleClick(id: string) {
     const el = document.getElementById(id);
     if (el) {
@@ -48,6 +57,7 @@ export function HelpToc({
       {headings.map((heading) => (
         <button
           key={heading.id}
+          ref={(el) => { if (el) tocRefs.current.set(heading.id, el); }}
           onClick={() => handleClick(heading.id)}
           className={cn(
             "block w-full text-left text-sm py-1 transition-colors hover:text-foreground",
@@ -67,7 +77,7 @@ export function HelpToc({
     <>
       {/* Desktop: sticky sidebar */}
       <aside className="hidden lg:block w-56 shrink-0">
-        <div className="sticky top-6">
+        <div className="sticky top-0 max-h-[calc(100dvh-3.5rem-3rem)] overflow-y-auto py-6">
           <h2 className="text-sm font-semibold mb-3">{title}</h2>
           {tocList}
         </div>
