@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "@/lib/db";
-import { nodes, settings, lineTunnels, lineNodes, devices } from "@/lib/db/schema";
+import { nodes, settings, lineTunnels, lineNodes, lines } from "@/lib/db/schema";
 import { success, created, error, paginated } from "@/lib/api-response";
-import { DEFAULT_PROXY_PORT, getXrayDefaultPort } from "@/lib/proxy-port";
+import { DEFAULT_PROXY_PORT } from "@/lib/proxy-port";
 import packageJson from "../../../../package.json";
 import { parsePaginationParams, paginationOffset } from "@/lib/pagination";
 import { eq, or, like, count, and, inArray, SQL } from "drizzle-orm";
@@ -107,39 +107,29 @@ export async function GET(request: NextRequest) {
     entryLineMap.get(row.nodeId)!.push(row.lineId);
   }
 
-  // Find all lines that have xray or socks5 devices
+  // Find all entry line IDs for batch proxy port query
   const allEntryLineIds = [...new Set(entryLineRows.map((r) => r.lineId))];
-  const proxyDeviceRows = allEntryLineIds.length > 0
-    ? db
-        .select({ lineId: devices.lineId, protocol: devices.protocol })
-        .from(devices)
-        .where(
-          and(
-            inArray(devices.lineId, allEntryLineIds),
-            or(eq(devices.protocol, "xray"), eq(devices.protocol, "socks5"))
-          )
-        )
-        .all()
+
+  // Batch query proxy ports from lines
+  const linePortRows = allEntryLineIds.length > 0
+    ? db.select({ id: lines.id, xrayPort: lines.xrayPort, socks5Port: lines.socks5Port })
+        .from(lines).where(inArray(lines.id, allEntryLineIds)).all()
     : [];
-
-  const xrayLineIdsSet = new Set(proxyDeviceRows.filter((d) => d.protocol === "xray" && d.lineId != null).map((d) => d.lineId!));
-  const socks5LineIdsSet = new Set(proxyDeviceRows.filter((d) => d.protocol === "socks5" && d.lineId != null).map((d) => d.lineId!));
-
-  const xrayDefaultPort = getXrayDefaultPort();
+  const linePortMap = new Map(linePortRows.map((r) => [r.id, r]));
 
   // Build ports for each node
   const rowsWithPorts = rows.map((row) => {
     const tunnels = [...(tunnelPortMap.get(row.id) ?? [])].sort((a, b) => a - b);
     const nodeEntryLines = entryLineMap.get(row.id) ?? [];
-    const basePort = row.xrayPort ?? xrayDefaultPort;
 
-    // Inline port allocation matching getProxyPortForLine logic:
-    // Sort by lineId for stable assignment, Xray first then SOCKS5
-    const xrayLines = nodeEntryLines.filter((lid) => xrayLineIdsSet.has(lid)).sort((a, b) => a - b);
-    const socks5Lines = nodeEntryLines.filter((lid) => socks5LineIdsSet.has(lid)).sort((a, b) => a - b);
-    let port = basePort;
-    const xrayPorts: number[] = xrayLines.map(() => port++);
-    const socks5Ports: number[] = socks5Lines.map(() => port++);
+    // Read persisted proxy ports from lines table
+    const xrayPorts: number[] = [];
+    const socks5Ports: number[] = [];
+    for (const lid of nodeEntryLines.sort((a, b) => a - b)) {
+      const lp = linePortMap.get(lid);
+      if (lp?.xrayPort !== null && lp?.xrayPort !== undefined) xrayPorts.push(lp.xrayPort);
+      if (lp?.socks5Port !== null && lp?.socks5Port !== undefined) socks5Ports.push(lp.socks5Port);
+    }
 
     return {
       ...row,

@@ -1,10 +1,10 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { nodes, lineNodes, lineTunnels, devices, lineBranches, branchFilters, filters, settings } from "@/lib/db/schema";
-import { eq, or, and, count } from "drizzle-orm";
+import { nodes, lineNodes, lineTunnels, devices, lineBranches, branchFilters, filters, settings, lines } from "@/lib/db/schema";
+import { eq, or, and, count, inArray } from "drizzle-orm";
 import { decrypt } from "@/lib/crypto";
 import { authenticateAgent } from "@/lib/agent-auth";
-import { getXrayPortForLine, getProxyPortForLine, getXrayDefaultPort } from "@/lib/proxy-port";
+import { getXrayDefaultPort } from "@/lib/proxy-port";
 import { BRANCH_MARK_START, XRAY_MARK_START, SOCKS5_MARK_START } from "@/lib/routing-constants";
 
 function getNodePublicHost(nodeId: number): string {
@@ -278,6 +278,13 @@ export async function GET(request: NextRequest) {
 
   const xrayDefaultPort = getXrayDefaultPort();
 
+  // Batch-fetch persisted proxy ports for all entry lines
+  const linePortRows = entryLineIds.length > 0
+    ? db.select({ id: lines.id, xrayPort: lines.xrayPort, socks5Port: lines.socks5Port })
+        .from(lines).where(inArray(lines.id, entryLineIds)).all()
+    : [];
+  const linePortMap = new Map(linePortRows.map((r) => [r.id, r]));
+
   if (node.xrayConfig) {
     let realitySettings: {
       realityPrivateKey?: string;
@@ -354,7 +361,7 @@ export async function GET(request: NextRequest) {
       xrayRoutes.push({
         lineId,
         uuids,
-        port: getXrayPortForLine(nodeId, lineId, xrayBasePort),
+        port: linePortMap.get(lineId)?.xrayPort ?? xrayBasePort,
         tunnel,
         mark: XRAY_MARK_START + lineId,
         branches: xrayBranches,
@@ -407,7 +414,7 @@ export async function GET(request: NextRequest) {
       const tunnel = isSingleNode ? extIface : (lineToDownstreamIface.get(lineId) ?? "");
       if (!tunnel) continue;
 
-      const port = getProxyPortForLine(nodeId, lineId, "socks5", proxyBasePort);
+      const port = linePortMap.get(lineId)?.socks5Port ?? proxyBasePort;
 
       socks5Routes.push({
         lineId,

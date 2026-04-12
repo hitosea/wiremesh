@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { devices, lineNodes, nodes } from "@/lib/db/schema";
+import { devices, lineNodes, nodes, lines } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
 import { eq, and, sql } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
@@ -101,13 +101,26 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   if (isNaN(deviceId)) return error("VALIDATION_ERROR", "validation.invalidDeviceId");
 
   const existing = db
-    .select({ id: devices.id, name: devices.name, lineId: devices.lineId })
+    .select({ id: devices.id, name: devices.name, protocol: devices.protocol, lineId: devices.lineId })
     .from(devices)
     .where(eq(devices.id, deviceId))
     .get();
   if (!existing) return error("NOT_FOUND", "notFound.device");
 
   db.delete(devices).where(eq(devices.id, deviceId)).run();
+
+  // Release proxy port if this was the last xray/socks5 device on the line
+  if (existing.lineId && (existing.protocol === "xray" || existing.protocol === "socks5")) {
+    const remaining = db
+      .select({ id: devices.id })
+      .from(devices)
+      .where(and(eq(devices.lineId, existing.lineId), eq(devices.protocol, existing.protocol)))
+      .get();
+    if (!remaining) {
+      const portField = existing.protocol === "xray" ? "xrayPort" : "socks5Port";
+      db.update(lines).set({ [portField]: null }).where(eq(lines.id, existing.lineId)).run();
+    }
+  }
 
   writeAuditLog({
     action: "delete",

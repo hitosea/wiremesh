@@ -70,6 +70,8 @@ export const lines = sqliteTable("lines", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   status: text("status").notNull().default("active"),
+  xrayPort: integer("xray_port"),
+  socks5Port: integer("socks5_port"),
   remark: text("remark"),
   ...timestamps,
 });
