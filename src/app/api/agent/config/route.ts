@@ -39,10 +39,10 @@ export async function GET(request: NextRequest) {
     .where(eq(lineNodes.nodeId, nodeId))
     .all();
 
-  const lineIds = [...new Set(myLineNodes.map((ln) => ln.lineId))];
+  const lineIds = [...new Set(myLineNodes.map((ln) => ln.lineId))].sort((a, b) => a - b);
 
   // ---- Peers (entry role: devices on lines where this node is entry) ----
-  const entryLineIds = myLineNodes.filter((ln) => ln.role === "entry").map((ln) => ln.lineId);
+  const entryLineIds = [...new Set(myLineNodes.filter((ln) => ln.role === "entry").map((ln) => ln.lineId))].sort((a, b) => a - b);
 
   const peers: { publicKey: string; allowedIps: string }[] = [];
   if (entryLineIds.length > 0) {
@@ -268,13 +268,11 @@ export async function GET(request: NextRequest) {
   } | null = null;
 
   // Precompute branch marks — single source of truth for both routing and Xray configs.
-  // Branch marks are allocated sequentially from BRANCH_MARK_START (30001).
-  // Single-branch lines still get marks allocated (for Xray) but routing skips them.
+  // Use BRANCH_MARK_START + branchId for stable assignment that survives line additions.
   const branchMarkMap = new Map<number, number>(); // branchId → mark
-  let branchMarkSeq = BRANCH_MARK_START;
   for (const lineId of entryLineIds) {
     for (const branch of lineBranchCache.get(lineId) ?? []) {
-      branchMarkMap.set(branch.id, branchMarkSeq++);
+      branchMarkMap.set(branch.id, BRANCH_MARK_START + branch.id);
     }
   }
 
@@ -309,8 +307,6 @@ export async function GET(request: NextRequest) {
       lineId: number; uuids: string[]; port: number; tunnel: string; mark: number;
       branches: { mark: number; tunnel: string; is_default: boolean; domain_rules: string[] }[];
     }[] = [];
-    let xrayPerLineMarkCounter = XRAY_MARK_START;
-
     for (const lineId of entryLineIds) {
       const xrayDevices = db
         .select({ xrayUuid: devices.xrayUuid })
@@ -360,7 +356,7 @@ export async function GET(request: NextRequest) {
         uuids,
         port: getXrayPortForLine(nodeId, lineId, xrayBasePort),
         tunnel,
-        mark: xrayPerLineMarkCounter++,
+        mark: XRAY_MARK_START + lineId,
         branches: xrayBranches,
       });
     }
@@ -387,7 +383,6 @@ export async function GET(request: NextRequest) {
 
   if (entryLineIds.length > 0) {
     const socks5Routes: { lineId: number; port: number; mark: number; tunnel: string; users: { username: string; password: string }[] }[] = [];
-    let socks5MarkCounter = SOCKS5_MARK_START;
     const proxyBasePort = node.xrayPort ?? xrayDefaultPort;
 
     for (const lineId of entryLineIds) {
@@ -417,7 +412,7 @@ export async function GET(request: NextRequest) {
       socks5Routes.push({
         lineId,
         port,
-        mark: socks5MarkCounter++,
+        mark: SOCKS5_MARK_START + lineId,
         tunnel,
         users,
       });

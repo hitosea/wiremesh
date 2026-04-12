@@ -42,22 +42,20 @@ export function getProxyPortForLine(
     )
     .all();
 
-  const xrayLineIds = new Set(proxyDevices.filter((d) => d.protocol === "xray").map((d) => d.lineId));
-  const socks5LineIds = new Set(proxyDevices.filter((d) => d.protocol === "socks5").map((d) => d.lineId));
+  const xrayLineIds = [...new Set(proxyDevices.filter((d) => d.protocol === "xray").map((d) => d.lineId))].sort((a, b) => a! - b!);
+  const socks5LineIds = [...new Set(proxyDevices.filter((d) => d.protocol === "socks5").map((d) => d.lineId))].sort((a, b) => a! - b!);
 
-  // Allocate all Xray ports first, then SOCKS5 ports, to avoid collisions.
+  // Allocate all Xray ports first (sorted by lineId), then SOCKS5 ports.
+  // Sorting by lineId ensures stable assignment: new lines get higher IDs
+  // and always append to the end, never shifting existing port assignments.
   let port = basePort;
-  for (const lid of entryLineIds) {
-    if (xrayLineIds.has(lid)) {
-      if (lid === lineId && protocol === "xray") return port;
-      port++;
-    }
+  for (const lid of xrayLineIds) {
+    if (lid === lineId && protocol === "xray") return port;
+    port++;
   }
-  for (const lid of entryLineIds) {
-    if (socks5LineIds.has(lid)) {
-      if (lid === lineId && protocol === "socks5") return port;
-      port++;
-    }
+  for (const lid of socks5LineIds) {
+    if (lid === lineId && protocol === "socks5") return port;
+    port++;
   }
 
   return basePort;

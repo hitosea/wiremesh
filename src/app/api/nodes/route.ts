@@ -122,8 +122,8 @@ export async function GET(request: NextRequest) {
         .all()
     : [];
 
-  const xrayLineIds = new Set(proxyDeviceRows.filter((d) => d.protocol === "xray" && d.lineId != null).map((d) => d.lineId!));
-  const socks5LineIds = new Set(proxyDeviceRows.filter((d) => d.protocol === "socks5" && d.lineId != null).map((d) => d.lineId!));
+  const xrayLineIdsSet = new Set(proxyDeviceRows.filter((d) => d.protocol === "xray" && d.lineId != null).map((d) => d.lineId!));
+  const socks5LineIdsSet = new Set(proxyDeviceRows.filter((d) => d.protocol === "socks5" && d.lineId != null).map((d) => d.lineId!));
 
   const xrayDefaultPort = getXrayDefaultPort();
 
@@ -134,20 +134,12 @@ export async function GET(request: NextRequest) {
     const basePort = row.xrayPort ?? xrayDefaultPort;
 
     // Inline port allocation matching getProxyPortForLine logic:
-    // Allocate all Xray ports first, then SOCKS5 ports
+    // Sort by lineId for stable assignment, Xray first then SOCKS5
+    const xrayLines = nodeEntryLines.filter((lid) => xrayLineIdsSet.has(lid)).sort((a, b) => a - b);
+    const socks5Lines = nodeEntryLines.filter((lid) => socks5LineIdsSet.has(lid)).sort((a, b) => a - b);
     let port = basePort;
-    const xrayPorts: number[] = [];
-    for (const lid of nodeEntryLines) {
-      if (xrayLineIds.has(lid)) {
-        xrayPorts.push(port++);
-      }
-    }
-    const socks5Ports: number[] = [];
-    for (const lid of nodeEntryLines) {
-      if (socks5LineIds.has(lid)) {
-        socks5Ports.push(port++);
-      }
-    }
+    const xrayPorts: number[] = xrayLines.map(() => port++);
+    const socks5Ports: number[] = socks5Lines.map(() => port++);
 
     return {
       ...row,

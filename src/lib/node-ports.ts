@@ -54,22 +54,18 @@ export function getNodePorts(nodeId: number, wgPort: number, xrayPort: number | 
         .all()
     : [];
 
-  const xrayLineIds = new Set(proxyDeviceRows.filter((d) => d.protocol === "xray" && d.lineId != null).map((d) => d.lineId!));
-  const socks5LineIds = new Set(proxyDeviceRows.filter((d) => d.protocol === "socks5" && d.lineId != null).map((d) => d.lineId!));
+  const xrayLineIdsSorted = [...new Set(proxyDeviceRows.filter((d) => d.protocol === "xray" && d.lineId != null).map((d) => d.lineId!))].sort((a, b) => a - b);
+  const socks5LineIdsSorted = [...new Set(proxyDeviceRows.filter((d) => d.protocol === "socks5" && d.lineId != null).map((d) => d.lineId!))].sort((a, b) => a - b);
 
-  // Allocate ports: Xray first, then SOCKS5
+  // Allocate ports: Xray first, then SOCKS5 (sorted by lineId for stability)
   let port = basePort;
   const xrayPorts: number[] = [];
-  for (const lid of entryLineIds) {
-    if (xrayLineIds.has(lid)) {
-      xrayPorts.push(port++);
-    }
+  for (const lid of xrayLineIdsSorted) {
+    xrayPorts.push(port++);
   }
   const socks5Ports: number[] = [];
-  for (const lid of entryLineIds) {
-    if (socks5LineIds.has(lid)) {
-      socks5Ports.push(port++);
-    }
+  for (const lid of socks5LineIdsSorted) {
+    socks5Ports.push(port++);
   }
 
   return {
