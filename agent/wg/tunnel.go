@@ -10,10 +10,13 @@ import (
 )
 
 type ActiveTunnel struct {
-	Name       string
-	PrivateKey string
-	Address    string
-	ListenPort int
+	Name          string
+	PrivateKey    string
+	Address       string
+	ListenPort    int
+	PeerPublicKey string
+	PeerAddress   string
+	PeerPort      int
 }
 
 func SyncTunnels(desired []api.TunnelInterface, active map[string]ActiveTunnel) (map[string]ActiveTunnel, error) {
@@ -55,6 +58,8 @@ func SyncTunnels(desired []api.TunnelInterface, active map[string]ActiveTunnel) 
 		active[iface.Name] = ActiveTunnel{
 			Name: iface.Name, PrivateKey: iface.PrivateKey,
 			Address: iface.Address, ListenPort: iface.ListenPort,
+			PeerPublicKey: iface.PeerPublicKey, PeerAddress: iface.PeerAddress,
+			PeerPort: iface.PeerPort,
 		}
 	}
 
@@ -67,7 +72,10 @@ func SyncTunnels(desired []api.TunnelInterface, active map[string]ActiveTunnel) 
 func tunnelChanged(active ActiveTunnel, desired api.TunnelInterface) bool {
 	return active.PrivateKey != desired.PrivateKey ||
 		active.Address != desired.Address ||
-		active.ListenPort != desired.ListenPort
+		active.ListenPort != desired.ListenPort ||
+		active.PeerPublicKey != desired.PeerPublicKey ||
+		active.PeerAddress != desired.PeerAddress ||
+		active.PeerPort != desired.PeerPort
 }
 
 func createTunnel(iface api.TunnelInterface) error {

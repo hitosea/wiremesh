@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
 
       for (let i = 0; i < tunnels.length; i++) {
         const tunnel = tunnels[i];
-        const ifaceName = `wm-tun${interfaces.length + 1}`;
+        const ifaceName = `wm-tun${tunnel.id}`;
 
         let privateKey: string;
         let address: string;
