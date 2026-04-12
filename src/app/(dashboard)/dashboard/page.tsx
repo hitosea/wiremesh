@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { StatusDot } from "@/components/status-dot";
+import { useAdminSSE } from "@/components/admin-sse-provider";
 import {
   Card,
   CardContent,
@@ -76,13 +77,27 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchDashboard = useCallback(() => {
     fetch("/api/dashboard")
       .then((res) => res.json())
       .then((json) => setData(json.data))
       .catch(() => toast.error(t("loadFailed")))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    fetchDashboard();
+  }, [fetchDashboard]);
+
+  // Debounced re-fetch on status changes (node_status + device_status may fire together)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debouncedFetch = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchDashboard(), 200);
+  }, [fetchDashboard]);
+
+  useAdminSSE("node_status", debouncedFetch);
+  useAdminSSE("device_status", debouncedFetch);
 
   if (loading) {
     return (

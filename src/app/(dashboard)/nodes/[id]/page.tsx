@@ -19,6 +19,7 @@ import { StatusDot } from "@/components/status-dot";
 import { NodeStatusChart } from "@/components/node-status-chart";
 import { xrayPortHintParams } from "@/lib/port-hint";
 import { NodePortsDetail } from "@/components/node-ports-detail";
+import { useAdminSSE } from "@/components/admin-sse-provider";
 
 type NodeDetail = {
   id: number;
@@ -105,6 +106,13 @@ export default function NodeDetailPage() {
       .finally(() => setLoading(false));
     fetch("/api/settings").then(r => r.json()).then(j => setDefaults(j.data ?? {})).catch(() => {});
   }, [nodeId, router]);
+
+  // SSE real-time updates for this node
+  useAdminSSE("node_status", (update) => {
+    if (update.nodeId === Number(nodeId)) {
+      setNode((prev) => prev ? { ...prev, ...update, id: prev.id } as NodeDetail : prev);
+    }
+  });
 
   const handleSave = async () => {
     if (!name.trim()) {

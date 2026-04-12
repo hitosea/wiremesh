@@ -8,6 +8,7 @@ import { translateError } from "@/lib/translate-error";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { StatusDot } from "@/components/status-dot";
+import { useAdminSSE } from "@/components/admin-sse-provider";
 import {
   Dialog,
   DialogContent,
@@ -96,25 +97,14 @@ export default function NodesPage() {
     fetchNodes(1, "");
   }, []);
 
-  // SSE connection for real-time updates
-  useEffect(() => {
-    const es = new EventSource("/api/admin/sse");
-
-    es.addEventListener("node_status", (e) => {
-      const update = JSON.parse(e.data);
-      setData((prev) =>
-        prev.map((node) =>
-          node.id === update.nodeId ? { ...node, ...update, id: node.id } : node
-        )
-      );
-    });
-
-    es.onerror = () => {
-      // EventSource auto-reconnects
-    };
-
-    return () => es.close();
-  }, []);
+  // SSE real-time updates
+  useAdminSSE("node_status", (update) => {
+    setData((prev) =>
+      prev.map((node) =>
+        node.id === update.nodeId ? { ...node, ...update, id: node.id } : node
+      )
+    );
+  });
 
   const handleSearch = (q: string) => {
     setSearch(q);
@@ -317,7 +307,7 @@ export default function NodesPage() {
       </div>
 
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
+        <div className="flex items-center gap-3 p-3 bg-muted dark:bg-card border rounded-lg">
           <span className="text-sm font-medium">{tc("selectedItems", { count: selectedIds.size })}</span>
           <Button
             size="sm"
@@ -346,7 +336,7 @@ export default function NodesPage() {
           <Button size="sm" variant="destructive" onClick={() => setShowBatchDelete(true)}>
             {tc("batchDelete")}
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+          <Button size="sm" variant="outline" onClick={() => setSelectedIds(new Set())}>
             {tc("cancelSelection")}
           </Button>
         </div>

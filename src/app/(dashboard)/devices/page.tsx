@@ -9,6 +9,7 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { StatusDot } from "@/components/status-dot";
+import { useAdminSSE } from "@/components/admin-sse-provider";
 import {
   Dialog,
   DialogContent,
@@ -126,6 +127,9 @@ function DevicesContent() {
     fetchDevices(1, "");
     fetchLineOptions();
   }, []);
+
+  // SSE real-time updates
+  useAdminSSE("device_status", () => fetchDevices(pagination.page));
 
   const handleSearch = (q: string) => {
     setSearch(q);
@@ -301,7 +305,7 @@ function DevicesContent() {
       </div>
 
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
+        <div className="flex items-center gap-3 p-3 bg-muted dark:bg-card border rounded-lg">
           <span className="text-sm font-medium">{tc("selectedItems", { count: selectedIds.size })}</span>
           <Button size="sm" variant="outline" onClick={() => { fetchLineOptions(); setShowBatchLine(true); }}>
             {t("batchSwitchLine")}
@@ -309,7 +313,7 @@ function DevicesContent() {
           <Button size="sm" variant="destructive" onClick={() => setShowBatchDelete(true)}>
             {tc("batchDelete")}
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+          <Button size="sm" variant="outline" onClick={() => setSelectedIds(new Set())}>
             {tc("cancelSelection")}
           </Button>
         </div>
