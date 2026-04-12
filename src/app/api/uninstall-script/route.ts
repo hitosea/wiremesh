@@ -226,10 +226,10 @@ ok "Removed wiremesh-xray.service"
 rm -rf /etc/wiremesh/
 ok "Removed /etc/wiremesh/"
 
-rm -f /usr/local/bin/wiremesh-agent
+rm -f /usr/local/bin/wiremesh-agent /usr/local/bin/wiremesh-agent.backup
 ok "Removed /usr/local/bin/wiremesh-agent"
 
-rm -f /usr/local/bin/wiremesh-xray
+rm -f /usr/local/bin/wiremesh-xray /usr/local/bin/wiremesh-xray.backup
 ok "Removed /usr/local/bin/wiremesh-xray"
 
 systemctl daemon-reload

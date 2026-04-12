@@ -283,14 +283,62 @@ fi
 echo ""
 
 # ============================================================
-# Phase 3: Configure WireGuard
+# Phase 3: Download binaries (before any system modifications)
 # ============================================================
-info "Phase 3: Configuring WireGuard..."
+info "Phase 3: Downloading binaries..."
 
-# 3.1 Create config directory
+# 3.1 Download Agent binary
+info "Downloading agent binary (\$AGENT_ARCH)..."
+if ! download_with_retry "${serverUrl}/api/agent/binary?arch=\$AGENT_ARCH" /tmp/agent.tar.gz; then
+  fail "Failed to download agent binary after 3 attempts"
+fi
+
+# Verify agent checksum
+EXPECTED_CHECKSUM=\$(curl -fsSI "${serverUrl}/api/agent/binary?arch=\$AGENT_ARCH" 2>/dev/null | grep -i 'X-Agent-Checksum' | awk '{print \$2}' | tr -d '\\r' | sed 's/sha256://')
+if [ -n "\$EXPECTED_CHECKSUM" ]; then
+  ACTUAL_CHECKSUM=\$(sha256sum /tmp/agent.tar.gz | awk '{print \$1}')
+  if [ "\$EXPECTED_CHECKSUM" != "\$ACTUAL_CHECKSUM" ]; then
+    rm -f /tmp/agent.tar.gz
+    fail "Agent binary checksum mismatch"
+  fi
+  ok "Agent binary checksum verified"
+fi
+ok "Agent binary downloaded"
+
+# 3.2 Download Xray binary
+XRAY_NEEDS_INSTALL=true
+if [ -f /usr/local/bin/wiremesh-xray ]; then
+  CURRENT_XRAY_VER=\$(/usr/local/bin/wiremesh-xray version 2>/dev/null | head -1 | awk '{print \$2}' || echo "unknown")
+  LATEST_XRAY_VER=\$(curl -fsSI "${serverUrl}/api/agent/xray?arch=\$AGENT_ARCH" 2>/dev/null | grep -i 'X-Xray-Version' | awk '{print \$2}' | tr -d '\\r' || echo "unknown")
+  if [ "\$CURRENT_XRAY_VER" = "\$LATEST_XRAY_VER" ] && [ "\$CURRENT_XRAY_VER" != "unknown" ]; then
+    ok "Xray already at latest version (\$CURRENT_XRAY_VER)"
+    XRAY_NEEDS_INSTALL=false
+  else
+    info "Xray version outdated (\$CURRENT_XRAY_VER -> \$LATEST_XRAY_VER), will update"
+  fi
+fi
+
+if [ "\$XRAY_NEEDS_INSTALL" = true ]; then
+  info "Downloading Xray binary (\$AGENT_ARCH)..."
+  if download_with_retry "${serverUrl}/api/agent/xray?arch=\$AGENT_ARCH" /tmp/xray.tar.gz; then
+    ok "Xray binary downloaded"
+  else
+    warn "Xray download failed (non-fatal, can be installed later)"
+    XRAY_NEEDS_INSTALL=false
+  fi
+fi
+
+echo ""
+
+# ============================================================
+# Phase 4: Configure WireGuard
+# ============================================================
+info "Phase 4: Configuring WireGuard..."
+
+# 4.1 Create config directory
 mkdir -p /etc/wiremesh/wireguard
 
-# 3.2 Write WireGuard config
+# 4.2 Write WireGuard config
 cat > /etc/wiremesh/wireguard/wm-wg0.conf << 'WGEOF'
 [Interface]
 PrivateKey = ${wgPrivateKey}
@@ -299,7 +347,7 @@ WGEOF
 chmod 600 /etc/wiremesh/wireguard/wm-wg0.conf
 ok "WireGuard config written"
 
-# 3.3 Enable IP forwarding
+# 4.3 Enable IP forwarding
 if sysctl net.ipv4.ip_forward | grep -q "= 1"; then
   ok "IP forwarding already enabled"
 else
@@ -309,7 +357,7 @@ else
   ok "IP forwarding enabled"
 fi
 
-# 3.3b Check FORWARD chain default policy
+# 4.3b Check FORWARD chain default policy
 FORWARD_POLICY=$(iptables -L FORWARD 2>/dev/null | head -1 | grep -oP '\\(policy \\K\\w+' || echo "unknown")
 if [ "\$FORWARD_POLICY" = "ACCEPT" ]; then
   warn "============================================"
@@ -321,7 +369,7 @@ if [ "\$FORWARD_POLICY" = "ACCEPT" ]; then
   warn "============================================"
 fi
 
-# 3.4 Start WireGuard interface
+# 4.4 Start WireGuard interface
 if ip link show wm-wg0 &>/dev/null; then
   info "WireGuard interface wm-wg0 already exists, reconfiguring..."
   wg setconf wm-wg0 /etc/wiremesh/wireguard/wm-wg0.conf
@@ -333,39 +381,24 @@ else
 fi
 ok "WireGuard interface wm-wg0 is up"
 
-# 3.5 Install Xray (download from management platform)
-XRAY_NEEDS_INSTALL=true
-if [ -f /usr/local/bin/wiremesh-xray ]; then
-  CURRENT_XRAY_VER=\$(/usr/local/bin/wiremesh-xray version 2>/dev/null | head -1 | awk '{print \$2}' || echo "unknown")
-  LATEST_XRAY_VER=\$(curl -fsSI "${serverUrl}/api/agent/xray?arch=\$AGENT_ARCH" 2>/dev/null | grep -i 'X-Xray-Version' | awk '{print \$2}' | tr -d '\\r' || echo "unknown")
-  if [ "\$CURRENT_XRAY_VER" = "\$LATEST_XRAY_VER" ] && [ "\$CURRENT_XRAY_VER" != "unknown" ]; then
-    ok "Xray already at latest version (\$CURRENT_XRAY_VER)"
-    XRAY_NEEDS_INSTALL=false
-  else
-    info "Xray version outdated (\$CURRENT_XRAY_VER -> \$LATEST_XRAY_VER), updating..."
+# 4.5 Install Xray from pre-downloaded binary
+if [ "\$XRAY_NEEDS_INSTALL" = true ]; then
+  if [ -f /usr/local/bin/wiremesh-xray ]; then
     cp /usr/local/bin/wiremesh-xray /usr/local/bin/wiremesh-xray.backup 2>/dev/null || true
   fi
-fi
-
-if [ "\$XRAY_NEEDS_INSTALL" = true ]; then
-  info "Installing Xray..."
-  if download_with_retry "${serverUrl}/api/agent/xray?arch=\$AGENT_ARCH" /tmp/xray.tar.gz; then
-    tar -xzf /tmp/xray.tar.gz -C /tmp/
-    mv /tmp/xray /usr/local/bin/wiremesh-xray 2>/dev/null || \\
-      cp /tmp/xray /usr/local/bin/wiremesh-xray
-    chmod +x /usr/local/bin/wiremesh-xray
-    rm -f /tmp/xray.tar.gz /tmp/xray
-    if [ -f /usr/local/bin/wiremesh-xray ]; then
-      ok "Xray installed as wiremesh-xray"
-    else
-      warn "Xray installation failed (non-fatal, can be installed later)"
-    fi
+  tar -xzf /tmp/xray.tar.gz -C /tmp/
+  mv /tmp/xray /usr/local/bin/wiremesh-xray 2>/dev/null || \\
+    cp /tmp/xray /usr/local/bin/wiremesh-xray
+  chmod +x /usr/local/bin/wiremesh-xray
+  rm -f /tmp/xray.tar.gz /tmp/xray
+  if [ -f /usr/local/bin/wiremesh-xray ]; then
+    ok "Xray installed as wiremesh-xray"
   else
-    warn "Xray download failed (non-fatal, can be installed later)"
+    warn "Xray installation failed (non-fatal, can be installed later)"
   fi
 fi
 
-# 3.6 Configure wiremesh-xray service
+# 4.6 Configure wiremesh-xray service
 mkdir -p /etc/wiremesh/xray
 cat > /etc/systemd/system/wiremesh-xray.service << 'XRAYSVCEOF'
 [Unit]
@@ -391,11 +424,11 @@ ok "Xray service configured (wiremesh-xray)"
 echo ""
 
 # ============================================================
-# Phase 4: Deploy Agent
+# Phase 5: Deploy Agent
 # ============================================================
-info "Phase 4: Deploying WireMesh Agent..."
+info "Phase 5: Deploying WireMesh Agent..."
 
-# 4.1 Stop existing agent if upgrading
+# 5.1 Stop existing agent if upgrading
 if [ "\$UPGRADE" = true ]; then
   info "Stopping existing agent..."
   systemctl stop wiremesh-agent 2>/dev/null || true
@@ -407,28 +440,13 @@ if [ "\$UPGRADE" = true ] && [ -f /usr/local/bin/wiremesh-agent ]; then
   ok "Backed up current agent binary"
 fi
 
-# 4.2 Download and extract agent binary
-info "Downloading agent binary (\$AGENT_ARCH)..."
-if ! download_with_retry "${serverUrl}/api/agent/binary?arch=\$AGENT_ARCH" /tmp/agent.tar.gz; then
-  fail "Failed to download agent binary after 3 attempts"
-fi
-
-# Verify agent checksum
-EXPECTED_CHECKSUM=\$(curl -fsSI "${serverUrl}/api/agent/binary?arch=\$AGENT_ARCH" 2>/dev/null | grep -i 'X-Agent-Checksum' | awk '{print \$2}' | tr -d '\\r' | sed 's/sha256://')
-if [ -n "\$EXPECTED_CHECKSUM" ]; then
-  ACTUAL_CHECKSUM=\$(sha256sum /tmp/agent.tar.gz | awk '{print \$1}')
-  if [ "\$EXPECTED_CHECKSUM" != "\$ACTUAL_CHECKSUM" ]; then
-    fail "Agent binary checksum mismatch"
-  fi
-  ok "Agent binary checksum verified"
-fi
-
+# 5.2 Install agent from pre-downloaded binary
 tar -xzf /tmp/agent.tar.gz -C /usr/local/bin/
 chmod +x /usr/local/bin/wiremesh-agent
 rm -f /tmp/agent.tar.gz
-ok "Agent binary downloaded"
+ok "Agent binary installed"
 
-# 4.3 Write agent config
+# 5.3 Write agent config
 cat > /etc/wiremesh/agent.yaml << 'AGENTEOF'
 server_url: ${serverUrl}
 node_id: ${node.id}
@@ -438,7 +456,7 @@ AGENTEOF
 chmod 600 /etc/wiremesh/agent.yaml
 ok "Agent config written"
 
-# 4.4 Create systemd service
+# 5.4 Create systemd service
 cat > /etc/systemd/system/wiremesh-agent.service << 'SVCEOF'
 [Unit]
 Description=WireMesh Agent
@@ -455,7 +473,7 @@ User=root
 WantedBy=multi-user.target
 SVCEOF
 
-# 4.5 Start agent
+# 5.5 Start agent
 systemctl daemon-reload
 systemctl enable wiremesh-agent >/dev/null 2>&1
 systemctl start wiremesh-agent
