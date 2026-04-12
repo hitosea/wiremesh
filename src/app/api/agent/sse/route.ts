@@ -4,6 +4,7 @@ import { nodes } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { sseManager } from "@/lib/sse-manager";
 import { authenticateAgent } from "@/lib/agent-auth";
+import { adminSseManager } from "@/lib/admin-sse-manager";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,7 @@ export async function GET(request: NextRequest) {
         .set({ status: "online", errorMessage: null, updatedAt: new Date().toISOString() })
         .where(eq(nodes.id, nodeId))
         .run();
+      adminSseManager.broadcast("node_status", { nodeId, status: "online" });
 
       // Send connected event
       const message = `event: connected\ndata: ${JSON.stringify({ nodeId })}\n\n`;
@@ -66,6 +68,7 @@ export async function GET(request: NextRequest) {
             .set({ status: "offline", updatedAt: new Date().toISOString() })
             .where(eq(nodes.id, nodeId))
             .run();
+          adminSseManager.broadcast("node_status", { nodeId, status: "offline" });
         }
       } catch {
         // ignore

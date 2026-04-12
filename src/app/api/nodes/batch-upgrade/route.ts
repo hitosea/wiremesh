@@ -4,6 +4,7 @@ import { nodes } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { sseManager } from "@/lib/sse-manager";
 import { success, error } from "@/lib/api-response";
+import { adminSseManager } from "@/lib/admin-sse-manager";
 
 export async function POST(request: NextRequest) {
   const body = await request.json() as { nodeIds: number[]; type: "agent" | "xray" };
@@ -30,6 +31,7 @@ export async function POST(request: NextRequest) {
           .set({ ...field, updatedAt: now })
           .where(eq(nodes.id, nodeId))
           .run();
+        adminSseManager.broadcast("node_status", { nodeId, ...field });
         sent++;
       } else {
         offline++;

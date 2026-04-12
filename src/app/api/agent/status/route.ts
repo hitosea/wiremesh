@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { nodes, nodeStatus, devices } from "@/lib/db/schema";
 import { eq, sql, inArray } from "drizzle-orm";
 import { authenticateAgent } from "@/lib/agent-auth";
+import { adminSseManager } from "@/lib/admin-sse-manager";
 
 export const dynamic = "force-dynamic";
 
@@ -48,15 +49,24 @@ export async function POST(request: NextRequest) {
     .run();
 
   // Update node status
+  const newStatus = is_online ? "online" : "offline";
   db.update(nodes)
     .set({
-      status: is_online ? "online" : "offline",
+      status: newStatus,
       ...(agent_version && { agentVersion: agent_version }),
       ...(xray_version && { xrayVersion: xray_version }),
       updatedAt: new Date().toISOString(),
     })
     .where(eq(nodes.id, node.id))
     .run();
+
+  // Broadcast to admin browsers
+  adminSseManager.broadcast("node_status", {
+    nodeId: node.id,
+    status: newStatus,
+    ...(agent_version && { agentVersion: agent_version }),
+    ...(xray_version && { xrayVersion: xray_version }),
+  });
 
   // Build a map of peer transfers for quick lookup
   const transferMap = new Map<string, Transfer>();
@@ -85,6 +95,10 @@ export async function POST(request: NextRequest) {
         })
         .where(eq(devices.id, device.id))
         .run();
+      adminSseManager.broadcast("device_status", {
+        deviceId: device.id,
+        lastHandshake: h.last_handshake,
+      });
     }
   }
 
@@ -95,6 +109,15 @@ export async function POST(request: NextRequest) {
       .set({ lastHandshake: now, updatedAt: now })
       .where(inArray(devices.xrayUuid, xray_online_users))
       .run();
+    // Broadcast device_status for xray devices
+    const xrayDevices = db
+      .select({ id: devices.id })
+      .from(devices)
+      .where(inArray(devices.xrayUuid, xray_online_users))
+      .all();
+    for (const d of xrayDevices) {
+      adminSseManager.broadcast("device_status", { deviceId: d.id, lastHandshake: now });
+    }
   }
 
   return Response.json({ data: { ok: true } });

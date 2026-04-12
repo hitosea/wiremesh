@@ -4,6 +4,7 @@ import { nodes } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { sseManager } from "@/lib/sse-manager";
 import { success, error } from "@/lib/api-response";
+import { adminSseManager } from "@/lib/admin-sse-manager";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -20,10 +21,13 @@ export async function POST(request: NextRequest, { params }: Params) {
     return error("CONFLICT", "nodes.upgradeOffline");
   }
 
+  const now = new Date().toISOString();
   db.update(nodes)
-    .set({ xrayUpgradeTriggeredAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+    .set({ xrayUpgradeTriggeredAt: now, updatedAt: now })
     .where(eq(nodes.id, nodeId))
     .run();
+
+  adminSseManager.broadcast("node_status", { nodeId, xrayUpgradeTriggeredAt: now });
 
   return success({ message: "nodes.xrayUpgradeTriggered" });
 }

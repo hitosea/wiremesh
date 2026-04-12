@@ -96,6 +96,26 @@ export default function NodesPage() {
     fetchNodes(1, "");
   }, []);
 
+  // SSE connection for real-time updates
+  useEffect(() => {
+    const es = new EventSource("/api/admin/sse");
+
+    es.addEventListener("node_status", (e) => {
+      const update = JSON.parse(e.data);
+      setData((prev) =>
+        prev.map((node) =>
+          node.id === update.nodeId ? { ...node, ...update, id: node.id } : node
+        )
+      );
+    });
+
+    es.onerror = () => {
+      // EventSource auto-reconnects
+    };
+
+    return () => es.close();
+  }, []);
+
   const handleSearch = (q: string) => {
     setSearch(q);
     fetchNodes(1, q);
