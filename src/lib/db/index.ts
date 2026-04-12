@@ -27,6 +27,10 @@ function getDb(): BetterSQLite3Database<typeof schema> {
 
   migrate(_db, { migrationsFolder: path.join(process.cwd(), "drizzle") });
 
+  // Backfill proxy ports for existing lines (idempotent)
+  const { backfillProxyPorts } = require("@/lib/proxy-port");
+  backfillProxyPorts();
+
   return _db;
 }
 

@@ -47,7 +47,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   if (!node) return error("NOT_FOUND", "notFound.node");
 
-  const ports = getNodePorts(node.id, node.port, node.xrayPort);
+  const ports = getNodePorts(node.id, node.port);
   return success({ ...node, ports });
 }
 

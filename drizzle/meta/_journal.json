@@ -50,6 +50,13 @@
       "when": 1744400400000,
       "tag": "0006_add_upgrade_triggered_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1744500000000,
+      "tag": "0007_add_proxy_ports",
+      "breakpoints": true
     }
   ]
 }

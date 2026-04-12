@@ -1,7 +1,6 @@
 import { db } from "@/lib/db";
-import { lineTunnels, lineNodes, devices } from "@/lib/db/schema";
-import { eq, and, inArray, or } from "drizzle-orm";
-import { getXrayDefaultPort } from "@/lib/proxy-port";
+import { lineTunnels, lineNodes, lines } from "@/lib/db/schema";
+import { eq, and, inArray } from "drizzle-orm";
 
 export type NodePorts = {
   wg: number;
@@ -13,10 +12,7 @@ export type NodePorts = {
 /**
  * Compute all ports used by a single node.
  */
-export function getNodePorts(nodeId: number, wgPort: number, xrayPort: number | null): NodePorts {
-  const xrayDefaultPort = getXrayDefaultPort();
-  const basePort = xrayPort ?? xrayDefaultPort;
-
+export function getNodePorts(nodeId: number, wgPort: number): NodePorts {
   // Tunnel ports
   const tunnelPorts = new Set<number>();
   const fromRows = db
@@ -32,7 +28,7 @@ export function getNodePorts(nodeId: number, wgPort: number, xrayPort: number | 
   for (const r of fromRows) tunnelPorts.add(r.port);
   for (const r of toRows) tunnelPorts.add(r.port);
 
-  // Entry lines for this node
+  // Entry lines for this node — read persisted proxy ports
   const entryLineIds = db
     .select({ lineId: lineNodes.lineId })
     .from(lineNodes)
@@ -40,38 +36,25 @@ export function getNodePorts(nodeId: number, wgPort: number, xrayPort: number | 
     .all()
     .map((r) => r.lineId);
 
-  // Find xray/socks5 devices on those lines
-  const proxyDeviceRows = entryLineIds.length > 0
-    ? db
-        .select({ lineId: devices.lineId, protocol: devices.protocol })
-        .from(devices)
-        .where(
-          and(
-            inArray(devices.lineId, entryLineIds),
-            or(eq(devices.protocol, "xray"), eq(devices.protocol, "socks5"))
-          )
-        )
-        .all()
-    : [];
-
-  const xrayLineIdsSorted = [...new Set(proxyDeviceRows.filter((d) => d.protocol === "xray" && d.lineId != null).map((d) => d.lineId!))].sort((a, b) => a - b);
-  const socks5LineIdsSorted = [...new Set(proxyDeviceRows.filter((d) => d.protocol === "socks5" && d.lineId != null).map((d) => d.lineId!))].sort((a, b) => a - b);
-
-  // Allocate ports: Xray first, then SOCKS5 (sorted by lineId for stability)
-  let port = basePort;
   const xrayPorts: number[] = [];
-  for (const lid of xrayLineIdsSorted) {
-    xrayPorts.push(port++);
-  }
   const socks5Ports: number[] = [];
-  for (const lid of socks5LineIdsSorted) {
-    socks5Ports.push(port++);
+
+  if (entryLineIds.length > 0) {
+    const lineRows = db
+      .select({ id: lines.id, xrayPort: lines.xrayPort, socks5Port: lines.socks5Port })
+      .from(lines)
+      .where(inArray(lines.id, entryLineIds))
+      .all();
+    for (const row of lineRows) {
+      if (row.xrayPort !== null) xrayPorts.push(row.xrayPort);
+      if (row.socks5Port !== null) socks5Ports.push(row.socks5Port);
+    }
   }
 
   return {
     wg: wgPort,
-    xray: xrayPorts,
+    xray: xrayPorts.sort((a, b) => a - b),
     tunnels: [...tunnelPorts].sort((a, b) => a - b),
-    socks5: socks5Ports,
+    socks5: socks5Ports.sort((a, b) => a - b),
   };
 }
