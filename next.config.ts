@@ -3,7 +3,9 @@ import createNextIntlPlugin from "next-intl/plugin";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  allowedDevOrigins: ["*.coder.dootask.com"],
+  ...(process.env.ALLOWED_DEV_ORIGINS
+    ? { allowedDevOrigins: process.env.ALLOWED_DEV_ORIGINS.split(",") }
+    : {}),
 };
 
 const withNextIntl = createNextIntlPlugin();

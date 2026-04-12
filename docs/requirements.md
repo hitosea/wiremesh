@@ -1,689 +1,551 @@
-# WireMesh 管理平台 — 需求文档
+# WireMesh Management Platform — Requirements Document
 
-> 版本: 2.4  
-> 日期: 2026-04-06
+> Version: 3.0
+> Date: 2026-04-12
 
 ---
 
-## 1. 项目概述
+## 1. Project Overview
 
-### 1.1 定位
+### 1.1 Purpose
 
-内部自用的 WireMesh 网络管理平台，用于管理 VPN 节点（服务器）、客户端接入点（设备）、网络线路和流量分流规则。系统由单一管理员使用，不涉及多租户和计费功能。
+An internal WireMesh network management platform for managing VPN nodes (servers), client access points (devices), network lines, and traffic routing rules. The system is used by a single administrator and does not involve multi-tenancy or billing features.
 
-### 1.2 业务规模
+### 1.2 Business Scale
 
-初期中小型规模：节点 10~50 台，设备 50~200 台。
+Initial small-to-medium scale: 10–50 nodes, 50–200 devices.
 
-### 1.3 技术栈
+### 1.3 Technology Stack
 
-| 层级 | 技术选型 |
-|------|---------|
-| 全栈框架 | Next.js (App Router) |
-| 前端 UI | React 18 + TypeScript + shadcn/ui + Tailwind CSS |
-| 数据库 | SQLite (via better-sqlite3 或 Drizzle ORM) |
-| 后台任务 | 轻量 Node.js Worker 进程（与 Next.js 同容器） |
-| 节点 Agent | Go 单二进制（部署到每个节点服务器） |
-| VPN 协议 | WireGuard + Xray (VLESS + WebSocket/gRPC) |
-| 敏感数据加密 | AES-256-GCM，密钥通过环境变量 `ENCRYPTION_KEY` 注入 |
-| 部署方式 | Docker Compose（单容器） |
+| Layer | Technology |
+|-------|-----------|
+| Full-stack Framework | Next.js (App Router) |
+| Frontend UI | React 19 + TypeScript + shadcn/ui + Tailwind CSS |
+| Database | SQLite (Drizzle ORM) |
+| Background Tasks | Lightweight Node.js Worker process (same container as Next.js) |
+| Node Agent | Go single binary (deployed to each node server, supports linux/amd64 and linux/arm64) |
+| VPN Protocol | WireGuard + Xray (VLESS Reality) + SOCKS5 |
+| Sensitive Data Encryption | AES-256-GCM, key injected via `ENCRYPTION_KEY` environment variable |
+| Internationalization | next-intl routeless mode (Chinese + English) |
+| Deployment | Docker Compose (single container) |
 
-### 1.4 代码组织
+### 1.4 Code Organization
 
-Monorepo 结构，Agent 与管理平台在同一仓库：
+Monorepo structure with Agent and management platform in the same repository:
 
 ```
 wiremesh/
-├── src/                    # Next.js 管理平台
-├── agent/                  # Go Agent 源码
-├── worker/                 # Node.js Worker 进程
-├── docs/                   # 文档
+├── src/                    # Next.js Management Platform
+├── agent/                  # Go Agent source code
+├── worker/                 # Node.js Worker process
+├── docs/                   # Documentation
+├── messages/               # i18n translation files (zh-CN.json, en.json)
 ├── docker-compose.yml
 ├── Dockerfile
 └── package.json
 ```
 
-### 1.5 单容器架构
-
-使用一个 Docker 容器运行所有服务：
+### 1.5 Single-Container Architecture
 
 ```
-┌──────────────────────────────────────┐
-│           Docker Container           │
-│                                      │
-│  ┌───────────┐  ┌──────────────────┐ │
-│  │  Next.js   │  │  Worker          │ │
-│  │  (Web+API  │  │  (定时任务       │ │
-│  │   +SSE)    │  │   +状态检测)     │ │
-│  └─────┬─────┘  └───────┬──────────┘ │
-│        │                 │            │
-│        └────────┬────────┘            │
-│                 │                     │
-│          ┌──────┴──────┐              │
-│          │   SQLite    │              │
-│          │(wiremesh.db)│              │
-│          └─────────────┘              │
-└──────────────────────────────────────┘
-         ▲
-         │ SSE (通知) + HTTP POST (上报/拉取)
-         ▼
-┌─────────────────┐
-│  Node Agent(s)  │
-│  (Go 二进制)     │
-│  运行在各节点上   │
-└─────────────────┘
+┌────────────────────────────────────────┐
+│     Docker Container (Management Platform) │
+│                                        │
+│  Next.js (Web+API+SSE)                │
+│  Worker (Scheduled Tasks+Health Checks)│
+│  SQLite                                │
+└───────────────────┬────────────────────┘
+                    │ SSE + HTTP
+                    ▼
+              Node Agent(s)
+              (Go binary)
 ```
 
-- Next.js 同时负责前端页面渲染、API 接口和 SSE 推送
-- Worker 进程负责定时任务（节点状态检测、数据清理等）
-- SQLite 数据文件通过 Docker Volume 持久化
-- Node Agent 运行在各节点服务器上，通过 SSE 接收通知，HTTP POST 上报数据
+- Next.js handles frontend page rendering, API endpoints, and SSE push notifications
+- Worker process handles scheduled tasks (node health checks, data cleanup, etc.)
+- SQLite data files are persisted via Docker Volume
+- Node Agent runs on each node server, receives notifications via SSE, and reports data via HTTP POST
 
 ---
 
-## 2. 用户与认证
+## 2. Users & Authentication
 
-### 2.1 角色
+### 2.1 Roles
 
-仅 **管理员** 一种角色，无多用户体系。
+Only one role: **Administrator**. No multi-user system.
 
-### 2.2 认证方式
+### 2.2 Authentication Method
 
-- 用户名 + 密码登录
-- JWT Token 会话管理
-- 首次启动时进入初始化页面，设置管理员账号密码及 WireGuard 默认网段
-- 支持修改密码
+- Username + password login
+- JWT Token session management
+- On first startup, redirects to an initialization page to set up administrator credentials
+- Supports password changes
 
-### 2.3 首次初始化
+### 2.3 First-Time Initialization
 
-系统首次启动时（数据库无管理员记录），自动跳转到 `/setup` 页面：
+On first system startup (no administrator record in database), automatically redirects to the `/setup` page:
 
-- 设置管理员用户名和密码
-- 设置 WireGuard 默认内网网段（如 `10.0.0.0/24`）
-- 其他配置使用默认值，后续可在设置页修改
-- 初始化完成后跳转到登录页
-
-### 2.4 页面
-
-| 页面 | 说明 |
-|------|------|
-| 初始化页 `/setup` | 首次启动时的管理员账号设置 |
-| 登录页 `/login` | 用户名 + 密码表单 |
-| 全局布局 | 侧边栏导航 + 顶部栏（用户信息、退出） |
+- Set administrator username and password
+- Other configurations use default values and can be modified later in the settings page
+- After initialization, redirects to the login page
 
 ---
 
-## 3. 功能模块
+## 3. Feature Modules
 
-### 3.1 Dashboard（仪表盘）
+### 3.1 Dashboard
 
-概览页面，展示系统整体状态：
+Overview page displaying overall system status:
 
-- 节点总数 / 在线数 / 离线数
-- 设备（接入点）总数 / 在线数
-- 线路总数 / 活跃数
-- 各节点基本流量统计（上行/下行）
-- 节点/设备在线状态列表（快速预览）
+- Total nodes / online / offline count
+- Total devices (access points) / online count
+- Total lines / active count
+- Basic traffic statistics per node (upload/download)
+- Node/device online status list (quick preview)
 
 ---
 
-### 3.2 节点管理 (Nodes)
+### 3.2 Node Management (Nodes)
 
-节点 = 云端服务器，运行 WireGuard 和/或 Xray 服务。任何节点都可以在不同线路中担任入口、中转或出口角色，角色由线路编排决定。每个节点上运行一个 Agent 进程。
+Node = cloud server running WireGuard and/or Xray/SOCKS5 services. Any node can serve as entry, relay, or exit in different lines — roles are determined by line orchestration. Each node runs one Agent process.
 
-**设备接入方式：**
+**Device Access Methods:**
 
-- **WireGuard 接入**：设备通过 WireGuard 协议直接连接节点的 wm-wg0 接口
-- **Xray 接入**：设备通过 VLESS (WS/gRPC) 协议连接节点的 Xray 服务，Xray 作为入口层代理，将流量解密后转发到本地 wm-wg0 接口
-
-两种接入方式进入 wm-wg0 后，后续链路完全相同（走 WireGuard 隧道链路转发到出口）。
+- **WireGuard access**: Devices connect directly to a node's wm-wg0 interface via WireGuard protocol
+- **Xray access**: Devices connect to a node's Xray service via VLESS Reality protocol; Xray decrypts and forwards to the local wm-wg0 interface
+- **SOCKS5 access**: Devices connect to a node's SOCKS5 server via system proxy (username/password authentication); traffic is routed to tunnels via fwmark
 
 ```
-WireGuard 设备 ──WG 隧道──► wm-wg0(入口节点) ──► wg 隧道链 ──► 出口 ──► 互联网
-Xray 设备 ──VLESS──► Xray(入口节点) ──► wm-wg0 ──► wg 隧道链 ──► 出口 ──► 互联网
+WireGuard Device ──WG tunnel──► wm-wg0(entry node) ──► WG tunnel chain ──► exit ──► Internet
+Xray Device ──VLESS Reality──► Xray(entry node) ──► wm-wg0 ──► WG tunnel chain ──► exit ──► Internet
+SOCKS5 Device ──proxy──► SOCKS5(entry node) ──fwmark──► WG tunnel chain ──► exit ──► Internet
 ```
 
-**Xray 的定位：** Xray 仅作为入口层的接入代理，解决"设备怎么接入"的问题（适用于 WireGuard 被封锁的网络环境）。节点之间的隧道链路全部使用 WireGuard，不涉及 Xray。
+**Xray's Role:** Xray serves only as an entry-layer access proxy, solving the "how devices connect" problem (applicable in network environments where WireGuard is blocked). All inter-node tunnel links use WireGuard exclusively — Xray is not involved.
 
-#### 3.2.1 节点信息
+#### 3.2.1 Node Fields
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | 自增主键 | — |
-| name | string | 节点名称 |
-| ip | string | 服务器公网 IP |
-| domain | string? | 可选域名 |
-| port | number | WireGuard 监听端口 |
-| agent_token | string | Agent 认证 Token（创建时自动生成，唯一） |
-| wg_private_key | string | WireGuard 私钥（自动生成，加密存储） |
-| wg_public_key | string | WireGuard 公钥（自动生成） |
-| wg_address | string | WireGuard 内网地址（如 10.0.0.1/24） |
-| ~~xray_enabled~~ | ~~boolean~~ | ~~已废弃，代理服务由线路编排决定~~ |
-| xray_protocol | enum? | VLESS 协议 |
-| xray_transport | enum? | 传输层：ws / grpc |
-| xray_port | number? | Xray 监听端口 |
-| xray_config | json? | Xray 扩展配置参数 |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | auto-increment PK | — |
+| name | string | Node name |
+| ip | string | Server public IP |
+| domain | string? | Optional domain name |
+| port | number | WireGuard listen port |
+| agent_token | string | Agent authentication token (auto-generated on creation, unique) |
+| wg_private_key | string | WireGuard private key (auto-generated, encrypted storage) |
+| wg_public_key | string | WireGuard public key (auto-generated) |
+| wg_address | string | WireGuard internal address (e.g., 10.210.0.1/24) |
+| xray_protocol | string? | VLESS protocol |
+| xray_transport | string? | Transport layer (uses tcp + Reality in practice) |
+| xray_port | number? | Xray listen port |
+| xray_config | json? | Xray extended configuration (includes Reality key pair, dest, shortId, etc.) |
+| external_interface | string | External network interface name (default eth0) |
 | status | enum | online / offline / installing / error |
-| error_message | string? | 错误信息（status 为 error 时） |
-| tags | string? | 标签，逗号分隔 |
-| remark | text? | 备注 |
-| created_at | datetime | 创建时间 |
-| updated_at | datetime | 更新时间 |
+| error_message | string? | Error message (when status is error) |
+| agent_version | string? | Current Agent version |
+| xray_version | string? | Current Xray version |
+| upgrade_triggered_at | datetime? | Agent upgrade trigger time |
+| xray_upgrade_triggered_at | datetime? | Xray upgrade trigger time |
+| pending_delete | boolean | Whether awaiting uninstall/deletion |
+| remark | text? | Remark |
+| created_at | datetime | Creation time |
+| updated_at | datetime | Update time |
 
-#### 3.2.2 节点功能
+#### 3.2.2 Node Features
 
-- **CRUD**：新增、编辑、删除节点
-- **一键安装脚本生成**：
-  - 根据节点配置生成 bash 安装脚本
-  - 脚本内容包括：安装 WireGuard、配置 wm-wg0 接口、安装 Xray（如启用）、下载并安装 Agent 二进制、注册 systemd 服务、启动所有服务
-  - 管理员复制脚本到节点服务器上执行
-  - Agent 启动后通过 SSE 连接管理平台，上报安装完成状态
-- **状态监控**：Agent 定时上报在线状态和延迟
-- **配置同步**：当节点参数或关联的 Peer 变更时，通过 SSE 通知 Agent 拉取最新配置并应用
-- **批量操作**：批量删除、批量更新标签
-- **错误处理**：配置同步或安装失败时，节点状态标记为 error，记录错误信息，Dashboard 高亮提示
+- **CRUD**: Create, edit, delete nodes
+- **One-click install script generation**: Generate bash install scripts based on node configuration, supporting Ubuntu/Debian/CentOS/RHEL/Rocky/AlmaLinux/Fedora, x86_64 and ARM64
+- **Remote uninstall**: Notify Agent via SSE to execute uninstall; node is marked as pending_delete; Worker cleans up after 7 days
+- **Agent upgrade**: Trigger Agent to automatically download a new version and restart via SSE
+- **Xray upgrade**: Trigger Xray binary update via SSE
+- **Batch operations**: Batch delete, batch upgrade
+- **Status monitoring**: Agent periodically reports online status, latency, and version number
+- **Configuration sync**: When node parameters or associated Peers change, notify Agent via SSE to pull and apply the latest configuration
 
-#### 3.2.3 节点状态记录
+#### 3.2.3 Node Status Records
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | 自增主键 | — |
-| node_id | FK | 关联节点 |
-| is_online | boolean | 是否在线 |
-| latency | number? | 延迟（ms） |
-| upload_bytes | bigint | 上行流量 |
-| download_bytes | bigint | 下行流量 |
-| checked_at | datetime | 检测时间 |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | auto-increment PK | — |
+| node_id | FK | Associated node |
+| is_online | boolean | Whether online |
+| latency | number? | Latency (ms) |
+| upload_bytes | bigint | Upload traffic |
+| download_bytes | bigint | Download traffic |
+| checked_at | datetime | Check time |
 
-**数据保留策略：** 保留 7 天，Worker 定时清理过期记录。
+**Data Retention Policy:** Retained for 7 days; Worker periodically cleans expired records.
 
 ---
 
-### 3.3 设备管理 (Devices)
+### 3.3 Device Management (Devices)
 
-设备 = 客户端接入点，即连接到 VPN 网络的终端（电脑、手机、路由器等），通过 WireGuard 或 Xray 协议接入。
+Device = client access point, i.e., a terminal (computer, phone, router, etc.) connecting to the VPN network.
 
-#### 3.3.1 设备信息
+#### 3.3.1 Device Fields
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | 自增主键 | — |
-| name | string | 设备名称 |
-| protocol | enum | 接入协议：wireguard / xray |
-| wg_public_key | string? | WireGuard 公钥（WG 协议时） |
-| wg_private_key | string? | WireGuard 私钥（自动生成，加密存储，WG 协议时） |
-| wg_address | string? | 分配的 WireGuard 内网 IP |
-| xray_uuid | string? | Xray 客户端 UUID（Xray 协议时） |
-| xray_config | json? | Xray 客户端配置参数 |
-| line_id | FK? | 关联的线路 |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | auto-increment PK | — |
+| name | string | Device name |
+| protocol | enum | Access protocol: wireguard / xray / socks5 |
+| wg_public_key | string? | WireGuard public key (for WG protocol) |
+| wg_private_key | string? | WireGuard private key (auto-generated, encrypted storage, for WG protocol) |
+| wg_address | string? | Assigned WireGuard internal IP |
+| xray_uuid | string? | Xray client UUID (for Xray protocol) |
+| xray_config | json? | Xray client configuration parameters |
+| socks5_username | string? | SOCKS5 username (for SOCKS5 protocol, auto-generated) |
+| socks5_password | string? | SOCKS5 password (for SOCKS5 protocol, auto-generated, encrypted storage) |
+| line_id | FK? | Associated line |
 | status | enum | online / offline |
-| last_handshake | datetime? | 最后握手/连接时间 |
-| tags | string? | 标签 |
-| remark | text? | 备注 |
-| created_at | datetime | 创建时间 |
-| updated_at | datetime | 更新时间 |
+| last_handshake | datetime? | Last handshake/connection time |
+| upload_bytes | bigint | Cumulative upload traffic |
+| download_bytes | bigint | Cumulative download traffic |
+| remark | text? | Remark |
+| created_at | datetime | Creation time |
+| updated_at | datetime | Update time |
 
-#### 3.3.2 设备功能
+#### 3.3.2 Device Features
 
-- **CRUD**：新增、编辑、删除设备
-- **自动生成密钥/UUID**：创建设备时自动生成 WireGuard 密钥对或 Xray UUID
-- **生成客户端配置**：根据设备信息和关联线路，生成可直接使用的客户端配置文件（WireGuard .conf 或 Xray JSON）
-- **Peer 自动同步**：创建/删除/修改设备后，通过 SSE 通知相关节点的 Agent 拉取最新 Peer 列表并更新 WireGuard 配置
-- **关联线路**：将设备绑定到指定线路
-- **在线状态**：通过节点 Agent 上报的 WireGuard handshake 信息判断
-- **批量操作**：批量删除、批量切换线路
+- **CRUD**: Create, edit, delete devices
+- **Auto-generate keys/UUID/credentials**: Automatically generate WireGuard key pair, Xray UUID, or SOCKS5 username/password based on protocol when creating a device
+- **Generate client configuration**: WireGuard .conf file, Xray VLESS share link, SOCKS5 proxy address
+- **Peer auto-sync**: After creating/deleting/modifying a device, notify relevant node Agents via SSE to update configuration
+- **Associate with line**: Bind a device to a specified line
+- **Traffic statistics**: Agent reports incremental upload/download traffic per device
+- **Online status**: Determined via Agent-reported WireGuard handshake or Xray online user data
+- **Batch operations**: Batch delete, batch switch lines
 
 ---
 
-### 3.4 线路管理 (Lines)
+### 3.4 Line Management (Lines)
 
-线路 = 逻辑隧道链路，由入口节点和出口节点组成，定义流量的转发路径。
+Line = logical tunnel chain, composed of entry and exit nodes, defining the traffic forwarding path.
 
-#### 3.4.1 线路信息
+#### 3.4.1 Line Fields
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | 自增主键 | — |
-| name | string | 线路名称 |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | auto-increment PK | — |
+| name | string | Line name |
 | status | enum | active / inactive |
-| tags | string? | 标签 |
-| remark | text? | 备注 |
-| created_at | datetime | 创建时间 |
-| updated_at | datetime | 更新时间 |
+| remark | text? | Remark |
+| created_at | datetime | Creation time |
+| updated_at | datetime | Update time |
 
-#### 3.4.2 线路节点关联（多跳支持）
+#### 3.4.2 Line-Node Association (Multi-Hop Support)
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | 自增主键 | — |
-| line_id | FK | 关联线路 |
-| node_id | FK | 关联节点 |
-| hop_order | number | 跳数顺序（0=入口, 1=中转, 2=出口...） |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | auto-increment PK | — |
+| line_id | FK | Associated line |
+| node_id | FK | Associated node |
+| branch_id | FK? | Associated branch (NULL indicates main path) |
+| hop_order | number | Hop sequence (0=entry, 1=relay, 2=exit...) |
 | role | enum | entry / relay / exit |
 
-#### 3.4.3 线路隧道（line_tunnels）
+#### 3.4.3 Line Branches (line_branches)
 
-每条隧道代表两个相邻节点之间的一条 WireGuard 点对点链路，包含两端各自的密钥、地址和端口。
+Lines support multiple branch exits for routing rules to match different destinations via different paths.
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | 自增主键 | — |
-| line_id | FK | 关联线路 |
-| hop_index | number | 隧道序号（0=第一跳, 1=第二跳...） |
-| from_node_id | FK | 低 hop_order 端节点 |
-| to_node_id | FK | 高 hop_order 端节点 |
-| from_wg_private_key | string | from 端 WireGuard 私钥（自动生成，加密存储） |
-| from_wg_public_key | string | from 端 WireGuard 公钥（自动生成） |
-| from_wg_address | string | from 端隧道内�� IP（如 10.1.0.1/30） |
-| from_wg_port | number | from 端 WireGuard 监听端口 |
-| to_wg_private_key | string | to 端 WireGuard 私钥（自动生成，加密存储） |
-| to_wg_public_key | string | to 端 WireGuard 公钥（自动生成） |
-| to_wg_address | string | to 端隧道内网 IP（如 10.1.0.2/30） |
-| to_wg_port | number | to 端 WireGuard 监听端口 |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | auto-increment PK | — |
+| line_id | FK | Associated line |
+| name | string | Branch name |
+| is_default | boolean | Whether this is the default branch |
+| created_at | datetime | Creation time |
+| updated_at | datetime | Update time |
 
-**示例（线路 A→B→C）：**
+#### 3.4.4 Line Tunnels (line_tunnels)
 
-| line_id | hop_index | from_node | to_node | from 端 | to 端 |
-|---------|-----------|-----------|---------|---------|-------|
-| 3 | 0 | A | B | 10.1.0.1/30 :51830 | 10.1.0.2/30 :51830 |
-| 3 | 1 | B | C | 10.1.0.5/30 :51831 | 10.1.0.6/30 :51831 |
+Each tunnel represents a point-to-point WireGuard link between two adjacent nodes.
 
-中转节点 B 出现在两行中——hop_index=0 的 to 端和 hop_index=1 的 from 端——天然拥有两套独立的隧道密钥和地址。
+| Field | Type | Description |
+|-------|------|-------------|
+| id | auto-increment PK | — |
+| line_id | FK | Associated line |
+| hop_index | number | Tunnel sequence number |
+| from_node_id | FK | Node at the lower hop_order end |
+| to_node_id | FK | Node at the higher hop_order end |
+| from_wg_private_key | string | from-end WireGuard private key (encrypted storage) |
+| from_wg_public_key | string | from-end WireGuard public key |
+| from_wg_address | string | from-end tunnel internal IP (e.g., 10.211.0.1/30) |
+| from_wg_port | number | from-end WireGuard listen port |
+| to_wg_private_key | string | to-end WireGuard private key (encrypted storage) |
+| to_wg_public_key | string | to-end WireGuard public key |
+| to_wg_address | string | to-end tunnel internal IP (e.g., 10.211.0.2/30) |
+| to_wg_port | number | to-end WireGuard listen port |
+| branch_id | FK? | Associated branch (NULL indicates main path) |
 
-**说明：** `line_tunnels` 中的密钥与节点表上的 wg_private_key/wg_public_key（给设备接入 wm-wg0 用的）完全独立。创建线路编排时自动生成。
+**Node Composition Rules:**
 
-**节点自由组合规则：**
+- Nodes have no fixed role; roles are entirely determined by line orchestration
+- The same node can participate in multiple lines simultaneously, serving different roles in different lines
+- Lines are independent of each other and do not affect one another
 
-- 节点本身不限定角色，角色完全由线路编排（line_nodes）决定
-- 同一个节点可以同时参与多条线路，且在不同线路中担任不同角色
-- 一个节点可以同时是线路 1 的入口、线路 2 的出口、线路 3 的中转
-- 线路之间互相独立，互不影响
+**Multi-Hop Forwarding Mechanism:** Each hop establishes an independent WireGuard tunnel interface (wm-tun1, wm-tun2, ...). Relay nodes forward traffic via iptables rules. wm-wg0 is reserved for device access.
 
-**组合示例：**
+#### 3.4.5 Line Features
 
-假设有 A、B、C 三个节点，可以自由组合出以下线路：
-
-```
-线路 1: A(入口) → B(出口)           # A 当入口，B 当出口
-线路 2: A(入口) → C(出口)           # A 同时也是另一条线路的入口
-线路 3: A(入口) → B(中转) → C(出口)  # B 在这条线路里当中转
-线路 4: C(入口) → A(出口)           # A 在这条线路里变成出口
-线路 5: B(入口) → A(中转) → C(出口)  # A 在这条线路里当中转
-```
-
-上述线路可以**同时存在并同时生效**。每个节点的 Agent 会收到它参与的所有线路的隧道配置。
-
-**多跳转发机制：** 使用 WireGuard 隧道嵌套。每一跳建立独立的 WireGuard 隧道，中转节点作为上一跳的 Peer 和下一跳的 Peer，通过 iptables 规则转发流量。
-
-**流量路径示例（线路 3）：**
-
-```
-设备 → [A 入口 hop_order=0] ──── [B 中转 hop_order=1] ──── [C 出口 hop_order=2] → 互联网
-        ╰── A↔B 隧道 (hop_index=0) ──╯╰── B↔C 隧道 (hop_index=1) ──╯
-```
-
-每条线路的隧道使用独立的 WireGuard 接口（wm-tun1, wm-tun2, wm-tun3...），wm-wg0 保留给设备接入使用。Agent 负责配置所有相关的 WireGuard 接口和 iptables 转发规则。
-
-#### 3.4.3 线路功能
-
-- **CRUD**：新增、编辑、删除线路
-- **节点编排**：选择入口 → (可选)中转 → 出口节点，定义跳数顺序。同一节点可出现在多条线路中
-- **线路状态**：根据组成节点的在线状态自动判断线路可用性
-- **关联设备查看**：查看哪些设备正在使用此线路
-- **节点线路查看**：在节点详情中查看该节点参与的所有线路及角色
-- **配置联动**：线路节点编排变更时，通知相关节点 Agent 更新隧道配置
+- **CRUD**: Create, edit, delete lines
+- **Node orchestration**: Select entry -> (optional) relay -> exit nodes
+- **Branch management**: Create multiple branch paths for a line, bind different routing rules
+- **Line status**: Automatically determined based on constituent nodes' online status (synced periodically by Worker)
+- **Configuration linkage**: Notify all related node Agents to update tunnel configuration when a line changes
 
 ---
 
-### 3.5 分流规则 (Filters)
+### 3.5 Routing Rules (Filters)
 
-分流规则 = IP/CIDR 路由策略，决定哪些目标流量走 VPN 加速线路，哪些直连。
+Routing rules = IP/CIDR and domain-based routing policies that determine which destination traffic goes through the VPN line and which goes direct.
 
-#### 3.5.1 分流规则信息
+#### 3.5.1 Routing Rule Fields
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | 自增主键 | — |
-| name | string | 规则名称（如"国外流量"、"视频加速"） |
-| rules | text | 规则内容，每行一条 IP/CIDR |
-| mode | enum | whitelist（仅匹配走代理）/ blacklist（匹配的不走代理） |
-| is_enabled | boolean | 是否启用 |
-| tags | string? | 标签 |
-| remark | text? | 备注 |
-| created_at | datetime | 创建时间 |
-| updated_at | datetime | 更新时间 |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | auto-increment PK | — |
+| name | string | Rule name |
+| rules | text | IP/CIDR rules, one per line |
+| domain_rules | text? | Domain rules, one per line |
+| mode | enum | whitelist (matched traffic goes through proxy) / blacklist (matched traffic goes direct) |
+| is_enabled | boolean | Whether enabled |
+| source_url | string? | External rule source URL (periodically synced) |
+| source_updated_at | datetime? | Last sync time for rule source |
+| remark | text? | Remark |
+| created_at | datetime | Creation time |
+| updated_at | datetime | Update time |
 
-#### 3.5.2 分流规则与线路关联
+#### 3.5.2 Routing Rule-Branch Association (branch_filters)
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | 自增主键 | — |
-| line_id | FK | 关联线路 |
-| filter_id | FK | 关联分流规则 |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | auto-increment PK | — |
+| branch_id | FK | Associated line branch |
+| filter_id | FK | Associated routing rule |
 
-#### 3.5.3 分流规则功能
+#### 3.5.3 Routing Rule Features
 
-- **CRUD**：新增、编辑、删除规则
-- **规则编辑器**：支持批量输入 IP/CIDR，每行一条
-- **模式切换**：白名单模式（仅匹配走代理）/ 黑名单模式（匹配的直连）
-- **关联线路**：将规则应用到指定线路
-- **启用/禁用**：快速开关规则
-
----
-
-### 3.6 系统设置 (Settings)
-
-系统设置以 key-value 形式存储在 settings 表中。
-
-#### 3.6.1 默认配置项
-
-| key | 默认值 | 说明 |
-|-----|--------|------|
-| `wg_default_port` | `51820` | WireGuard 默认监听端口 |
-| `wg_default_subnet` | `10.0.0.0/24` | WireGuard 默认内网网段 |
-| `wg_default_dns` | `1.1.1.1` | WireGuard 客户端默认 DNS |
-| `wg_node_ip_start` | `1` | 节点 IP 自动分配起始位（如 10.0.0.1） |
-| `wg_device_ip_start` | `100` | 设备 IP 自动分配起始位（如 10.0.0.100） |
-| `xray_default_protocol` | `vless` | Xray 默认协议 |
-| `xray_default_transport` | `ws` | Xray 默认传输层（ws / grpc） |
-| `xray_default_port` | `443` | Xray 默认监听端口 |
-| `tunnel_subnet` | `10.1.0.0/16` | 隧道 IP 地址池网段（节点间点对点隧道使用） |
-| `tunnel_port_start` | `51830` | 隧道 WireGuard 端口自动分配起始值 |
-| `node_check_interval` | `5` | 节点状态检测间隔（分钟） |
-
-#### 3.6.2 管理功能
-
-| 设置项 | 说明 |
-|--------|------|
-| 管理员密码 | 修改登录密码 |
-| WireGuard 默认参数 | 默认监听端口、内网网段、DNS 等 |
-| Xray 默认参数 | 默认协议类型（VLESS）、传输层（WS/gRPC）、端口等 |
-| 节点检测间隔 | 定时检测节点在线状态的频率（分钟） |
+- **CRUD**: Create, edit, delete rules
+- **Rule editor**: Supports IP/CIDR rules and domain rules
+- **Mode toggle**: Whitelist / blacklist mode
+- **External rule source**: Supports periodic sync from URL
+- **Associate with branch**: Bind rules to line branches
+- **Enable/disable**: Quick toggle for rules
 
 ---
 
-### 3.7 操作日志 (Audit Log)
+### 3.6 System Settings (Settings)
 
-记录关键操作，用于审计回溯。
+System settings are stored in the settings table as key-value pairs.
 
-#### 3.7.1 日志信息
+#### 3.6.1 Default Configuration Items
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | 自增主键 | — |
-| action | string | 操作类型（create / update / delete） |
-| target_type | string | 操作对象类型（node / device / line / filter / settings） |
-| target_id | number? | 操作对象 ID |
-| target_name | string? | 操作对象名称 |
-| detail | text? | 操作详情（如变更内容摘要） |
-| created_at | datetime | 操作时间 |
+| key | Default Value | Description |
+|-----|---------------|-------------|
+| `wg_default_port` | `41820` | WireGuard default listen port |
+| `wg_default_subnet` | `10.210.0.0/24` | WireGuard default internal subnet |
+| `wg_default_dns` | `1.1.1.1` | WireGuard client default DNS |
+| `wg_node_ip_start` | `1` | Node IP auto-assignment start position (e.g., 10.210.0.1) |
+| `wg_device_ip_start` | `100` | Device IP auto-assignment start position (e.g., 10.210.0.100) |
+| `xray_default_protocol` | `vless` | Xray default protocol |
+| `xray_default_port` | `41443` | Xray / SOCKS5 default starting port |
+| `tunnel_subnet` | `10.211.0.0/16` | Tunnel IP address pool subnet |
+| `tunnel_port_start` | `41830` | Tunnel WireGuard port auto-assignment start value |
+| `node_check_interval` | `5` | Node health check interval (minutes) |
+| `filter_sync_interval` | `3600` | External rule source sync interval (seconds, minimum 60) |
+| `dns_upstream` | — | Upstream DNS servers (comma-separated) |
 
-#### 3.7.2 记录范围
-
-- 节点的增删改操作
-- 设备的增删改操作
-- 线路的增删改操作
-- 分流规则的增删改操作
-- 系统设置变更
-- 配置同步事件（成功/失败）
+The 10.210/10.211 subnets and 41xxx ports are chosen to avoid conflicts with common software such as Docker, Kubernetes, cloud provider VPCs, etc.
 
 ---
 
-## 4. Node Agent（节点 Agent）
+### 3.7 Audit Log
 
-### 4.1 概述
+| Field | Type | Description |
+|-------|------|-------------|
+| id | auto-increment PK | — |
+| action | string | Operation type (create / update / delete) |
+| target_type | string | Target object type (node / device / line / filter / settings) |
+| target_id | number? | Target object ID |
+| target_name | string? | Target object name |
+| detail | text? | Operation details |
+| created_at | datetime | Operation time |
 
-Node Agent 是运行在每个节点服务器上的 Go 常驻进程，负责与管理平台通信、执行本地配置变更和上报状态。
+---
 
-### 4.2 技术方案
+## 4. Node Agent
 
-| 项目 | 方案 |
-|------|------|
-| 语言 | Go |
-| 产物 | 单二进制文件，无运行时依赖 |
-| 部署 | 通过安装脚本从管理平台下载，注册为 systemd 服务 |
-| 通信 | SSE 接收服务端通知 + HTTP POST 上报数据和拉取配置 |
-| 认证 | 节点级 Token（创建节点时自动生成，写入 Agent 配置） |
+### 4.1 Technical Approach
 
-### 4.3 Agent 配置文件
+| Item | Approach |
+|------|----------|
+| Language | Go |
+| Artifact | Single binary file, supports linux/amd64 and linux/arm64 |
+| Deployment | Downloaded as tar.gz from management platform via install script, extracted and registered as a systemd service |
+| Communication | SSE for receiving server notifications + HTTP GET/POST for pulling config and reporting data |
+| Authentication | Node-level token (auto-generated on node creation, written to Agent config) |
 
-Agent 启动时读取配置文件 `/etc/wiremesh/agent.yaml`：
+### 4.2 Agent Configuration File
+
+`/etc/wiremesh/agent.yaml`:
 
 ```yaml
-server_url: "https://管理平台地址:3000"
+server_url: "https://management-platform-address"
 node_id: 1
-token: "节点级认证Token"
-report_interval: 300   # 状态上报间隔（秒），默认 5 分钟
+token: "node-level-auth-token"
+report_interval: 30   # Status report interval (seconds)
 ```
 
-### 4.4 Agent 功能
-
-| 功能 | 说明 |
-|------|------|
-| SSE 连接 | 启动后连接管理平台 SSE 端点，接收配置变更通知。断线自动重连。 |
-| 配置拉取 | 收到 SSE 通知后，通过 HTTP GET 拉取最新的 WireGuard/Xray 配置 |
-| wm-wg0 Peer 管理 | 更新 wm-wg0.conf 中的 Peer 列表，执行 `wg syncconf wm-wg0` 热加载（无需重启） |
-| 隧道接口管理 | 动态创建/更新/销毁隧道 WireGuard 接口（wm-tun1, wm-tun2, ...），见 4.4.1 |
-| iptables 管理 | 维护隧道转发所需的 iptables 规则，见 4.4.2 |
-| Xray 配置 | 更新 Xray 配置文件并重载服务 |
-| 状态上报 | 定时通过 HTTP POST 上报：在线状态、延迟（ping 管理平台）、流量统计 |
-| 流量采集 | 解析所有 wg 接口（wm-wg0, wm-tun1, ...）的 `wg show transfer` 输出，获取流量数据 |
-| 错误上报 | 配置应用失败时，通过 HTTP POST 上报错误信息 |
-
-#### 4.4.1 隧道接口生命周期管理
-
-Agent 维护一份本地的**隧道接口状态表**（内存中），记录当前活跃的隧道接口。每次收到配置更新时，对比新配置与本地状态，执行三种操作：
-
-**新增隧道接口（新线路或新增跳）：**
-
-```bash
-# 1. 创建 WireGuard 接口
-ip link add wm-tun1 type wireguard
-
-# 2. 写入接口配置文件
-cat > /etc/wiremesh/wireguard/wm-tun1.conf << EOF
-[Interface]
-PrivateKey = {tunnel_wg_private_key}
-ListenPort = {tunnel_wg_port}
-
-[Peer]
-PublicKey = {对端tunnel_wg_public_key}
-AllowedIPs = {allowed_ips}
-Endpoint = {对端公网IP}:{对端tunnel_wg_port}
-PersistentKeepalive = 25
-EOF
-
-# 3. 应用配置并启动
-wg setconf wm-tun1 /etc/wiremesh/wireguard/wm-tun1.conf
-ip addr add {tunnel_wg_address} dev wm-tun1
-ip link set wm-tun1 up
-
-# 4. 添加 iptables 转发规则（见 4.4.2）
-```
-
-**更新隧道接口（Peer 变更）：**
-
-```bash
-# 使用 wg syncconf 热加载，无需销毁重建
-wg syncconf wm-tun1 /etc/wiremesh/wireguard/wm-tun1.conf
-```
-
-**销毁隧道接口（线路删除或节点移出线路）：**
-
-```bash
-# 1. 清理 iptables 规则
-iptables -D FORWARD -i wm-wg0 -o wm-tun1 -j ACCEPT
-iptables -D FORWARD -i wm-tun1 -o wm-wg0 -j ACCEPT
-
-# 2. 关闭并删除接口
-ip link set wm-tun1 down
-ip link del wm-tun1
-
-# 3. 删除配置文件
-rm /etc/wiremesh/wireguard/wm-tun1.conf
-```
-
-#### 4.4.2 iptables 转发规则管理
-
-Agent 根据节点在线路中的角色，管理不同的 iptables 规则：
-
-**入口节点（设备流量 → 下一跳）：**
-
-```bash
-# 允许 wm-wg0（设备接入）到 wm-tun1（隧道）的转发
-iptables -A FORWARD -i wm-wg0 -o wm-tun1 -j ACCEPT
-iptables -A FORWARD -i wm-tun1 -o wm-wg0 -j ACCEPT
-```
-
-**中转节点（上一跳 → 下一跳）：**
-
-```bash
-# 允许 wm-tun1（上游隧道）到 wm-tun2（下游隧道）的转发
-iptables -A FORWARD -i wm-tun1 -o wm-tun2 -j ACCEPT
-iptables -A FORWARD -i wm-tun2 -o wm-tun1 -j ACCEPT
-```
-
-**出口节点（隧道流量 → 互联网）：**
-
-```bash
-# 允许隧道流量出站并做 NAT
-iptables -A FORWARD -i wm-tun1 -o eth0 -j ACCEPT
-iptables -A FORWARD -i eth0 -o wm-tun1 -m state --state RELATED,ESTABLISHED -j ACCEPT
-iptables -t nat -A POSTROUTING -o eth0 -s {tunnel_subnet} -j MASQUERADE
-```
-
-**规则命名约定：** Agent 使用 iptables comment 模块为每条规则打标签（如 `--comment "wm-line-3"`），便于精确清理特定线路的规则而不影响其他线路。
-
-### 4.5 Agent API 交互
-
-Agent 调用管理平台的 API：
+### 4.3 Agent Startup Flow
 
 ```
-# Agent → 管理平台
-GET  /api/agent/sse               # SSE 长连接（Header: Authorization: Bearer {token}）
-GET  /api/agent/config             # 拉取节点完整配置（WG peers、Xray 等）
-POST /api/agent/status             # 上报节点状态（在线、延迟、流量）
-POST /api/agent/error              # 上报错误信息
-POST /api/agent/installed          # 上报安装完成
+Agent startup
+  ├── Report installation complete (POST /api/agent/installed)
+  ├── Pull config (GET /api/agent/config) → Apply config
+  ├── Connect SSE (GET /api/agent/sse) → Receive events
+  └── Start periodic reporting (every report_interval seconds)
 ```
 
-### 4.6 SSE 事件类型
+### 4.4 Configuration Application Order
 
-| 事件 | 说明 |
-|------|------|
-| `peer_update` | Peer 列表变更（设备增删改、设备切换线路） |
-| `config_update` | 节点自身配置变更（端口、Xray 参数等） |
-| `tunnel_update` | 线路隧道配置变更（多跳编排变动） |
+Each time the Agent pulls a new configuration, it applies changes in the following order:
 
-Agent 收到事件后，调用 `/api/agent/config` 拉取最新完整配置并应用。
+1. Sync wm-wg0 Peer list (wg syncconf hot reload)
+2. Sync tunnel WireGuard interfaces (create/update/destroy wm-tun*)
+3. Sync iptables forwarding rules
+4. Sync per-device policy routing
+5. Sync Xray configuration (Reality inbound + fwmark routing)
+6. Sync SOCKS5 server (per-line start/stop + fwmark routing)
+7. Sync branch routing (DNS + ipset rules)
+
+### 4.5 SSE Event Types
+
+| Event | Description |
+|-------|-------------|
+| `connected` | SSE connection established; Agent force-pulls latest config |
+| `peer_update` | Peer list changed (device added/removed/modified, device switched lines) |
+| `config_update` | Node's own config changed (parameter modification, routing rule sync, etc.) |
+| `tunnel_update` | Line tunnel config changed (multi-hop orchestration changes) |
+| `upgrade` | Trigger Agent auto-upgrade |
+| `xray_upgrade` | Trigger Xray binary upgrade |
+| `node_delete` | Node deleted; Agent executes uninstall |
+
+### 4.6 Agent Shutdown Flow
+
+On shutdown, the Agent cleans up in reverse order: stop SSE, stop Xray, stop SOCKS5, destroy all tunnel interfaces, clean up routes and iptables rules.
 
 ---
 
-## 5. API 设计
+## 5. API Design
 
-### 5.1 认证
-
-```
-POST   /api/auth/login          # 登录，返回 JWT
-POST   /api/auth/logout         # 退出
-GET    /api/auth/me             # 获取当前用户信息
-PUT    /api/auth/password       # 修改密码
-```
-
-### 5.2 初始化
+### 5.1 Authentication
 
 ```
-GET    /api/setup/status        # 检查是否已初始化
-POST   /api/setup               # 执行初始化（设置管理员账号、默认配置）
+POST   /api/auth/login          # Login, returns JWT
+POST   /api/auth/logout         # Logout
+GET    /api/auth/me             # Get current user info
+PUT    /api/auth/password       # Change password
 ```
 
-### 5.3 节点
+### 5.2 Initialization
 
 ```
-GET    /api/nodes               # 节点列表（支持分页、筛选、搜索）
-POST   /api/nodes               # 创建节点
-GET    /api/nodes/:id           # 节点详情
-PUT    /api/nodes/:id           # 更新节点
-DELETE /api/nodes/:id           # 删除节点
-GET    /api/nodes/:id/script    # 获取安装脚本
-GET    /api/nodes/:id/status    # 获取节点状态历史
-POST   /api/nodes/:id/check     # 手动触发状态检测
+GET    /api/setup/status        # Check if already initialized
+POST   /api/setup               # Execute initialization (set admin account, default config)
 ```
 
-### 5.4 设备
+### 5.3 Nodes
 
 ```
-GET    /api/devices              # 设备列表（支持分页、筛选、搜索）
-POST   /api/devices              # 创建设备
-GET    /api/devices/:id          # 设备详情
-PUT    /api/devices/:id          # 更新设备
-DELETE /api/devices/:id          # 删除设备
-GET    /api/devices/:id/config   # 获取客户端配置文件
-PUT    /api/devices/:id/line     # 切换关联线路
+GET    /api/nodes               # Node list (paginated, filtered, searchable)
+POST   /api/nodes               # Create node
+GET    /api/nodes/:id           # Node details
+PUT    /api/nodes/:id           # Update node
+DELETE /api/nodes/:id           # Delete node (mark pending_delete, SSE notify uninstall)
+POST   /api/nodes/batch         # Batch delete
+POST   /api/nodes/batch-upgrade # Batch upgrade
+GET    /api/nodes/:id/script    # Get install script
+GET    /api/nodes/:id/uninstall-script  # Get uninstall script
+GET    /api/nodes/:id/status    # Get node status history
+POST   /api/nodes/:id/check     # Manually trigger health check
+POST   /api/nodes/:id/upgrade   # Trigger Agent upgrade
+POST   /api/nodes/:id/xray-upgrade  # Trigger Xray upgrade
 ```
 
-### 5.5 线路
+### 5.4 Devices
 
 ```
-GET    /api/lines                # 线路列表（支持分页、筛选、搜索）
-POST   /api/lines                # 创建线路
-GET    /api/lines/:id            # 线路详情（含节点编排）
-PUT    /api/lines/:id            # 更新线路
-DELETE /api/lines/:id            # 删除线路
-GET    /api/lines/:id/devices    # 查看关联设备
+GET    /api/devices              # Device list (paginated, filtered, searchable)
+POST   /api/devices              # Create device
+GET    /api/devices/:id          # Device details
+PUT    /api/devices/:id          # Update device
+DELETE /api/devices/:id          # Delete device
+POST   /api/devices/batch        # Batch delete
+GET    /api/devices/:id/config   # Get client configuration
+PUT    /api/devices/:id/line     # Switch associated line
 ```
 
-### 5.6 分流规则
+### 5.5 Lines
 
 ```
-GET    /api/filters              # 规则列表（支持分页、筛选、搜索）
-POST   /api/filters              # 创建规则
-GET    /api/filters/:id          # 规则详情
-PUT    /api/filters/:id          # 更新规则
-DELETE /api/filters/:id          # 删除规则
-PUT    /api/filters/:id/toggle   # 启用/禁用
+GET    /api/lines                # Line list (paginated, filtered, searchable)
+POST   /api/lines                # Create line
+GET    /api/lines/:id            # Line details (includes node orchestration and branches)
+PUT    /api/lines/:id            # Update line
+DELETE /api/lines/:id            # Delete line
+GET    /api/lines/:id/devices    # View associated devices
 ```
 
-### 5.7 系统
+### 5.6 Routing Rules
 
 ```
-GET    /api/settings             # 获取系统设置
-PUT    /api/settings             # 更新系统设置
-GET    /api/dashboard            # Dashboard 统计数据
-GET    /api/audit-logs           # 操作日志列表（支持分页、筛选）
+GET    /api/filters              # Rule list (paginated, filtered, searchable)
+POST   /api/filters              # Create rule
+GET    /api/filters/:id          # Rule details
+PUT    /api/filters/:id          # Update rule
+DELETE /api/filters/:id          # Delete rule
+PUT    /api/filters/:id/toggle   # Enable/disable
+POST   /api/filters/:id/sync    # Manually sync external rule source
 ```
 
-### 5.8 Agent API（Token 认证）
-
-供节点 Agent 调用，使用节点级 Token 认证（Bearer Token）：
+### 5.7 System
 
 ```
-GET    /api/agent/sse            # SSE 长连接，推送配置变更通知
-GET    /api/agent/config         # 获取节点完整配置（WG peers、Xray、隧道等）
-POST   /api/agent/status         # 上报节点状态
-POST   /api/agent/error          # 上报错误信息
-POST   /api/agent/installed      # 上报安装完成
+GET    /api/settings             # Get system settings
+PUT    /api/settings             # Update system settings
+GET    /api/dashboard            # Dashboard statistics
+GET    /api/audit-logs           # Audit log list (paginated, filtered)
 ```
 
-### 5.9 Agent 二进制下载
+### 5.8 Agent API (Token Authentication)
 
 ```
-GET    /api/agent/binary         # 下载 Agent 二进制文件（仅 linux/amd64）
+GET    /api/agent/sse            # SSE long connection, pushes config change notifications
+GET    /api/agent/config         # Get full node configuration
+POST   /api/agent/status         # Report node status
+POST   /api/agent/error          # Report error information
+POST   /api/agent/installed      # Report installation complete
+GET    /api/agent/binary         # Download Agent binary (tar.gz, supports ?arch=amd64|arm64)
+GET    /api/agent/xray           # Download Xray binary (tar.gz, supports ?arch=amd64|arm64)
 ```
 
-此接口无需认证，安装脚本中使用。Agent 二进制在 Docker 构建时编译，打包在管理平台镜像中。
+### 5.9 Admin SSE
 
-### 5.10 API 统一响应格式
+```
+GET    /api/admin/sse            # Admin dashboard real-time push (node status, device status changes)
+```
 
-**成功响应：**
+### 5.10 Unified API Response Format
+
+**Success response:**
 
 ```json
-{
-  "data": { ... }
-}
+{ "data": { ... } }
 ```
 
-**列表响应：**
+**List response:**
 
 ```json
 {
@@ -697,599 +559,244 @@ GET    /api/agent/binary         # 下载 Agent 二进制文件（仅 linux/amd6
 }
 ```
 
-**错误响应：**
+**Error response:**
 
 ```json
 {
   "error": {
     "code": "VALIDATION_ERROR",
-    "message": "节点名称不能为空"
+    "message": "validation.nameRequired"
   }
 }
 ```
 
-**HTTP 状态码约定：**
+Error messages use translation keys; the frontend is responsible for translating and displaying them.
 
-| 状态码 | 说明 |
-|--------|------|
-| 200 | 成功 |
-| 201 | 创建成功 |
-| 400 | 请求参数错误（VALIDATION_ERROR） |
-| 401 | 未认证（UNAUTHORIZED） |
-| 403 | 无权限（FORBIDDEN） |
-| 404 | 资源不存在（NOT_FOUND） |
-| 409 | 资源冲突，如 IP 已被占用（CONFLICT） |
-| 500 | 服务器内部错误（INTERNAL_ERROR） |
+**HTTP Status Codes / Error Codes:**
 
-**错误码清单：**
+| Status Code | Error Code | Description |
+|-------------|------------|-------------|
+| 400 | VALIDATION_ERROR | Request parameter validation failed |
+| 401 | UNAUTHORIZED | Not logged in or token expired |
+| 403 | FORBIDDEN | No permission to access |
+| 404 | NOT_FOUND | Resource not found |
+| 409 | CONFLICT | Resource conflict (duplicate IP/name, etc.) |
+| 500 | INTERNAL_ERROR | Internal server error |
+| 502 | CONFIG_SYNC_FAILED | Configuration sync failed |
+| 503 | NODE_OFFLINE | Node is offline |
 
-| 错误码 | 说明 |
-|--------|------|
-| UNAUTHORIZED | 未登录或 Token 过期 |
-| FORBIDDEN | 无权限访问 |
-| NOT_FOUND | 资源不存在 |
-| VALIDATION_ERROR | 请求参数校验失败 |
-| CONFLICT | 资源冲突（IP 重复、名称重复等） |
-| INTERNAL_ERROR | 服务器内部错误 |
-| NODE_OFFLINE | 节点不在线，无法执行操作 |
-| CONFIG_SYNC_FAILED | 配置同步失败 |
+### 5.11 Pagination Conventions
 
-### 5.11 Dashboard API 响应结构
+All list APIs support unified pagination parameters:
 
-`GET /api/dashboard` 返回：
-
-```json
-{
-  "data": {
-    "nodes": {
-      "total": 10,
-      "online": 8,
-      "offline": 1,
-      "error": 1
-    },
-    "devices": {
-      "total": 50,
-      "online": 35,
-      "offline": 15
-    },
-    "lines": {
-      "total": 5,
-      "active": 4,
-      "inactive": 1
-    },
-    "traffic": [
-      {
-        "node_id": 1,
-        "node_name": "东京节点",
-        "upload_bytes": 1073741824,
-        "download_bytes": 5368709120
-      }
-    ],
-    "recent_nodes": [
-      {
-        "id": 1,
-        "name": "东京节点",
-        "ip": "1.2.3.4",
-        "status": "online",
-        "latency": 45
-      }
-    ],
-    "recent_devices": [
-      {
-        "id": 1,
-        "name": "MacBook",
-        "status": "online",
-        "last_handshake": "2026-04-06T10:30:00Z"
-      }
-    ]
-  }
-}
-```
-
-### 5.12 Agent Config 响应结构
-
-`GET /api/agent/config` 返回节点的完整配置，Agent 据此生成本地配置文件：
-
-```json
-{
-  "data": {
-    "node": {
-      "id": 1,
-      "name": "东京节点",
-      "ip": "1.2.3.4",
-      "wg_address": "10.0.0.1/24",
-      "wg_port": 51820,
-      "wg_private_key": "节点WG私钥（明文，传输层HTTPS保护）"
-    },
-    "peers": [
-      {
-        "public_key": "设备或对端节点的WG公钥",
-        "allowed_ips": "10.0.0.100/32",
-        "endpoint": null,
-        "persistent_keepalive": 25
-      }
-    ],
-    "tunnels": [
-      {
-        "line_id": 3,
-        "line_name": "东京-新加坡线路",
-        "role": "entry",
-        "interfaces": [
-          {
-            "name": "wm-tun1",
-            "direction": "downstream",
-            "private_key": "本节点在此隧道的私钥（来自 line_tunnels.from_wg_private_key）",
-            "address": "10.1.0.1/30",
-            "listen_port": 51830,
-            "peer": {
-              "public_key": "下一跳节点的公钥（line_tunnels.to_wg_public_key）",
-              "allowed_ips": "0.0.0.0/0",
-              "endpoint": "下一跳节点公网IP:51830"
-            }
-          }
-        ],
-        "iptables_rules": [
-          "iptables -A FORWARD -i wm-wg0 -o wm-tun1 -m comment --comment 'wm-line-3' -j ACCEPT",
-          "iptables -A FORWARD -i wm-tun1 -o wm-wg0 -m comment --comment 'wm-line-3' -j ACCEPT"
-        ]
-      },
-      {
-        "line_id": 5,
-        "line_name": "备用线路",
-        "role": "relay",
-        "interfaces": [
-          {
-            "name": "wm-tun2",
-            "direction": "upstream",
-            "private_key": "本节点在上游隧道的私钥（line_tunnels[hop_index=0].to_wg_private_key）",
-            "address": "10.1.0.2/30",
-            "listen_port": 51831,
-            "peer": {
-              "public_key": "上一跳节点的公钥",
-              "allowed_ips": "10.1.0.0/30",
-              "endpoint": "上一跳节点公网IP:51830"
-            }
-          },
-          {
-            "name": "wm-tun3",
-            "direction": "downstream",
-            "private_key": "本节点在下游隧道的私钥（line_tunnels[hop_index=1].from_wg_private_key）",
-            "address": "10.1.0.5/30",
-            "listen_port": 51832,
-            "peer": {
-              "public_key": "下一跳节点的公钥",
-              "allowed_ips": "0.0.0.0/0",
-              "endpoint": "下一跳节点公网IP:51832"
-            }
-          }
-        ],
-        "iptables_rules": [
-          "iptables -A FORWARD -i wm-tun2 -o wm-tun3 -m comment --comment 'wm-line-5' -j ACCEPT",
-          "iptables -A FORWARD -i wm-tun3 -o wm-tun2 -m comment --comment 'wm-line-5' -j ACCEPT"
-        ]
-      }
-    ],
-    "xray": {
-      "enabled": true,
-      "protocol": "vless",
-      "transport": "ws",
-      "port": 443,
-      "config": { ... }
-    },
-    "version": "2026-04-06T10:00:00Z"
-  }
-}
-```
-
-**字段说明：**
-
-| 字段 | 说明 |
-|------|------|
-| `node` | 节点自身的基本信息和 WireGuard 主接口（wm-wg0）配置 |
-| `peers` | wm-wg0 上需要配置的所有 Peer（接入该节点的设备） |
-| `tunnels` | 该节点参与的所有线路隧道配置。每个 tunnel 包含 `interfaces` 数组（entry/exit 有 1 个接口，relay 有 2 个）和 iptables 规则。数据来源于 `line_tunnels` 表 |
-| `xray` | Xray 服务配置（未启用时 enabled=false） |
-| `version` | 配置版本时间戳，Agent 用于判断是否需要更新 |
-
-**tunnels 中的角色差异：**
-
-| 角色 | 接口数量 | 说明 |
-|------|----------|------|
-| entry | 1 个 | 一个下游隧道接口，转发 wm-wg0 设备流量到下一跳 |
-| relay | 2 个 | 一个上游接口（接收上一跳流量）+ 一个下游接口（转发到下一跳） |
-| exit | 1 个 | 一个上游隧道接口，将流量 NAT 出站到互联网 |
-
-Agent 收到配置后的处理流程：
-
-1. 对比 `version` 与本地缓存版本，相同则跳过
-2. **wm-wg0 Peer 更新**：更新 `/etc/wiremesh/wireguard/wm-wg0.conf` 中的 Peer 列表，执行 `wg syncconf wm-wg0 /etc/wiremesh/wireguard/wm-wg0.conf`
-3. **隧道接口同步**：对比新 tunnels 列表与本地活跃接口状态，执行新增/更新/销毁操作（见 4.4.1）
-4. **iptables 同步**：清理已失效线路的 iptables 规则（按 comment 标签），添加新线路的规则（见 4.4.2）
-5. 如 Xray 启用，更新 Xray 配置文件并 reload 服务
-6. 上报成功或失败状态
-
-### 5.13 Agent 状态上报结构
-
-`POST /api/agent/status` 请求体：
-
-```json
-{
-  "node_id": 1,
-  "is_online": true,
-  "latency": 45,
-  "transfers": [
-    {
-      "peer_public_key": "设备WG公钥",
-      "upload_bytes": 1048576,
-      "download_bytes": 5242880
-    }
-  ],
-  "handshakes": [
-    {
-      "peer_public_key": "设备WG公钥",
-      "last_handshake": "2026-04-06T10:30:00Z"
-    }
-  ]
-}
-```
-
-### 5.14 分页约定
-
-所有列表 API 支持统一的分页参数：
-
-| 参数 | 说明 | 默认值 |
-|------|------|--------|
-| page | 页码 | 1 |
-| pageSize | 每页条数 | 20 |
-| search | 搜索关键词（名称、IP 等） | — |
-| status | 状态筛选 | — |
-| tags | 标签筛选 | — |
-| sortBy | 排序字段 | created_at |
-| sortOrder | 排序方向 asc/desc | desc |
-
-响应格式：
-
-```json
-{
-  "data": [...],
-  "pagination": {
-    "page": 1,
-    "pageSize": 20,
-    "total": 100,
-    "totalPages": 5
-  }
-}
-```
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| page | Page number | 1 |
+| pageSize | Items per page | 20 |
+| search | Search keyword | — |
+| status | Status filter | — |
+| sortBy | Sort field | created_at |
+| sortOrder | Sort direction asc/desc | desc |
 
 ---
 
-## 6. 数据库设计
+## 6. Database Design
 
-### 6.1 ER 关系图
+### 6.1 ER Diagram
 
 ```
 ┌──────────┐       ┌──────────────┐       ┌──────────┐
 │  nodes   │◄──────│ line_nodes   │──────►│  lines   │
-│          │  1:N  │ (hop_order)  │  N:1  │          │
-│          │       └──────────────┘       │          │
-│          │                              │          │
-│          │◄──────┌──────────────┐──────►│          │
-│          │  1:N  │ line_tunnels │  N:1  │          │
-└──────────┘       │ (两端密钥/IP) │       └────┬─────┘
-     │             └──────────────┘             │
+│          │  1:N  │              │  N:1  │          │
+└──────────┘       └──────────────┘       └────┬─────┘
+     │                                         │
      │ 1:N                                1:N  │
      ▼                                         ▼
 ┌──────────────┐                     ┌──────────────┐
 │ node_status  │                     │   devices    │
-│ (监控记录)    │                     │ (line_id FK) │
 └──────────────┘                     └──────────────┘
-                                           
-┌──────────┐       ┌──────────────┐       ┌──────────┐
-│ filters  │◄──────│ line_filters │──────►│  lines   │
-│          │  1:N  │              │  N:1  │          │
-└──────────┘       └──────────────┘       └──────────┘
+
+┌──────────┐       ┌──────────────┐       ┌──────────────┐
+│  lines   │──────►│ line_branches│──────►│branch_filters│
+│          │  1:N  │              │  1:N  │              │
+└──────────┘       └──────────────┘       └──────┬───────┘
+                                                 │ N:1
+┌──────────┐       ┌──────────────┐              │
+│  lines   │──────►│ line_tunnels │       ┌──────┴───────┐
+│          │  1:N  │              │       │   filters    │
+└──────────┘       └──────────────┘       └──────────────┘
 
 ┌──────────┐       ┌──────────────┐
 │  users   │       │  settings    │
-│ (管理员)  │       │ (key-value)  │
 └──────────┘       └──────────────┘
 
 ┌──────────────┐
 │ audit_logs   │
-│ (操作日志)    │
 └──────────────┘
 ```
 
-### 6.2 users 表
+### 6.2 Table List
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | 自增主键 | — |
-| username | string | 用户名（唯一） |
-| password_hash | string | 密码哈希（bcrypt） |
-| created_at | datetime | 创建时间 |
-| updated_at | datetime | 更新时间 |
+| Table | Description |
+|-------|-------------|
+| users | Administrator account |
+| nodes | VPN nodes |
+| node_status | Node status monitoring records (retained 7 days) |
+| lines | Network lines |
+| line_nodes | Line-node association (includes hop order and role) |
+| line_branches | Line branches (multiple exit paths) |
+| line_tunnels | Line tunnels (key pair, address, and port for each tunnel endpoint) |
+| devices | Client access points |
+| filters | Routing rules (IP/CIDR + domain) |
+| branch_filters | Branch-routing rule association |
+| settings | System settings (key-value) |
+| audit_logs | Audit logs |
 
-### 6.3 settings 表
+### 6.3 IP Address Auto-Assignment
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| key | string (PK) | 设置项键名 |
-| value | text | 设置项值 |
-| updated_at | datetime | 更新时间 |
+#### Device Access Subnet (wm-wg0)
 
-### 6.4 IP 地址自动分配
+Assigned based on `wg_default_subnet` (default `10.210.0.0/24`):
 
-系统管理两套独立的 IP 地址空间：
+- **Nodes**: Starting from position `wg_node_ip_start` (default .1), e.g., 10.210.0.1, 10.210.0.2, ...
+- **Devices**: Starting from position `wg_device_ip_start` (default .100), e.g., 10.210.0.100, 10.210.0.101, ...
 
-#### 6.4.1 设备接入网段（wm-wg0）
+Assignment logic: Query used IPs, find the next available IP; deleted IPs can be reused.
 
-基于 `wg_default_subnet`（默认 `10.0.0.0/24`）分配：
+#### Tunnel Subnet (wm-tun*)
 
-- **节点**：从第 `wg_node_ip_start` 位开始（默认 .1），如 10.0.0.1, 10.0.0.2, ...
-- **设备**：从第 `wg_device_ip_start` 位开始（默认 .100），如 10.0.0.100, 10.0.0.101, ...
+Assigned based on `tunnel_subnet` (default `10.211.0.0/16`), each tunnel is allocated a /30 subnet (2 usable IPs).
 
-**分配逻辑：**
-
-1. 查询 nodes/devices 表中所有已使用的 wg_address
-2. 在对应范围内找下一个空闲 IP（已删除的 IP 可复用）
-3. 写入 wg_address 字段
-4. 创建时自动分配，编辑时不可修改（避免冲突）
-
-#### 6.4.2 隧道网段（wm-tun1, wm-tun2, ...）
-
-基于 `tunnel_subnet`（默认 `10.1.0.0/16`）分配，用于节点间的点对点隧道：
-
-- 每条隧道链路（两个相邻节点之间）分配一个 **/30 子网**（4 个 IP，2 个可用）
-- 低 hop_order 端分配 .1，高 hop_order 端分配 .2
-
-**分配示例（线路 A→B→C）：**
-
-```
-A↔B 隧道：10.1.0.0/30  →  A 端 10.1.0.1, B 端 10.1.0.2
-B↔C 隧道：10.1.0.4/30  →  B 端 10.1.0.5, C 端 10.1.0.6
-```
-
-**分配逻辑：**
-
-1. 查询 line_tunnels 表中所有已使用的 from_wg_address / to_wg_address
-2. 从 `tunnel_subnet` 中找下一个空闲的 /30 子网
-3. 为 line_tunnels 记录写入 from 端 .1 和 to 端 .2 地址
-4. 线路删除时释放 /30 子网，可复用
-
-**隧道端口分配：**
-
-- 从 `tunnel_port_start`（默认 51830）开始递增分配
-- 查询 line_tunnels 表中所有已使用的端口，找下一个空闲端口
-- 同一节点上的不同隧道使用不同端口（如 51830, 51831, ...）
-
-### 6.5 表清单
-
-| 表名 | 说明 |
-|------|------|
-| users | 管理员账号 |
-| nodes | VPN 节点（服务器） |
-| node_status | 节点状态监控记录（保留 7 天） |
-| lines | 网络线路 |
-| line_nodes | 线路-节点关联（含跳数顺序和角色） |
-| line_tunnels | 线路隧道（每条隧道两端的密钥对、地址和端口） |
-| devices | 客户端接入点 |
-| filters | 分流规则 |
-| line_filters | 线路-分流规则关联 |
-| settings | 系统设置（key-value） |
-| audit_logs | 操作日志 |
+Tunnel ports are assigned incrementally starting from `tunnel_port_start` (default 41830).
 
 ---
 
-## 7. 页面结构
+## 7. Page Structure
 
 ```
-/setup                          # 首次启动初始化页
+/setup                          # First-time initialization page
+/login                          # Login page
 
-/login                          # 登录页
+/dashboard                      # Dashboard (home page)
 
-/dashboard                      # 仪表盘（首页）
+/nodes                          # Node list
+/nodes/new                      # Create node
+/nodes/:id                      # Node details/edit
+/nodes/:id/script               # Install script
 
-/nodes                          # 节点列表
-/nodes/new                      # 新增节点
-/nodes/:id                      # 节点详情/编辑
-/nodes/:id/script               # 安装脚本查看/复制
+/devices                        # Device list
+/devices/new                    # Create device
+/devices/:id                    # Device details/edit
+/devices/:id/config             # Client configuration
 
-/devices                        # 设备列表
-/devices/new                    # 新增设备
-/devices/:id                    # 设备详情/编辑
-/devices/:id/config             # 客户端配置下载
+/lines                          # Line list
+/lines/new                      # Create line
+/lines/:id                      # Line details/edit
 
-/lines                          # 线路列表
-/lines/new                      # 新增线路（节点编排）
-/lines/:id                      # 线路详情/编辑
+/filters                        # Routing rule list
+/filters/new                    # Create rule
+/filters/:id                    # Rule details/edit
 
-/filters                        # 分流规则列表
-/filters/new                    # 新增规则
-/filters/:id                    # 规则详情/编辑
-
-/settings                       # 系统设置
-/settings/logs                  # 操作日志
+/settings                       # System settings
+/settings/logs                  # Audit logs
+/help                           # Help page
 ```
 
 ---
 
-## 8. 后台任务（Worker）
+## 8. Background Tasks (Worker)
 
-Worker 进程与 Next.js 运行在同一容器内，通过 `node worker/index.js` 启动。
+The Worker process runs in the same container as Next.js and begins execution after a 30-second delay on startup.
 
-| 任务 | 频率 | 说明 |
-|------|------|------|
-| 节点状态检测 | 可配置（默认 5 分钟） | 检查 Agent SSE 连接是否存活，标记掉线节点为 offline |
-| 线路状态同步 | 与节点检测同步 | 根据节点在线状态更新线路可用性 |
-| 监控数据清理 | 每天凌晨 | 清理 7 天前的 node_status 记录 |
-
----
-
-## 9. 安装脚本生成逻辑
-
-管理员新增节点后，系统生成一键安装 bash 脚本，内容包括：
-
-```bash
-#!/bin/bash
-# === WireMesh Node Install Script ===
-# Node: {node.name}
-# Generated: {timestamp}
-
-set -e
-
-# 1. 创建目录
-mkdir -p /etc/wiremesh/wireguard
-
-# 2. 安装 WireGuard
-apt-get update && apt-get install -y wireguard
-
-# 3. 写入 WireGuard 配置
-cat > /etc/wiremesh/wireguard/wm-wg0.conf << 'EOF'
-[Interface]
-PrivateKey = {node.wg_private_key}
-Address = {node.wg_address}
-ListenPort = {node.port}
-
-# Peers 由 Agent 动态管理
-EOF
-
-# 4. 启动 WireGuard
-systemctl enable wg-quick@wm-wg0
-systemctl start wg-quick@wm-wg0
-
-# 5. 安装 Xray（如启用）
-# ...Xray 安装和配置...
-
-# 6. 配置 IP 转发
-echo 'net.ipv4.ip_forward = 1' >> /etc/sysctl.conf
-sysctl -p
-
-# 7. 下载并安装 Agent
-curl -fsSL {server_url}/api/agent/binary -o /usr/local/bin/wiremesh-agent
-chmod +x /usr/local/bin/wiremesh-agent
-
-# 8. 写入 Agent 配置
-cat > /etc/wiremesh/agent.yaml << 'EOF'
-server_url: "{server_url}"
-node_id: {node.id}
-token: "{node.agent_token}"
-report_interval: 300
-EOF
-
-# 9. 注册 Agent systemd 服务
-cat > /etc/systemd/system/wiremesh-agent.service << 'EOF'
-[Unit]
-Description=WireMesh Node Agent
-After=network.target
-
-[Service]
-ExecStart=/usr/local/bin/wiremesh-agent
-Restart=always
-RestartSec=5
-WorkingDirectory=/etc/wiremesh
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-systemctl daemon-reload
-systemctl enable wiremesh-agent
-systemctl start wiremesh-agent
-
-# Agent 启动后会自动连接管理平台并上报安装完成状态
-echo "Installation complete. Agent is connecting to management platform..."
-```
+| Task | Frequency | Description |
+|------|-----------|-------------|
+| Node health check | 5 minutes | Check Agent's last report time; mark as offline if exceeding 10 minutes |
+| Line status sync | 5 minutes | Update line active/inactive status based on node online status |
+| Monitoring data cleanup | 1 hour | Clean up node_status records older than 7 days |
+| Pending-delete node cleanup | 1 hour | Clean up nodes with pending_delete status older than 7 days |
 
 ---
 
-## 10. Docker 部署
+## 9. Install Script
+
+The install script is dynamically generated by `GET /api/nodes/:id/script`. Main stages:
+
+1. **Environment detection**: Root privileges, architecture detection (amd64/arm64), OS version detection, kernel version check (warn if <5.6), systemd check, connectivity check, disk space check
+2. **Install dependencies**: WireGuard (wireguard + wireguard-tools), iptables, ipset; uses apt/yum/dnf depending on OS
+3. **Download binaries**: Download Agent and Xray tar.gz from management platform (by architecture), SHA256 verification, retry 3 times on failure
+4. **Configure WireGuard**: Write wm-wg0.conf, enable ip_forward, start interface using `ip link` + `wg setconf` (does not use wg-quick)
+5. **Deploy Xray**: Extract Xray binary, register wiremesh-xray.service (enable but do not start — managed by Agent)
+6. **Deploy Agent**: Extract Agent binary, write agent.yaml, register wiremesh-agent.service and start
+
+The script supports upgrade mode (skips certain steps when an existing installation is detected).
+
+---
+
+## 10. Docker Deployment
 
 ### 10.1 docker-compose.yml
 
 ```yaml
-version: '3.8'
 services:
   wiremesh:
-    build: .
+    image: ghcr.io/hitosea/wiremesh:latest
+    build:
+      context: .
+      args:
+        AGENT_VERSION: ${AGENT_VERSION:-dev}
     ports:
-      - "3000:3000"
+      - "3456:3000"
     volumes:
-      - ./data:/app/data          # SQLite 数据持久化
+      - ./data:/app/data
     environment:
-      - DATABASE_URL=file:/app/data/wiremesh.db
-      - JWT_SECRET=xxx
-      - ENCRYPTION_KEY=xxx        # AES-256-GCM 加密密钥
+      - JWT_SECRET=${JWT_SECRET:-<built-in-default>}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-<built-in-default>}
+      - PUBLIC_URL=${PUBLIC_URL:-http://localhost:3456}
+      - HOSTNAME=0.0.0.0
     restart: unless-stopped
 ```
 
 ### 10.2 Dockerfile
 
-```dockerfile
-FROM node:20-alpine AS base
+Four-stage build:
 
-# 安装 Go 编译 Agent
-FROM golang:1.22-alpine AS agent-builder
-WORKDIR /agent
-COPY agent/ .
-RUN CGO_ENABLED=0 GOOS=linux go build -o wiremesh-agent .
+1. **xray-downloader** (alpine): Download Xray dual-architecture binaries from GitHub, package as tar.gz
+2. **agent-builder** (golang:1.25-alpine): Compile Agent dual-architecture binaries (CGO_ENABLED=0), version number read from package.json, package as tar.gz
+3. **builder** (node:20-alpine): `npm install` + `npm run build` to build Next.js
+4. **runner** (node:20-alpine): Copy standalone artifacts, static files, Drizzle migrations, Worker, Agent and Xray binary packages
 
-# 构建 Next.js
-FROM base AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-
-# 运行
-FROM base AS runner
-WORKDIR /app
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
-COPY --from=agent-builder /agent/wiremesh-agent ./public/agent/wiremesh-agent-linux-amd64
-COPY worker/ ./worker/
-
-# 启动 Next.js + Worker
-CMD ["sh", "-c", "node worker/index.js & node server.js"]
-```
+Startup command: `node worker/index.js & node server.js`
 
 ---
 
-## 11. 敏感数据加密
+## 11. Sensitive Data Encryption
 
-### 11.1 加密方案
+### 11.1 Encryption Scheme
 
-使用 AES-256-GCM 对称加密，密钥通过环境变量 `ENCRYPTION_KEY` 注入。
+AES-256-GCM symmetric encryption. Key is injected via the `ENCRYPTION_KEY` environment variable (64-character hex string = 32 bytes). Each encryption uses a random 12-byte IV.
 
-### 11.2 加密字段
+Storage format: `Base64( IV + AuthTag + Ciphertext )`
 
-| 表 | 字段 | 说明 |
-|----|------|------|
-| nodes | wg_private_key | 节点 WireGuard 私钥（wm-wg0 设备接入用） |
-| devices | wg_private_key | 设备 WireGuard 私钥 |
-| line_tunnels | from_wg_private_key | 隧道 from 端 WireGuard 私钥 |
-| line_tunnels | to_wg_private_key | 隧道 to 端 WireGuard 私钥 |
+### 11.2 Encrypted Fields
 
-### 11.3 加密流程
-
-```
-存储：明文 → AES-256-GCM 加密 → Base64 编码 → 存入 SQLite
-读取：SQLite → Base64 解码 → AES-256-GCM 解密 → 明文
-```
-
-每次加密使用随机 IV（12 字节），与密文一起存储。
+| Table | Field | Description |
+|-------|-------|-------------|
+| nodes | wg_private_key | Node WireGuard private key |
+| nodes | reality_private_key within xray_config | Xray Reality private key |
+| devices | wg_private_key | Device WireGuard private key |
+| devices | socks5_password | SOCKS5 password |
+| line_tunnels | from_wg_private_key | Tunnel from-end private key |
+| line_tunnels | to_wg_private_key | Tunnel to-end private key |
 
 ---
 
-## 12. 非功能性需求
+## 12. Non-Functional Requirements
 
-| 项目 | 要求 |
-|------|------|
-| 响应式 | 适配桌面和平板，不需要移动端优化 |
-| 安全 | 敏感数据 AES-256-GCM 加密存储；管理 API 全部需要 JWT 认证；Agent API 使用节点级 Token 认证 |
-| 性能 | SQLite 足以支撑单管理员使用场景；服务端分页避免大量数据传输 |
-| 日志 | 关键操作日志记录到 SQLite audit_logs 表 |
-| 国际化 | 仅中文 |
-| 错误处理 | 配置同步/安装失败时记录错误信息，Dashboard 高亮提示，管理员手动处理 |
+| Item | Requirement |
+|------|-------------|
+| Responsive Design | Adapted for desktop and tablet; no mobile optimization needed |
+| Security | Sensitive data encrypted with AES-256-GCM; all admin APIs require JWT authentication; Agent APIs use node-level token authentication |
+| Performance | SQLite is sufficient for a single-admin use case; server-side pagination to avoid large data transfers |
+| Logging | Key operations logged in the audit_logs table |
+| Internationalization | Chinese + English, using next-intl routeless mode |
+| Error Handling | Record error messages on config sync/install failures; highlight on Dashboard |

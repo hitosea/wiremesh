@@ -1,66 +1,38 @@
 # WireMesh
 
-WireGuard 网状网络管理平台，用于管理 VPN 节点、客户端设备、网络线路和分流规则。单管理员内部使用。
+WireGuard mesh VPN management platform. Single admin, internal use. Manages nodes (servers), devices (clients), lines (multi-hop routes), and filter rules (traffic routing).
 
-## 项目结构
+## Architecture Constraints
 
-```
-wiremesh/
-├── src/                    # Next.js 管理平台 (App Router)
-├── agent/                  # Go Agent 源码（部署到每个节点服务器）
-├── worker/                 # Node.js Worker 进程（定时任务）
-├── docs/                   # 需求文档和架构图
-│   ├── requirements.md     # 完整需求文档 v2.4（务必通读）
-│   └── node-architecture.md # 节点架构图
-├── docker-compose.yml
-├── Dockerfile
-└── package.json
-```
+These are confirmed decisions — do not deviate:
 
-## 技术栈
+1. **Nodes have no fixed role** — No role field on nodes table. Roles are determined entirely by line orchestration (line_nodes). A single node can simultaneously be entry on one line, relay on another, exit on a third.
+2. **SSE + HTTP (not WebSocket)** — Platform pushes notifications to Agent via SSE. Agent pulls config via HTTP GET, reports status via HTTP POST. No WebSocket anywhere.
+3. **Xray is entry-layer only** — Xray decrypts VLESS Reality traffic and injects it into wm-wg0. All inter-node tunnels use WireGuard. Xray is never used between nodes.
+4. **SOCKS5 is entry-layer only** — Per-line SOCKS5 proxy servers on entry nodes. Traffic routed via SO_MARK fwmark into WireGuard tunnels, same as Xray.
+5. **Tunnel keys in line_tunnels** — Each tunnel's keys/addresses/ports are stored in line_tunnels (not line_nodes). Relay nodes appear in two rows.
+6. **WireGuard interface isolation** — Config dir: `/etc/wiremesh/wireguard/`. Interface prefix: `wm-` (wm-wg0 for device access, wm-tun1/2/3 for tunnels). Never use system `/etc/wireguard/`.
+7. **IP/port allocation** — Device subnet 10.210.0.0/24 (nodes from .1, devices from .100). Tunnel subnet 10.211.0.0/16 (/30 per tunnel). WG port 41820, tunnel ports from 41830, Xray/SOCKS5 ports from 41443. These avoid conflicts with Docker/K8s/cloud VPCs.
 
-- **全栈框架**: Next.js (App Router)
-- **前端**: React 18 + TypeScript + shadcn/ui + Tailwind CSS
-- **数据库**: SQLite (Drizzle ORM)
-- **节点 Agent**: Go 单二进制，通过 SSE 接收通知 + HTTP POST 上报
-- **VPN 协议**: WireGuard + Xray (VLESS + WS/gRPC)
-- **加密**: AES-256-GCM，密钥通过环境变量 ENCRYPTION_KEY 注入
-- **部署**: Docker Compose 单容器
+## Naming Conventions
 
-## 核心架构决策
-
-这些决策已确认，开发时不要偏离：
-
-1. **节点无固定角色** — 节点表没有 role 字段，角色完全由线路编排（line_nodes）决定。同一节点可同时在不同线路中当入口/中转/出口
-2. **SSE + HTTP POST（非 WebSocket）** — 管理平台通过 SSE 推送通知给 Agent，Agent 主动 HTTP GET 拉取配置、HTTP POST 上报状态。不使用 WebSocket
-3. **Xray 仅作为入口层代理** — Xray 解密 VLESS 流量后注入 wm-wg0，后续全走 WireGuard 隧道。节点间不使用 Xray
-4. **line_tunnels 表存储隧道密钥** — 每条隧道两端的密钥/地址/端口存在 line_tunnels 表（不是 line_nodes），中转节点出现在两行中
-5. **WireGuard 接口隔离** — 配置目录 /etc/wiremesh/wireguard/，接口前缀 wm-（wm-wg0 设备接入，wm-tun1/2/3 隧道），不使用系统的 /etc/wireguard/
-6. **IP 自动分配** — 设备接入网段 10.210.0.0/24（节点从 .1，设备从 .100），隧道网段 10.211.0.0/16（每条隧道 /30 子���），WireGuard 端口 41820，隧道端口从 41830 起，Xray 端口从 41443 起（每条线路自动递增）。选用 10.210/10.211 网段和 41xxx 端口以避免与 Docker/K8s/云厂商 VPC 等常见软件冲突
-
-## 命名规范
-
-| 项目 | 命名 |
+| Item | Name |
 |------|------|
-| Agent 二进制 | wiremesh-agent |
-| systemd 服务 | wiremesh-agent.service |
-| 配置目录 | /etc/wiremesh/ |
-| 设备接入接口 | wm-wg0 |
-| 隧道接口 | wm-tun1, wm-tun2, ... |
-| iptables 标签 | wm-line-{id} |
-| Xray 二进制 | wiremesh-xray |
-| Xray 服务 | wiremesh-xray.service |
-| 数据库文件 | wiremesh.db |
+| Agent binary | wiremesh-agent |
+| Agent service | wiremesh-agent.service |
+| Config directory | /etc/wiremesh/ |
+| Device access interface | wm-wg0 |
+| Tunnel interfaces | wm-tun1, wm-tun2, ... |
+| iptables tags | wm-line-{id} |
+| Xray binary | wiremesh-xray |
+| Xray service | wiremesh-xray.service |
+| Database file | wiremesh.db |
 
-## 开发注意事项
+## Development Rules
 
-- 国际化使用 next-intl 无路由模式，翻译文件在 messages/ 目录（zh-CN.json, en.json）
-- 新增 UI 文本必须使用 useTranslations() hook，不要硬编码中文或英文
-- API 错误消息使用翻译 key（如 "validation.nameRequired"），前端负责翻译
-- 新增语言：复制 en.json，翻译所有 value，在 src/i18n/config.ts 的 locales 数组中注册
-- 适配桌面和平板，不需要移动端优化
-- 所有列表 API 使用服务端分页
-- 敏感数据（WG 私钥）必须 AES-256-GCM 加密存储
-- Agent 二进制仅编译 linux/amd64
-- node_status 监控数据保留 7 天，Worker 定时清理
-- 详细的 API 设计、数据库表结构、Agent 通信协议等见 docs/requirements.md
+- **i18n**: Use next-intl (route-free mode). Translation files in `messages/` (zh-CN.json, en.json). All UI text must use `useTranslations()` hook — never hardcode Chinese or English strings.
+- **API errors**: Use translation keys (e.g. `"validation.nameRequired"`), frontend translates.
+- **Encryption**: All private keys and SOCKS5 passwords must be AES-256-GCM encrypted via `src/lib/crypto.ts` before storage.
+- **Pagination**: All list APIs use server-side pagination.
+- **Responsive**: Desktop and tablet only, no mobile optimization needed.
+- **Docs**: Full API design, DB schema, and Agent protocol in `docs/requirements.md`.

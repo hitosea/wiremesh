@@ -2,6 +2,12 @@
   "name": "wiremesh",
   "version": "1.0.0",
   "private": true,
+  "description": "WireGuard mesh network management platform",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hitosea/wiremesh.git"
+  },
   "scripts": {
     "dev": "next dev --webpack",
     "build": "next build",

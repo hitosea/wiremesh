@@ -5,7 +5,7 @@ WireMesh is a WireGuard mesh VPN management platform for internal use. It lets y
 **Core concepts:**
 
 - **Nodes** — Linux servers running the `wiremesh-agent` binary. Each node has a public IP and connects to the management platform over SSE. Nodes form the backbone of the VPN network.
-- **Devices** — Client endpoints (laptops, phones) that connect to the VPN. Each device gets a WireGuard or Xray configuration.
+- **Devices** — Client endpoints (laptops, phones) that connect to the VPN. Each device gets a WireGuard, Xray, or SOCKS5 configuration.
 - **Lines** — Multi-hop routes that chain nodes together. Each line has an entry node and one or more branches, where each branch defines a chain of relay and exit nodes. Devices are assigned to a line to determine their traffic path.
 - **Filter Rules** — Domain- or IP-based routing rules linked to line branches. They control which traffic goes through which branch, supporting whitelist and blacklist modes.
 
@@ -123,7 +123,7 @@ This is a generic script that works on any node without requiring authentication
 1. Go to **Devices → Add Device**.
 2. Fill in the form:
    - **Device Name** (required).
-   - **Protocol** (required) — choose **WireGuard** or **Xray**.
+   - **Protocol** (required) — choose **WireGuard**, **Xray**, or **SOCKS5**.
    - **Line** (optional) — assign the device to a line, or leave unassigned.
    - **Tags** (optional) — comma-separated tags.
    - **Notes** (optional).
@@ -143,9 +143,11 @@ For Xray devices, additional tabs show:
 - **Shadowrocket** — manual configuration fields (address, port, UUID, TLS settings).
 - **Clash Meta** — YAML config for Clash-compatible clients.
 
+For SOCKS5 devices, the config page shows a proxy URL (`socks5://username:password@host:port`). Configure it in your system or browser proxy settings.
+
 ### Viewing Device Details
 
-Click a device to see its detail page with protocol info, WireGuard address/public key (or Xray UUID), and last handshake time. You can edit the device's name, tags, notes, and line assignment.
+Click a device to see its detail page with protocol info, WireGuard address/public key, Xray UUID, or SOCKS5 proxy address. You can edit the device's name, tags, notes, and line assignment.
 
 ### Deleting a Device
 

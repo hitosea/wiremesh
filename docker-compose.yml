@@ -1,5 +1,6 @@
 services:
   wiremesh:
+    image: ghcr.io/hitosea/wiremesh:latest
     build:
       context: .
       args:
@@ -9,9 +10,8 @@ services:
     volumes:
       - ./data:/app/data
     environment:
-      - DATABASE_URL=file:/app/data/wiremesh.db
       - JWT_SECRET=${JWT_SECRET:-49aeca1d8570c817604c082a3caa7edd8474728993120ae0e50e854cbd289c0a}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-5f3bea79ae2f82d97eccfa184af54f4481818b854e06f8d30f830b1fae737359}
-      - PUBLIC_URL=${PUBLIC_URL:-https://3456--main--apang--kuaifan.coder.dootask.com}
+      - PUBLIC_URL=${PUBLIC_URL:-http://localhost:3456}
       - HOSTNAME=0.0.0.0
     restart: unless-stopped
