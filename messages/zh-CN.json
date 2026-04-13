@@ -160,7 +160,7 @@
     "nodeName": "节点名称",
     "nodeNamePlaceholder": "例如：香港节点01",
     "ipAddress": "IP 地址",
-    "ipPlaceholder": "例如：1.2.3.4",
+    "ipPlaceholder": "例如 1.2.3.4 或 192.168.1.100",
     "domain": "域名",
     "domainPlaceholder": "例如：node1.example.com",
     "wgPort": "WireGuard 端口",
@@ -346,6 +346,7 @@
     "entryNode": "入口节点",
     "loadingNodes": "加载节点中...",
     "selectEntry": "选择入口节点",
+    "privateIpTag": "内网",
     "branch": "分支 {index}",
     "deleteBranch": "删除分支",
     "branchName": "分支名称",
@@ -602,7 +603,8 @@
       "tunnelPortRange": "隧道端口起始值必须是 1-65535 的整数",
       "portConflict": "WireGuard 默认端口 ({wgPort}) 必须小于隧道端口起始值 ({tunnelPort})",
       "syncInterval": "同步间隔必须是不小于 60 的整数",
-      "dnsUpstream": "DNS 上游服务器必须是逗号分隔的合法 IP 地址"
+      "dnsUpstream": "DNS 上游服务器必须是逗号分隔的合法 IP 地址",
+      "privateIpNotAllowedAsRelayOrExit": "节点 \"{name}\" 使用内网 IP，不能作为中继或出口节点"
     },
     "auth": {
       "unauthorized": "用户名或密码错误",

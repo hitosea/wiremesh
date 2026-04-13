@@ -6,11 +6,12 @@ import { decrypt } from "@/lib/crypto";
 import { authenticateAgent } from "@/lib/agent-auth";
 import { getXrayDefaultPort } from "@/lib/proxy-port";
 import { BRANCH_MARK_START, XRAY_MARK_START, SOCKS5_MARK_START } from "@/lib/routing-constants";
+import { isPrivateIp } from "@/lib/ip-utils";
 
-function getNodePublicHost(nodeId: number): string {
+function getNodeHostInfo(nodeId: number): { host: string; ip: string } | null {
   const n = db.select({ ip: nodes.ip, domain: nodes.domain }).from(nodes).where(eq(nodes.id, nodeId)).get();
-  if (!n) return "";
-  return n.domain || n.ip;
+  if (!n) return null;
+  return { host: n.domain || n.ip, ip: n.ip };
 }
 
 export const dynamic = "force-dynamic";
@@ -127,7 +128,7 @@ export async function GET(request: NextRequest) {
           address = tunnel.fromWgAddress;
           listenPort = tunnel.fromWgPort;
           peerPublicKey = tunnel.toWgPublicKey;
-          peerAddress = getNodePublicHost(tunnel.toNodeId);
+          peerAddress = getNodeHostInfo(tunnel.toNodeId)?.host ?? "";
           peerPort = tunnel.toWgPort;
           role = "from";
         } else {
@@ -135,7 +136,8 @@ export async function GET(request: NextRequest) {
           address = tunnel.toWgAddress;
           listenPort = tunnel.toWgPort;
           peerPublicKey = tunnel.fromWgPublicKey;
-          peerAddress = getNodePublicHost(tunnel.fromNodeId);
+          const fromInfo = getNodeHostInfo(tunnel.fromNodeId);
+          peerAddress = (fromInfo && isPrivateIp(fromInfo.ip)) ? "" : (fromInfo?.host ?? "");
           peerPort = tunnel.fromWgPort;
           role = "to";
         }

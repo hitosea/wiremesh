@@ -160,7 +160,7 @@
     "nodeName": "Node Name",
     "nodeNamePlaceholder": "e.g., HK Node 01",
     "ipAddress": "IP Address",
-    "ipPlaceholder": "e.g., 1.2.3.4",
+    "ipPlaceholder": "e.g., 1.2.3.4 or 192.168.1.100",
     "domain": "Domain",
     "domainPlaceholder": "e.g., node1.example.com",
     "wgPort": "WireGuard Port",
@@ -346,6 +346,7 @@
     "entryNode": "Entry Node",
     "loadingNodes": "Loading nodes...",
     "selectEntry": "Select entry node",
+    "privateIpTag": "LAN",
     "branch": "Branch {index}",
     "deleteBranch": "Delete Branch",
     "branchName": "Branch Name",
@@ -602,7 +603,8 @@
       "tunnelPortRange": "Tunnel port start must be an integer between 1-65535",
       "portConflict": "WireGuard default port ({wgPort}) must be less than tunnel port start ({tunnelPort})",
       "syncInterval": "Sync interval must be an integer >= 60",
-      "dnsUpstream": "DNS upstream must be comma-separated valid IP addresses"
+      "dnsUpstream": "DNS upstream must be comma-separated valid IP addresses",
+      "privateIpNotAllowedAsRelayOrExit": "Node \"{name}\" uses a private IP and cannot be used as relay or exit"
     },
     "auth": {
       "unauthorized": "Invalid username or password",

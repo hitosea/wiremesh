@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { translateError } from "@/lib/translate-error";
 import { useTranslations } from "next-intl";
+import { isPrivateIp } from "@/lib/ip-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -396,11 +397,14 @@ export default function NewLinePage() {
                                 />
                               </SelectTrigger>
                               <SelectContent>
-                                {nodeOptions.map((n) => (
-                                  <SelectItem key={n.id} value={String(n.id)}>
-                                    {n.name} ({n.ip})
-                                  </SelectItem>
-                                ))}
+                                {nodeOptions.map((n) => {
+                                  const isPrivate = isPrivateIp(n.ip);
+                                  return (
+                                    <SelectItem key={n.id} value={String(n.id)} disabled={isPrivate}>
+                                      {n.name} ({n.ip}){isPrivate ? ` (${t("privateIpTag")})` : ""}
+                                    </SelectItem>
+                                  );
+                                })}
                               </SelectContent>
                             </Select>
                           </div>

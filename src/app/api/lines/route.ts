@@ -9,6 +9,7 @@ import { generateKeyPair } from "@/lib/wireguard";
 import { allocateTunnelSubnet, allocateTunnelPort } from "@/lib/ip-allocator";
 import { writeAuditLog } from "@/lib/audit-log";
 import { sseManager } from "@/lib/sse-manager";
+import { isPrivateIp } from "@/lib/ip-utils";
 
 export async function GET(request: NextRequest) {
   const params = parsePaginationParams(request.nextUrl.searchParams);
@@ -125,12 +126,15 @@ export async function POST(request: NextRequest) {
   }
   for (const nodeId of allBranchNodeIds) {
     const node = db
-      .select({ id: nodes.id })
+      .select({ id: nodes.id, name: nodes.name, ip: nodes.ip })
       .from(nodes)
       .where(eq(nodes.id, nodeId))
       .get();
     if (!node) {
       return error("VALIDATION_ERROR", "validation.nodeNotFound", { id: nodeId });
+    }
+    if (isPrivateIp(node.ip)) {
+      return error("VALIDATION_ERROR", "validation.privateIpNotAllowedAsRelayOrExit", { name: node.name });
     }
   }
 
