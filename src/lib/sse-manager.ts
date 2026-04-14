@@ -7,6 +7,7 @@ type SSEConnection = {
 class SSEManager {
   private connections = new Map<number, SSEConnection>();
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private pendingNotifications = new Map<string, ReturnType<typeof setTimeout>>();
 
   constructor() {
     this.startHeartbeat();
@@ -78,23 +79,37 @@ class SSEManager {
     return Array.from(this.connections.keys());
   }
 
+  private debouncedNotify(nodeId: number, event: string): boolean {
+    const key = `${nodeId}:${event}`;
+    const existing = this.pendingNotifications.get(key);
+    if (existing) clearTimeout(existing);
+    const timer = setTimeout(() => {
+      this.pendingNotifications.delete(key);
+      this.sendEvent(nodeId, event);
+    }, 2000);
+    this.pendingNotifications.set(key, timer);
+    return this.isConnected(nodeId);
+  }
+
   notifyNodePeerUpdate(nodeId: number): boolean {
-    return this.sendEvent(nodeId, "peer_update");
+    return this.debouncedNotify(nodeId, "peer_update");
   }
 
   notifyNodeConfigUpdate(nodeId: number): boolean {
-    return this.sendEvent(nodeId, "config_update");
+    return this.debouncedNotify(nodeId, "config_update");
   }
 
   notifyNodeTunnelUpdate(nodeId: number): boolean {
-    return this.sendEvent(nodeId, "tunnel_update");
+    return this.debouncedNotify(nodeId, "tunnel_update");
   }
 }
 
 // Singleton stored on globalThis to survive Next.js hot reload
-const globalForSSE = globalThis as typeof globalThis & { sseManager?: SSEManager };
-if (!globalForSSE.sseManager) {
+const SSE_VERSION = 2;
+const globalForSSE = globalThis as typeof globalThis & { sseManager?: SSEManager; sseVersion?: number };
+if (!globalForSSE.sseManager || globalForSSE.sseVersion !== SSE_VERSION) {
   globalForSSE.sseManager = new SSEManager();
+  globalForSSE.sseVersion = SSE_VERSION;
 }
 
 export const sseManager = globalForSSE.sseManager;

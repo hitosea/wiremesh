@@ -5,6 +5,7 @@ import { success, error } from "@/lib/api-response";
 import { eq, and, sql } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
 import { sseManager } from "@/lib/sse-manager";
+import { allocateProxyPort, getXrayDefaultPort } from "@/lib/proxy-port";
 
 function getEntryNodeId(lineId: number): number | null {
   const entry = db.select({ nodeId: lineNodes.nodeId }).from(lineNodes)
@@ -52,6 +53,25 @@ export async function PUT(request: NextRequest, { params }: Params) {
       lineId: devices.lineId,
     })
     .get();
+
+  // Allocate proxy port if moving an xray/socks5 device to a line that lacks one
+  if (lineId) {
+    const device = db.select({ protocol: devices.protocol }).from(devices)
+      .where(eq(devices.id, deviceId)).get();
+    if (device && (device.protocol === "xray" || device.protocol === "socks5")) {
+      const portField = device.protocol === "xray" ? "xrayPort" : "socks5Port";
+      const line = db.select({ xrayPort: lines.xrayPort, socks5Port: lines.socks5Port })
+        .from(lines).where(eq(lines.id, lineId)).get();
+      const entryNodeId = getEntryNodeId(lineId);
+      if (line && line[portField] === null && entryNodeId !== null) {
+        const nodeRow = db.select({ xrayPort: nodes.xrayPort }).from(nodes)
+          .where(eq(nodes.id, entryNodeId)).get();
+        const basePort = nodeRow?.xrayPort ?? getXrayDefaultPort();
+        const port = allocateProxyPort(entryNodeId, basePort);
+        db.update(lines).set({ [portField]: port }).where(eq(lines.id, lineId)).run();
+      }
+    }
+  }
 
   writeAuditLog({
     action: "update",
