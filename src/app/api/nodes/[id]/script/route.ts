@@ -232,7 +232,7 @@ else
     apt-get update -qq
     apt-get install -y -qq wireguard wireguard-tools
   elif [ "$PKG_MANAGER" = "yum" ]; then
-    yum install -y -q epel-release
+    yum install -y -q epel-release 2>/dev/null || true
     yum install -y -q wireguard-tools
   elif [ "$PKG_MANAGER" = "dnf" ]; then
     dnf install -y -q wireguard-tools
