@@ -76,12 +76,12 @@ export async function PUT(request: NextRequest, { params }: Params) {
     remark,
   } = body;
 
-  // Check IP uniqueness if changed
+  // Check IP uniqueness if changed (exclude soft-deleted nodes)
   if (ip) {
     const ipConflict = db
       .select({ id: nodes.id })
       .from(nodes)
-      .where(and(eq(nodes.ip, ip), ne(nodes.id, nodeId)))
+      .where(and(eq(nodes.ip, ip), ne(nodes.id, nodeId), eq(nodes.pendingDelete, false)))
       .get();
     if (ipConflict) return error("CONFLICT", "conflict.ipExists");
   }

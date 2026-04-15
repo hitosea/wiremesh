@@ -50,3 +50,6 @@ public/xray/
 # claude skills (project-local, contains credentials)
 .claude/
 agent/.next/
+
+# playwright-mcp
+/.playwright-mcp/

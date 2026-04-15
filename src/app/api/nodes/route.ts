@@ -165,11 +165,11 @@ export async function POST(request: NextRequest) {
     return error("VALIDATION_ERROR", "validation.nameAndIpRequired");
   }
 
-  // Check IP uniqueness
+  // Check IP uniqueness (exclude soft-deleted nodes)
   const existing = db
     .select({ id: nodes.id })
     .from(nodes)
-    .where(eq(nodes.ip, ip))
+    .where(and(eq(nodes.ip, ip), eq(nodes.pendingDelete, false)))
     .get();
   if (existing) {
     return error("CONFLICT", "conflict.ipExists");
