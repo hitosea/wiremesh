@@ -1,6 +1,6 @@
 {
   "name": "wiremesh",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "WireGuard mesh network management platform",
   "license": "MIT",
