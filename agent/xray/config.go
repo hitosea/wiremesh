@@ -31,15 +31,52 @@ func GenerateConfig(cfg *api.XrayConfig) ([]byte, error) {
 		// Collect clients for this line
 		var clients []map[string]interface{}
 		for _, uuid := range route.UUIDs {
-			clients = append(clients, map[string]interface{}{
+			client := map[string]interface{}{
 				"id":    uuid,
 				"email": uuid,
 				"level": 0,
-				"flow":  "xtls-rprx-vision",
-			})
+			}
+			if cfg.Transport != "ws-tls" {
+				client["flow"] = "xtls-rprx-vision"
+			}
+			clients = append(clients, client)
 		}
 
-		// Inbound: VLESS Reality on this line's port, with sniffing
+		// Build streamSettings based on transport type
+		var streamSettings map[string]interface{}
+		if cfg.Transport == "ws-tls" {
+			streamSettings = map[string]interface{}{
+				"network":  "ws",
+				"security": "tls",
+				"wsSettings": map[string]interface{}{
+					"path": cfg.WsPath,
+				},
+				"tlsSettings": map[string]interface{}{
+					"certificates": []map[string]interface{}{
+						{
+							"certificateFile": fmt.Sprintf("/etc/wiremesh/xray/%s.crt", cfg.TlsDomain),
+							"keyFile":         fmt.Sprintf("/etc/wiremesh/xray/%s.key", cfg.TlsDomain),
+						},
+					},
+					"serverName": cfg.TlsDomain,
+				},
+			}
+		} else {
+			streamSettings = map[string]interface{}{
+				"network":  "tcp",
+				"security": "reality",
+				"realitySettings": map[string]interface{}{
+					"show":        false,
+					"dest":        cfg.RealityDest,
+					"xver":        0,
+					"serverNames": cfg.RealityServerNames,
+					"privateKey":  cfg.RealityPrivateKey,
+					"shortIds":    []string{cfg.RealityShortId},
+				},
+			}
+		}
+
+		// Inbound: VLESS on this line's port, with sniffing
 		inbounds = append(inbounds, map[string]interface{}{
 			"tag":      inboundTag,
 			"listen":   "0.0.0.0",
@@ -53,18 +90,7 @@ func GenerateConfig(cfg *api.XrayConfig) ([]byte, error) {
 				"enabled":      true,
 				"destOverride": []string{"http", "tls"},
 			},
-			"streamSettings": map[string]interface{}{
-				"network":  "tcp",
-				"security": "reality",
-				"realitySettings": map[string]interface{}{
-					"show":        false,
-					"dest":        cfg.RealityDest,
-					"xver":        0,
-					"serverNames": cfg.RealityServerNames,
-					"privateKey":  cfg.RealityPrivateKey,
-					"shortIds":    []string{cfg.RealityShortId},
-				},
-			},
+			"streamSettings": streamSettings,
 		})
 
 		// Outbound: freedom with line-specific fwmark + UseIP for DNS resolution

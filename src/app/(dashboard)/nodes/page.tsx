@@ -32,6 +32,7 @@ type Node = {
   status: string;
   agentVersion: string | null;
   xrayVersion: string | null;
+  xrayTransport: string | null;
   upgradeTriggeredAt: string | null;
   xrayUpgradeTriggeredAt: string | null;
   ports: {
@@ -262,7 +263,7 @@ export default function NodesPage() {
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-64">
-              <NodePortsDetail ports={node.ports} />
+              <NodePortsDetail ports={node.ports} xrayTransport={node.xrayTransport} />
             </PopoverContent>
           </Popover>
         );

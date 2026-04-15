@@ -62,6 +62,11 @@ type XrayConfig struct {
 	RealityShortId     string            `json:"realityShortId"`
 	RealityDest        string            `json:"realityDest"`
 	RealityServerNames []string          `json:"realityServerNames"`
+	Transport          string            `json:"transport,omitempty"`  // "reality" or "ws-tls"
+	WsPath             string            `json:"wsPath,omitempty"`
+	TlsDomain          string            `json:"tlsDomain,omitempty"`
+	TlsCert            string            `json:"tlsCert,omitempty"`
+	TlsKey             string            `json:"tlsKey,omitempty"`
 	Routes             []XrayLineRoute   `json:"routes"`
 	DNSProxy           string            `json:"dnsProxy,omitempty"` // agent DNS proxy IP, e.g. "10.210.0.1"
 }

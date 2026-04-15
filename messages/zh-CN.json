@@ -149,7 +149,22 @@
     "upgradeConfirmTitle": "确认升级",
     "upgradeConfirmMessage": "当前版本：{current}，最新版本：{latest}。确认升级？",
     "confirmDeleteNode": "此操作将远程卸载节点上的所有 WireMesh 组件，确认删除？",
-    "deleteOfflinePending": "节点当前离线，将在下次上线时自动卸载。"
+    "deleteOfflinePending": "节点当前离线，将在下次上线时自动卸载。",
+    "xrayTransport": "传输方式",
+    "xrayTransportReality": "REALITY",
+    "xrayTransportWsTls": "WebSocket + TLS",
+    "tlsDomain": "TLS 域名",
+    "tlsDomainHint": "域名必须已解析到当前服务器 IP",
+    "tlsCertMode": "证书管理",
+    "tlsCertModeAuto": "自动申请",
+    "tlsCertModeManual": "手动上传",
+    "tlsCertAutoHint": "域名必须已解析到当前服务器，且 80 端口可被外部访问",
+    "tlsCert": "TLS 证书",
+    "tlsCertHint": "粘贴 PEM 格式证书内容",
+    "tlsKey": "TLS 私钥",
+    "tlsKeyHint": "粘贴 PEM 格式私钥内容",
+    "wsPath": "WebSocket 路径",
+    "wsPathHint": "系统自动生成，不可编辑"
   },
   "nodeNew": {
     "title": "新增节点",
@@ -604,7 +619,8 @@
       "portConflict": "WireGuard 默认端口 ({wgPort}) 必须小于隧道端口起始值 ({tunnelPort})",
       "syncInterval": "同步间隔必须是不小于 60 的整数",
       "dnsUpstream": "DNS 上游服务器必须是逗号分隔的合法 IP 地址",
-      "privateIpNotAllowedAsRelayOrExit": "节点 \"{name}\" 使用内网 IP，不能作为中继或出口节点"
+      "privateIpNotAllowedAsRelayOrExit": "节点 \"{name}\" 使用内网 IP，不能作为中继或出口节点",
+      "wsTlsDomainRequired": "WebSocket + TLS 模式必须设置域名"
     },
     "auth": {
       "unauthorized": "用户名或密码错误",

@@ -57,6 +57,13 @@
       "when": 1744500000000,
       "tag": "0007_add_proxy_ports",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1776268800000,
+      "tag": "0008_add_xray_ws_tls_fields",
+      "breakpoints": true
     }
   ]
 }

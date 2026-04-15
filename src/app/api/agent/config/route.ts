@@ -261,10 +261,15 @@ export async function GET(request: NextRequest) {
     enabled: boolean;
     protocol: string;
     port: number;
-    realityPrivateKey: string;
-    realityShortId: string;
-    realityDest: string;
-    realityServerNames: string[];
+    transport: string;
+    realityPrivateKey?: string;
+    realityShortId?: string;
+    realityDest?: string;
+    realityServerNames?: string[];
+    wsPath?: string;
+    tlsDomain?: string;
+    tlsCert?: string;
+    tlsKey?: string;
     routes: { lineId: number; uuids: string[]; port: number; tunnel: string; mark: number; branches: { mark: number; tunnel: string; is_default: boolean; domain_rules: string[] }[] }[];
     dnsProxy?: string;
   } | null = null;
@@ -287,7 +292,9 @@ export async function GET(request: NextRequest) {
     : [];
   const linePortMap = new Map(linePortRows.map((r) => [r.id, r]));
 
-  if (node.xrayConfig) {
+  if (node.xrayConfig || node.xrayTransport === "ws-tls") {
+    const xrayTransport = node.xrayTransport === "ws-tls" ? "ws-tls" : "reality";
+
     let realitySettings: {
       realityPrivateKey?: string;
       realityPublicKey?: string;
@@ -295,10 +302,12 @@ export async function GET(request: NextRequest) {
       realityDest?: string;
       realityServerName?: string;
     } = {};
-    try {
-      realitySettings = JSON.parse(node.xrayConfig);
-    } catch (e) {
-      console.warn(`[agent/config] Failed to parse xrayConfig for node ${nodeId}:`, e);
+    if (node.xrayConfig) {
+      try {
+        realitySettings = JSON.parse(node.xrayConfig);
+      } catch (e) {
+        console.warn(`[agent/config] Failed to parse xrayConfig for node ${nodeId}:`, e);
+      }
     }
 
     let realityPrivateKey = "";
@@ -372,17 +381,38 @@ export async function GET(request: NextRequest) {
 
     // Only set dnsProxy when domain rules exist (agent DNS proxy only starts with domain rules)
     const hasDomainRules = xrayRoutes.some((r) => r.branches.some((b) => b.domain_rules.length > 0));
-    xrayConfig = {
-      enabled: true,
-      protocol: "vless",
-      port: xrayBasePort,
-      realityPrivateKey,
-      realityShortId: realitySettings.realityShortId ?? "",
-      realityDest: realitySettings.realityDest ?? "www.microsoft.com:443",
-      realityServerNames: [realitySettings.realityServerName ?? "www.microsoft.com"],
-      routes: xrayRoutes,
-      dnsProxy: hasDomainRules && node.wgAddress ? node.wgAddress.split("/")[0] : "",
-    };
+
+    if (xrayTransport === "ws-tls") {
+      let tlsKey = "";
+      if (node.xrayTlsKey) {
+        try { tlsKey = decrypt(node.xrayTlsKey); } catch { tlsKey = ""; }
+      }
+      xrayConfig = {
+        enabled: true,
+        protocol: "vless",
+        port: xrayBasePort,
+        transport: "ws-tls",
+        wsPath: node.xrayWsPath ?? "/default",
+        tlsDomain: node.xrayTlsDomain ?? "",
+        tlsCert: node.xrayTlsCert ?? "",
+        tlsKey,
+        routes: xrayRoutes,
+        dnsProxy: hasDomainRules && node.wgAddress ? node.wgAddress.split("/")[0] : "",
+      };
+    } else {
+      xrayConfig = {
+        enabled: true,
+        protocol: "vless",
+        port: xrayBasePort,
+        transport: "reality",
+        realityPrivateKey,
+        realityShortId: realitySettings.realityShortId ?? "",
+        realityDest: realitySettings.realityDest ?? "www.microsoft.com:443",
+        realityServerNames: [realitySettings.realityServerName ?? "www.microsoft.com"],
+        routes: xrayRoutes,
+        dnsProxy: hasDomainRules && node.wgAddress ? node.wgAddress.split("/")[0] : "",
+      };
+    }
   }
 
   // ---- SOCKS5 config ----

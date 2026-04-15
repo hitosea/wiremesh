@@ -149,7 +149,22 @@
     "upgradeConfirmTitle": "Confirm Upgrade",
     "upgradeConfirmMessage": "Current: {current}, Latest: {latest}. Confirm upgrade?",
     "confirmDeleteNode": "This will remotely uninstall all WireMesh components on the node. Are you sure?",
-    "deleteOfflinePending": "Node is offline. It will be uninstalled when it comes back online."
+    "deleteOfflinePending": "Node is offline. It will be uninstalled when it comes back online.",
+    "xrayTransport": "Transport",
+    "xrayTransportReality": "REALITY",
+    "xrayTransportWsTls": "WebSocket + TLS",
+    "tlsDomain": "TLS Domain",
+    "tlsDomainHint": "Domain must resolve to this server's IP",
+    "tlsCertMode": "Certificate Management",
+    "tlsCertModeAuto": "Auto-provision",
+    "tlsCertModeManual": "Manual Upload",
+    "tlsCertAutoHint": "Domain must resolve to this server and port 80 must be accessible",
+    "tlsCert": "TLS Certificate",
+    "tlsCertHint": "Paste PEM format certificate",
+    "tlsKey": "TLS Private Key",
+    "tlsKeyHint": "Paste PEM format private key",
+    "wsPath": "WebSocket Path",
+    "wsPathHint": "Auto-generated, read-only"
   },
   "nodeNew": {
     "title": "Add Node",
@@ -604,7 +619,8 @@
       "portConflict": "WireGuard default port ({wgPort}) must be less than tunnel port start ({tunnelPort})",
       "syncInterval": "Sync interval must be an integer >= 60",
       "dnsUpstream": "DNS upstream must be comma-separated valid IP addresses",
-      "privateIpNotAllowedAsRelayOrExit": "Node \"{name}\" uses a private IP and cannot be used as relay or exit"
+      "privateIpNotAllowedAsRelayOrExit": "Node \"{name}\" uses a private IP and cannot be used as relay or exit",
+      "wsTlsDomainRequired": "Domain is required for WebSocket + TLS mode"
     },
     "auth": {
       "unauthorized": "Invalid username or password",

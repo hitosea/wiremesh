@@ -119,9 +119,67 @@ PersistentKeepalive = 25
       }
     }
 
-    if (!realityPublicKey) {
+    // Fetch transport fields for entry node
+    const nodeTransport = db
+      .select({ xrayTransport: nodes.xrayTransport, xrayTlsDomain: nodes.xrayTlsDomain, xrayWsPath: nodes.xrayWsPath })
+      .from(nodes)
+      .where(eq(nodes.id, entryNodeRow.nodeId))
+      .get();
+    const isWsTls = nodeTransport?.xrayTransport === "ws-tls";
+
+    if (!isWsTls && !realityPublicKey) {
       return error("VALIDATION_ERROR", "validation.realityIncomplete");
     }
+
+    const userConfig: Record<string, unknown> = { id: device.xrayUuid, encryption: "none" };
+    if (!isWsTls) { userConfig.flow = "xtls-rprx-vision"; }
+
+    let streamSettings: Record<string, unknown>;
+    let shareLink: string;
+
+    if (isWsTls) {
+      const wsDomain = nodeTransport?.xrayTlsDomain ?? endpoint;
+      const wsPath = nodeTransport?.xrayWsPath ?? "/default";
+      streamSettings = {
+        network: "ws",
+        security: "tls",
+        wsSettings: { path: wsPath, headers: { Host: wsDomain } },
+        tlsSettings: { serverName: wsDomain },
+      };
+      const vlessParams = new URLSearchParams({
+        encryption: "none",
+        security: "tls",
+        type: "ws",
+        host: wsDomain,
+        path: wsPath,
+        sni: wsDomain,
+      });
+      shareLink = `vless://${device.xrayUuid}@${wsDomain}:${xrayPort}?${vlessParams.toString()}#${encodeURIComponent(device.name)}`;
+    } else {
+      streamSettings = {
+        network: "tcp",
+        security: "reality",
+        realitySettings: {
+          serverName: realityServerName,
+          fingerprint: "chrome",
+          publicKey: realityPublicKey,
+          shortId: realityShortId,
+        },
+      };
+      const vlessParams = new URLSearchParams({
+        encryption: "none",
+        flow: "xtls-rprx-vision",
+        security: "reality",
+        sni: realityServerName,
+        fp: "chrome",
+        pbk: realityPublicKey,
+        sid: realityShortId,
+        type: "tcp",
+      });
+      shareLink = `vless://${device.xrayUuid}@${endpoint}:${xrayPort}?${vlessParams.toString()}#${encodeURIComponent(device.name)}`;
+    }
+
+    const vnextAddress = isWsTls ? (nodeTransport?.xrayTlsDomain ?? endpoint) : endpoint;
 
     const xrayConfig = {
       log: { loglevel: "warning" },
@@ -139,28 +197,13 @@ PersistentKeepalive = 25
           settings: {
             vnext: [
               {
-                address: endpoint,
+                address: vnextAddress,
                 port: xrayPort,
-                users: [
-                  {
-                    id: device.xrayUuid,
-                    encryption: "none",
-                    flow: "xtls-rprx-vision",
-                  },
-                ],
+                users: [userConfig],
               },
             ],
           },
-          streamSettings: {
-            network: "tcp",
-            security: "reality",
-            realitySettings: {
-              serverName: realityServerName,
-              fingerprint: "chrome",
-              publicKey: realityPublicKey,
-              shortId: realityShortId,
-            },
-          },
+          streamSettings,
         },
         {
           tag: "direct",
@@ -171,19 +214,6 @@ PersistentKeepalive = 25
 
     const config = JSON.stringify(xrayConfig, null, 2);
     const filename = `${device.name.replace(/[^a-zA-Z0-9_-]/g, "_")}-xray.json`;
-
-    // Build VLESS share link (for Shadowrocket, v2rayN, etc.)
-    const vlessParams = new URLSearchParams({
-      encryption: "none",
-      flow: "xtls-rprx-vision",
-      security: "reality",
-      sni: realityServerName,
-      fp: "chrome",
-      pbk: realityPublicKey,
-      sid: realityShortId,
-      type: "tcp",
-    });
-    const shareLink = `vless://${device.xrayUuid}@${endpoint}:${xrayPort}?${vlessParams.toString()}#${encodeURIComponent(device.name)}`;
 
     return success({ format: "xray", config, filename, shareLink });
   }

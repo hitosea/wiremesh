@@ -148,3 +148,21 @@ func (c *Client) DownloadBinary(endpoint string) ([]byte, error) {
 	}
 	return io.ReadAll(resp.Body)
 }
+
+func (c *Client) UploadCert(domain, cert, key string) error {
+	body := map[string]string{
+		"domain": domain,
+		"cert":   cert,
+		"key":    key,
+	}
+	resp, err := c.doRequest("POST", "/api/agent/cert", body)
+	if err != nil {
+		return fmt.Errorf("upload cert: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		data, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("upload cert: status %d: %s", resp.StatusCode, string(data))
+	}
+	return nil
+}

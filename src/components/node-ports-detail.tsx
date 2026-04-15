@@ -9,7 +9,7 @@ type NodePorts = {
   socks5: number[];
 };
 
-export function NodePortsDetail({ ports }: { ports: NodePorts }) {
+export function NodePortsDetail({ ports, xrayTransport }: { ports: NodePorts; xrayTransport?: string | null }) {
   const t = useTranslations("nodes");
 
   return (
@@ -22,7 +22,9 @@ export function NodePortsDetail({ ports }: { ports: NodePorts }) {
       </div>
       {ports.xray.length > 0 && (
         <div>
-          <span className="text-muted-foreground text-xs">{t("portsXray")}</span>
+          <span className="text-muted-foreground text-xs">
+            {xrayTransport === "ws-tls" ? t("xrayTransportWsTls") : t("portsXray")}
+          </span>
           <div className="flex flex-wrap gap-1.5 mt-1">
             {ports.xray.map((p) => (
               <span key={p} className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{p}</span>

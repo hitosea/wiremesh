@@ -10,6 +10,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
+import {
   Card,
   CardContent,
   CardHeader,
@@ -34,6 +41,9 @@ type NodeDetail = {
   xrayTransport: string | null;
   xrayPort: number | null;
   xrayConfig: string | null;
+  xrayWsPath: string | null;
+  xrayTlsDomain: string | null;
+  xrayTlsCert: string | null;
   status: string;
   errorMessage: string | null;
   externalInterface: string;
@@ -74,6 +84,12 @@ export default function NodeDetailPage() {
   const [realityPublicKey, setRealityPublicKey] = useState("");
   const [realityShortId, setRealityShortId] = useState("");
   const [defaults, setDefaults] = useState<Record<string, string>>({});
+  const [xrayTransport, setXrayTransport] = useState("reality");
+  const [tlsDomain, setTlsDomain] = useState("");
+  const [tlsCertMode, setTlsCertMode] = useState<"auto" | "manual">("auto");
+  const [tlsCert, setTlsCert] = useState("");
+  const [tlsKey, setTlsKey] = useState("");
+  const [wsPath, setWsPath] = useState("");
 
   useEffect(() => {
     fetch(`/api/nodes/${nodeId}`)
@@ -100,6 +116,13 @@ export default function NodeDetailPage() {
             setRealityPublicKey(cfg.realityPublicKey ?? "");
             setRealityShortId(cfg.realityShortId ?? "");
           } catch {}
+        }
+        setXrayTransport(n.xrayTransport === "ws-tls" ? "ws-tls" : "reality");
+        setTlsDomain(n.xrayTlsDomain || "");
+        setWsPath(n.xrayWsPath || "");
+        if (n.xrayTlsCert) {
+          setTlsCertMode("manual");
+          setTlsCert(n.xrayTlsCert);
         }
       })
       .catch(() => toast.error(ts("loadNodeFailed")))
@@ -131,6 +154,14 @@ export default function NodeDetailPage() {
         xrayPort: xrayPort ? parseInt(xrayPort) : null,
         realityDest: realityDest || undefined,
       };
+      body.xrayTransport = xrayTransport;
+      if (xrayTransport === "ws-tls") {
+        body.xrayTlsDomain = tlsDomain;
+        if (tlsCertMode === "manual") {
+          body.xrayTlsCert = tlsCert;
+          body.xrayTlsKey = tlsKey;
+        }
+      }
 
       const res = await fetch(`/api/nodes/${nodeId}`, {
         method: "PUT",
@@ -295,31 +326,107 @@ export default function NodeDetailPage() {
               </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="realityDest">{tn("realityTarget")}</Label>
-              <Input
-                id="realityDest"
-                value={realityDest}
-                onChange={(e) => setRealityDest(e.target.value)}
-                placeholder="www.microsoft.com:443"
-              />
-              <p className="text-xs text-muted-foreground">
-                {tn("realityTargetHint")}
-              </p>
+              <Label>{ts("xrayTransport")}</Label>
+              <Select value={xrayTransport} onValueChange={setXrayTransport}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="reality">{ts("xrayTransportReality")}</SelectItem>
+                  <SelectItem value="ws-tls">{ts("xrayTransportWsTls")}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            {realityPublicKey && (
+            {xrayTransport === "reality" && (
               <>
                 <div className="space-y-2">
-                  <Label>Reality Public Key</Label>
-                  <code className="block text-xs bg-muted px-3 py-2 rounded break-all">
-                    {realityPublicKey}
-                  </code>
+                  <Label htmlFor="realityDest">{tn("realityTarget")}</Label>
+                  <Input
+                    id="realityDest"
+                    value={realityDest}
+                    onChange={(e) => setRealityDest(e.target.value)}
+                    placeholder="www.microsoft.com:443"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {tn("realityTargetHint")}
+                  </p>
+                </div>
+                {realityPublicKey && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Reality Public Key</Label>
+                      <code className="block text-xs bg-muted px-3 py-2 rounded break-all">
+                        {realityPublicKey}
+                      </code>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Reality Short ID</Label>
+                      <code className="block text-xs bg-muted px-3 py-2 rounded break-all">
+                        {realityShortId}
+                      </code>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+            {xrayTransport === "ws-tls" && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="tlsDomain">{ts("tlsDomain")}</Label>
+                  <Input
+                    id="tlsDomain"
+                    value={tlsDomain}
+                    onChange={(e) => setTlsDomain(e.target.value)}
+                    placeholder="vpn.example.com"
+                  />
+                  <p className="text-xs text-muted-foreground">{ts("tlsDomainHint")}</p>
                 </div>
                 <div className="space-y-2">
-                  <Label>Reality Short ID</Label>
-                  <code className="block text-xs bg-muted px-3 py-2 rounded break-all">
-                    {realityShortId}
-                  </code>
+                  <Label>{ts("tlsCertMode")}</Label>
+                  <Select value={tlsCertMode} onValueChange={(v: string) => setTlsCertMode(v as "auto" | "manual")}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">{ts("tlsCertModeAuto")}</SelectItem>
+                      <SelectItem value="manual">{ts("tlsCertModeManual")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {tlsCertMode === "auto" && (
+                    <p className="text-xs text-muted-foreground">{ts("tlsCertAutoHint")}</p>
+                  )}
                 </div>
+                {tlsCertMode === "manual" && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="tlsCert">{ts("tlsCert")}</Label>
+                      <Textarea
+                        id="tlsCert"
+                        value={tlsCert}
+                        onChange={(e) => setTlsCert(e.target.value)}
+                        placeholder="-----BEGIN CERTIFICATE-----"
+                        rows={4}
+                        className="font-mono text-xs"
+                      />
+                      <p className="text-xs text-muted-foreground">{ts("tlsCertHint")}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="tlsKey">{ts("tlsKey")}</Label>
+                      <Textarea
+                        id="tlsKey"
+                        value={tlsKey}
+                        onChange={(e) => setTlsKey(e.target.value)}
+                        placeholder="-----BEGIN PRIVATE KEY-----"
+                        rows={4}
+                        className="font-mono text-xs"
+                      />
+                      <p className="text-xs text-muted-foreground">{ts("tlsKeyHint")}</p>
+                    </div>
+                  </>
+                )}
+                {wsPath && (
+                  <div className="space-y-2">
+                    <Label>{ts("wsPath")}</Label>
+                    <code className="block text-xs bg-muted px-3 py-2 rounded">{wsPath}</code>
+                    <p className="text-xs text-muted-foreground">{ts("wsPathHint")}</p>
+                  </div>
+                )}
               </>
             )}
           </div>

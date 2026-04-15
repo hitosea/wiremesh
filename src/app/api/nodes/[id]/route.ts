@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { randomBytes } from "crypto";
 import { db } from "@/lib/db";
 import { nodes } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
@@ -31,6 +32,9 @@ export async function GET(request: NextRequest, { params }: Params) {
       xrayTransport: nodes.xrayTransport,
       xrayPort: nodes.xrayPort,
       xrayConfig: nodes.xrayConfig,
+      xrayWsPath: nodes.xrayWsPath,
+      xrayTlsDomain: nodes.xrayTlsDomain,
+      xrayTlsCert: nodes.xrayTlsCert,
       status: nodes.status,
       errorMessage: nodes.errorMessage,
       remark: nodes.remark,
@@ -57,7 +61,13 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (isNaN(nodeId)) return error("VALIDATION_ERROR", "validation.invalidNodeId");
 
   const existing = db
-    .select({ id: nodes.id, name: nodes.name })
+    .select({
+      id: nodes.id,
+      name: nodes.name,
+      xrayWsPath: nodes.xrayWsPath,
+      xrayTlsDomain: nodes.xrayTlsDomain,
+      xrayTransport: nodes.xrayTransport,
+    })
     .from(nodes)
     .where(eq(nodes.id, nodeId))
     .get();
@@ -133,6 +143,33 @@ export async function PUT(request: NextRequest, { params }: Params) {
       parsed.realityServerName = normalized.realityServerName;
       updateData.xrayConfig = JSON.stringify(parsed);
     }
+  }
+
+  // Handle WS+TLS fields
+  if (body.xrayTransport !== undefined) {
+    updateData.xrayTransport = body.xrayTransport;
+  }
+  if (body.xrayTlsDomain !== undefined) {
+    updateData.xrayTlsDomain = body.xrayTlsDomain || null;
+  }
+  if (body.xrayTlsCert !== undefined) {
+    updateData.xrayTlsCert = body.xrayTlsCert || null;
+  }
+  if (body.xrayTlsKey !== undefined) {
+    updateData.xrayTlsKey = body.xrayTlsKey ? encrypt(body.xrayTlsKey) : null;
+  }
+
+  // Validate: ws-tls requires a domain
+  if (updateData.xrayTransport === "ws-tls") {
+    const domain = body.xrayTlsDomain ?? existing?.xrayTlsDomain;
+    if (!domain) {
+      return error("VALIDATION_ERROR", "validation.wsTlsDomainRequired");
+    }
+  }
+
+  // Auto-generate xrayWsPath when switching to ws-tls and node has none
+  if (updateData.xrayTransport === "ws-tls" && !existing?.xrayWsPath) {
+    updateData.xrayWsPath = "/" + randomBytes(4).toString("hex");
   }
 
   const updated = db

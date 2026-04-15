@@ -187,7 +187,7 @@ func (a *Agent) pullAndApplyConfigForce(force bool) error {
 	}
 
 	// 5. Sync Xray config
-	if err := xray.Sync(cfgData.Xray); err != nil {
+	if err := xray.Sync(cfgData.Xray, a.client); err != nil {
 		log.Printf("[agent] xray sync error: %v", err)
 	}
 

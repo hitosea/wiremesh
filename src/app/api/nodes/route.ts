@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { randomBytes } from "crypto";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "@/lib/db";
 import { nodes, settings, lineTunnels, lineNodes, lines } from "@/lib/db/schema";
@@ -215,6 +216,8 @@ export async function POST(request: NextRequest) {
     realityServerName,
   });
 
+  const xrayWsPath = "/" + randomBytes(4).toString("hex");
+
   const result = db
     .insert(nodes)
     .values({
@@ -227,7 +230,8 @@ export async function POST(request: NextRequest) {
       wgPublicKey: publicKey,
       wgAddress,
       xrayProtocol: "vless",
-      xrayTransport: "tcp",
+      xrayTransport: "reality",
+      xrayWsPath,
       xrayPort: xrayPort ?? parseInt(settingsMap["xray_default_port"] ?? String(DEFAULT_PROXY_PORT)),
       xrayConfig: resolvedXrayConfig,
       externalInterface: externalInterface ?? "eth0",

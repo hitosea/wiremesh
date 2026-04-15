@@ -19,7 +19,7 @@ const (
 
 // Sync generates the Xray config and manages the service.
 // If cfg is nil or not enabled, it stops the service.
-func Sync(cfg *api.XrayConfig) error {
+func Sync(cfg *api.XrayConfig, client *api.Client) error {
 	if cfg == nil || !cfg.Enabled {
 		return stopIfRunning()
 	}
@@ -27,6 +27,14 @@ func Sync(cfg *api.XrayConfig) error {
 	if len(cfg.Routes) == 0 {
 		log.Println("[xray] No clients configured, skipping")
 		return stopIfRunning()
+	}
+
+	if err := AutoCert(cfg, client); err != nil {
+		log.Printf("[xray] Auto-cert failed: %v", err)
+	}
+
+	if err := writeCertFiles(cfg); err != nil {
+		return fmt.Errorf("write cert files: %w", err)
 	}
 
 	configBytes, err := GenerateConfig(cfg)
@@ -112,6 +120,36 @@ func ensureRunning() error {
 		return start()
 	}
 	return nil
+}
+
+func writeCertFiles(cfg *api.XrayConfig) error {
+	if cfg.Transport != "ws-tls" || cfg.TlsDomain == "" || cfg.TlsCert == "" {
+		return nil
+	}
+
+	certPath := fmt.Sprintf("%s/%s.crt", XrayConfigDir, cfg.TlsDomain)
+	keyPath := fmt.Sprintf("%s/%s.key", XrayConfigDir, cfg.TlsDomain)
+
+	if err := os.MkdirAll(XrayConfigDir, 0755); err != nil {
+		return fmt.Errorf("create xray config dir: %w", err)
+	}
+
+	certChanged := writeIfChanged(certPath, cfg.TlsCert, 0644)
+	keyChanged := writeIfChanged(keyPath, cfg.TlsKey, 0600)
+
+	if certChanged || keyChanged {
+		log.Printf("[xray] TLS cert files updated for %s", cfg.TlsDomain)
+	}
+	return nil
+}
+
+func writeIfChanged(path, content string, perm os.FileMode) bool {
+	existing, _ := os.ReadFile(path)
+	if string(existing) == content {
+		return false
+	}
+	os.WriteFile(path, []byte(content), perm)
+	return true
 }
 
 func systemctl(action, service string) error {
