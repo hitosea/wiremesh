@@ -134,11 +134,14 @@ case "$OS_ID" in
     fi
     PKG_MANAGER="apt"
     ;;
-  centos|rhel|rocky|almalinux|alinux)
+  centos|rhel|rocky|almalinux)
     OS_MAJOR=$(echo "$OS_VERSION_ID" | cut -d. -f1)
     if [ "$OS_MAJOR" -lt 8 ]; then
       fail "$OS_ID $OS_VERSION_ID is not supported (requires 8+)"
     fi
+    PKG_MANAGER="yum"
+    ;;
+  alinux)
     PKG_MANAGER="yum"
     ;;
   fedora)
