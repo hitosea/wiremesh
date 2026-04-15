@@ -134,7 +134,7 @@ case "$OS_ID" in
     fi
     PKG_MANAGER="apt"
     ;;
-  centos|rhel|rocky|almalinux)
+  centos|rhel|rocky|almalinux|alinux)
     OS_MAJOR=$(echo "$OS_VERSION_ID" | cut -d. -f1)
     if [ "$OS_MAJOR" -lt 8 ]; then
       fail "$OS_ID $OS_VERSION_ID is not supported (requires 8+)"
@@ -145,7 +145,7 @@ case "$OS_ID" in
     PKG_MANAGER="dnf"
     ;;
   *)
-    fail "Unsupported OS: $OS_ID. Supported: Ubuntu 20+, Debian 11+, CentOS/RHEL/Rocky/Alma 8+, Fedora"
+    fail "Unsupported OS: $OS_ID. Supported: Ubuntu 20+, Debian 11+, CentOS/RHEL/Rocky/Alma/Alinux 8+, Fedora"
     ;;
 esac
 ok "OS: $OS_NAME ($PKG_MANAGER)"
