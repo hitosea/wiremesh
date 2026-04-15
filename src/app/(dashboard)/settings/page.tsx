@@ -48,7 +48,7 @@ const SETTING_GROUPS = [
     descriptionKey: undefined,
     fields: [
       { key: "filter_sync_interval", placeholder: "86400", type: "number" },
-      { key: "dns_upstream", placeholder: "8.8.8.8,1.1.1.1" },
+      { key: "dns_upstream", placeholder: "tls://8.8.8.8,tls://1.1.1.1" },
     ],
   },
 ];

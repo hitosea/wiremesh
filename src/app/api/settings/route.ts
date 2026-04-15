@@ -79,8 +79,13 @@ export async function PUT(request: NextRequest) {
   }
 
   if (merged["dns_upstream"]) {
-    const ips = merged["dns_upstream"].split(",").map((s) => s.trim());
-    if (ips.length === 0 || ips.some((ip) => !isValidIP(ip))) {
+    const entries = merged["dns_upstream"].split(",").map((s) => s.trim());
+    const isValidDnsEntry = (entry: string) => {
+      const raw = entry.replace(/^tls:\/\//, "");
+      const [host] = raw.split(":");
+      return isValidIP(host);
+    };
+    if (entries.length === 0 || entries.some((e) => !isValidDnsEntry(e))) {
       validationErrors.push("validation.dnsUpstream");
     }
   }

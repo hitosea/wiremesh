@@ -482,7 +482,7 @@ export async function GET(request: NextRequest) {
     // Read settings
     const dnsUpstreamSetting = db.select().from(settings).where(eq(settings.key, "dns_upstream")).get();
     const filterSyncIntervalSetting = db.select().from(settings).where(eq(settings.key, "filter_sync_interval")).get();
-    const dnsUpstream = dnsUpstreamSetting?.value ? dnsUpstreamSetting.value.split(",").map((s: string) => s.trim()) : ["8.8.8.8", "1.1.1.1"];
+    const dnsUpstream = dnsUpstreamSetting?.value ? dnsUpstreamSetting.value.split(",").map((s: string) => s.trim()) : ["tls://1.1.1.1", "tls://8.8.8.8"];
     const filterSyncInterval = filterSyncIntervalSetting?.value ? parseInt(filterSyncIntervalSetting.value, 10) : 86400;
 
     const branches: {

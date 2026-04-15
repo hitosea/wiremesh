@@ -1,9 +1,11 @@
 package dns
 
 import (
+	"crypto/tls"
 	"fmt"
 	"log"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -11,24 +13,70 @@ import (
 	"github.com/wiremesh/agent/ipset"
 )
 
+const tlsScheme = "tls://"
+
+type upstreamServer struct {
+	addr  string
+	isTLS bool
+}
+
 // Proxy is a forwarding DNS proxy that intercepts matching domains
 // and adds resolved IPs to ipsets for policy routing.
 type Proxy struct {
 	listenAddr string
-	upstream   []string
+	upstream   []upstreamServer
 	matcher    *DomainMatcher
 	server     *mdns.Server
-	client     *mdns.Client
+	udpClient  *mdns.Client
+	tlsClient  *mdns.Client
+	tlsConns   map[string]*mdns.Conn
+	tlsConnMu  sync.Mutex
 	mu         sync.Mutex
 	running    bool
+}
+
+func normalizeAddr(addr, defaultPort string) string {
+	if _, _, err := net.SplitHostPort(addr); err != nil {
+		return addr + ":" + defaultPort
+	}
+	return addr
+}
+
+func parseUpstream(raw []string) []upstreamServer {
+	var servers []upstreamServer
+	for _, u := range raw {
+		u = strings.TrimSpace(u)
+		if u == "" {
+			continue
+		}
+		if strings.HasPrefix(u, tlsScheme) {
+			servers = append(servers, upstreamServer{
+				addr:  normalizeAddr(strings.TrimPrefix(u, tlsScheme), "853"),
+				isTLS: true,
+			})
+		} else {
+			servers = append(servers, upstreamServer{
+				addr: normalizeAddr(u, "53"),
+			})
+		}
+	}
+	return servers
 }
 
 func NewProxy(listenAddr string, upstream []string) *Proxy {
 	return &Proxy{
 		listenAddr: listenAddr,
-		upstream:   upstream,
+		upstream:   parseUpstream(upstream),
 		matcher:    NewDomainMatcher(),
-		client:     &mdns.Client{Timeout: 5 * time.Second},
+		udpClient:  &mdns.Client{Timeout: 3 * time.Second},
+		tlsClient: &mdns.Client{
+			Net:     "tcp-tls",
+			Timeout: 3 * time.Second,
+			TLSConfig: &tls.Config{
+				MinVersion: tls.VersionTLS12,
+			},
+		},
+		tlsConns: make(map[string]*mdns.Conn),
 	}
 }
 
@@ -83,6 +131,12 @@ func (p *Proxy) Stop() {
 	if p.server != nil {
 		p.server.Shutdown()
 	}
+	p.tlsConnMu.Lock()
+	for addr, conn := range p.tlsConns {
+		conn.Close()
+		delete(p.tlsConns, addr)
+	}
+	p.tlsConnMu.Unlock()
 	p.running = false
 	log.Println("[dns] DNS proxy stopped")
 }
@@ -133,16 +187,87 @@ func (p *Proxy) handleQuery(w mdns.ResponseWriter, r *mdns.Msg) {
 	w.WriteMsg(resp)
 }
 
-func (p *Proxy) forward(r *mdns.Msg) (*mdns.Msg, error) {
-	for _, upstream := range p.upstream {
-		addr := upstream
-		if _, _, err := net.SplitHostPort(addr); err != nil {
-			addr = addr + ":53"
+func (p *Proxy) getTLSConn(addr string) (*mdns.Conn, error) {
+	p.tlsConnMu.Lock()
+	conn, ok := p.tlsConns[addr]
+	p.tlsConnMu.Unlock()
+
+	if ok {
+		return conn, nil
+	}
+
+	newConn, err := p.tlsClient.Dial(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	p.tlsConnMu.Lock()
+	p.tlsConns[addr] = newConn
+	p.tlsConnMu.Unlock()
+
+	return newConn, nil
+}
+
+func (p *Proxy) closeTLSConn(addr string) {
+	p.tlsConnMu.Lock()
+	if conn, ok := p.tlsConns[addr]; ok {
+		conn.Close()
+		delete(p.tlsConns, addr)
+	}
+	p.tlsConnMu.Unlock()
+}
+
+func (p *Proxy) exchangeTLS(r *mdns.Msg, addr string) (*mdns.Msg, error) {
+	conn, err := p.getTLSConn(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	conn.SetDeadline(time.Now().Add(3 * time.Second))
+	resp, _, err := p.tlsClient.ExchangeWithConn(r, conn)
+	if err != nil {
+		p.closeTLSConn(addr)
+		// Retry once with fresh connection
+		conn, err = p.getTLSConn(addr)
+		if err != nil {
+			return nil, err
 		}
-		resp, _, err := p.client.Exchange(r, addr)
-		if err == nil {
-			return resp, nil
+		conn.SetDeadline(time.Now().Add(3 * time.Second))
+		resp, _, err = p.tlsClient.ExchangeWithConn(r, conn)
+		if err != nil {
+			p.closeTLSConn(addr)
+			return nil, err
 		}
 	}
-	return nil, fmt.Errorf("all upstream DNS servers failed")
+	return resp, nil
+}
+
+func (p *Proxy) forward(r *mdns.Msg) (*mdns.Msg, error) {
+	type result struct {
+		resp *mdns.Msg
+		err  error
+	}
+
+	ch := make(chan result, len(p.upstream))
+	for _, upstream := range p.upstream {
+		go func(u upstreamServer) {
+			if u.isTLS {
+				resp, err := p.exchangeTLS(r, u.addr)
+				ch <- result{resp, err}
+			} else {
+				resp, _, err := p.udpClient.Exchange(r, u.addr)
+				ch <- result{resp, err}
+			}
+		}(upstream)
+	}
+
+	var lastErr error
+	for range p.upstream {
+		res := <-ch
+		if res.err == nil {
+			return res.resp, nil
+		}
+		lastErr = res.err
+	}
+	return nil, fmt.Errorf("all upstream DNS servers failed: %w", lastErr)
 }
