@@ -1,16 +1,9 @@
 import { db } from "@/lib/db";
-import { devices, lines, lineNodes, nodes } from "@/lib/db/schema";
+import { devices, lines } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
-import { inArray, eq, and } from "drizzle-orm";
+import { inArray, eq, sql } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
-import { sseManager } from "@/lib/sse-manager";
-import { sql } from "drizzle-orm";
-
-function getEntryNodeId(lineId: number): number | null {
-  const entry = db.select({ nodeId: lineNodes.nodeId }).from(lineNodes)
-    .where(and(eq(lineNodes.lineId, lineId), eq(lineNodes.role, "entry"))).get();
-  return entry?.nodeId ?? null;
-}
+import { notifyLineNodes } from "@/lib/line-notify";
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -27,12 +20,9 @@ export async function POST(request: Request) {
       .where(inArray(devices.id, ids))
       .all();
 
-    const affectedEntryNodeIds = new Set<number>();
+    const affectedLineIds = new Set<number>();
     for (const device of existing) {
-      if (device.lineId) {
-        const entryNodeId = getEntryNodeId(device.lineId);
-        if (entryNodeId !== null) affectedEntryNodeIds.add(entryNodeId);
-      }
+      if (device.lineId) affectedLineIds.add(device.lineId);
     }
 
     db.delete(devices).where(inArray(devices.id, ids)).run();
@@ -47,9 +37,8 @@ export async function POST(request: Request) {
       });
     }
 
-    for (const nodeId of affectedEntryNodeIds) {
-      db.update(nodes).set({ updatedAt: sql`(datetime('now'))` }).where(eq(nodes.id, nodeId)).run();
-      sseManager.notifyNodePeerUpdate(nodeId);
+    for (const lineId of affectedLineIds) {
+      notifyLineNodes(lineId);
     }
 
     return success({ message: `已删除 ${existing.length} 个设备` });
@@ -69,12 +58,9 @@ export async function POST(request: Request) {
       .where(inArray(devices.id, ids))
       .all();
 
-    const affectedEntryNodeIds = new Set<number>();
+    const affectedLineIds = new Set<number>();
     for (const device of existing) {
-      if (device.lineId) {
-        const entryNodeId = getEntryNodeId(device.lineId);
-        if (entryNodeId !== null) affectedEntryNodeIds.add(entryNodeId);
-      }
+      if (device.lineId) affectedLineIds.add(device.lineId);
     }
 
     db.update(devices)
@@ -82,10 +68,7 @@ export async function POST(request: Request) {
       .where(inArray(devices.id, ids))
       .run();
 
-    if (lineId !== null) {
-      const entryNodeId = getEntryNodeId(lineId);
-      if (entryNodeId !== null) affectedEntryNodeIds.add(entryNodeId);
-    }
+    if (lineId !== null) affectedLineIds.add(lineId);
 
     for (const device of existing) {
       writeAuditLog({
@@ -97,9 +80,8 @@ export async function POST(request: Request) {
       });
     }
 
-    for (const nodeId of affectedEntryNodeIds) {
-      db.update(nodes).set({ updatedAt: sql`(datetime('now'))` }).where(eq(nodes.id, nodeId)).run();
-      sseManager.notifyNodePeerUpdate(nodeId);
+    for (const lineId of affectedLineIds) {
+      notifyLineNodes(lineId);
     }
 
     return success({ message: `已更新 ${ids.length} 个设备的线路` });

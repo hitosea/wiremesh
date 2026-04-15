@@ -4,14 +4,14 @@ import { db } from "@/lib/db";
 import { devices, settings, nodes, lineNodes, lines } from "@/lib/db/schema";
 import { success, created, error, paginated } from "@/lib/api-response";
 import { parsePaginationParams, paginationOffset } from "@/lib/pagination";
-import { eq, or, like, count, and, gt, lte, isNull, sql, SQL } from "drizzle-orm";
+import { eq, or, like, count, and, gt, lte, isNull, SQL } from "drizzle-orm";
 import { encrypt, generateRandomString } from "@/lib/crypto";
 import { generateKeyPair } from "@/lib/wireguard";
 import { allocateDeviceIp } from "@/lib/ip-allocator";
 import { allocateProxyPort, getXrayDefaultPort } from "@/lib/proxy-port";
 import { writeAuditLog } from "@/lib/audit-log";
-import { sseManager } from "@/lib/sse-manager";
 import { computeDeviceStatus } from "@/lib/device-status";
+import { notifyLineNodes } from "@/lib/line-notify";
 
 function getEntryNodeId(lineId: number): number | null {
   const entry = db.select({ nodeId: lineNodes.nodeId }).from(lineNodes)
@@ -192,9 +192,8 @@ export async function POST(request: NextRequest) {
     detail: `protocol=${protocol}`,
   });
 
-  if (entryNodeId !== null) {
-    db.update(nodes).set({ updatedAt: sql`(datetime('now'))` }).where(eq(nodes.id, entryNodeId)).run();
-    sseManager.notifyNodePeerUpdate(entryNodeId);
+  if (result.lineId) {
+    notifyLineNodes(result.lineId);
   }
 
   return created(result);

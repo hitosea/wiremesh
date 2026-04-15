@@ -2,10 +2,10 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { devices, lines, lineNodes, nodes } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
-import { sseManager } from "@/lib/sse-manager";
 import { allocateProxyPort, getXrayDefaultPort } from "@/lib/proxy-port";
+import { notifyLineNodes } from "@/lib/line-notify";
 
 function getEntryNodeId(lineId: number): number | null {
   const entry = db.select({ nodeId: lineNodes.nodeId }).from(lineNodes)
@@ -81,21 +81,13 @@ export async function PUT(request: NextRequest, { params }: Params) {
     detail: lineId ? `lineId=${lineId}` : "unlinked line",
   });
 
-  // Notify old entry node
+  // Notify all nodes on old line
   if (existing.lineId && existing.lineId !== lineId) {
-    const oldEntryNodeId = getEntryNodeId(existing.lineId);
-    if (oldEntryNodeId !== null) {
-      db.update(nodes).set({ updatedAt: sql`(datetime('now'))` }).where(eq(nodes.id, oldEntryNodeId)).run();
-      sseManager.notifyNodePeerUpdate(oldEntryNodeId);
-    }
+    notifyLineNodes(existing.lineId);
   }
-  // Notify new entry node
+  // Notify all nodes on new line
   if (lineId) {
-    const newEntryNodeId = getEntryNodeId(lineId);
-    if (newEntryNodeId !== null) {
-      db.update(nodes).set({ updatedAt: sql`(datetime('now'))` }).where(eq(nodes.id, newEntryNodeId)).run();
-      sseManager.notifyNodePeerUpdate(newEntryNodeId);
-    }
+    notifyLineNodes(lineId);
   }
 
   return success(updated);
