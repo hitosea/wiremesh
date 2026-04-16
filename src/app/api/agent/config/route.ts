@@ -379,8 +379,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Only set dnsProxy when domain rules exist (agent DNS proxy only starts with domain rules)
-    const hasDomainRules = xrayRoutes.some((r) => r.branches.some((b) => b.domain_rules.length > 0));
+    // Always point Xray at the agent DNS proxy on entry nodes. The proxy
+    // handles DoT forwarding over the tunnel (bypassing GFW), and also
+    // populates ipsets from resolved domains for multi-branch split routing.
+    const xrayDnsProxy = node.wgAddress ? node.wgAddress.split("/")[0] : "";
 
     if (xrayTransport === "ws-tls") {
       let tlsKey = "";
@@ -397,7 +399,7 @@ export async function GET(request: NextRequest) {
         tlsCert: node.xrayTlsCert ?? "",
         tlsKey,
         routes: xrayRoutes,
-        dnsProxy: hasDomainRules && node.wgAddress ? node.wgAddress.split("/")[0] : "",
+        dnsProxy: xrayDnsProxy,
       };
     } else {
       xrayConfig = {
@@ -410,7 +412,7 @@ export async function GET(request: NextRequest) {
         realityDest: realitySettings.realityDest ?? "www.microsoft.com:443",
         realityServerNames: [realitySettings.realityServerName ?? "www.microsoft.com"],
         routes: xrayRoutes,
-        dnsProxy: hasDomainRules && node.wgAddress ? node.wgAddress.split("/")[0] : "",
+        dnsProxy: xrayDnsProxy,
       };
     }
   }
