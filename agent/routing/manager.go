@@ -26,8 +26,34 @@ func NewManager() *Manager {
 // xrayRoutes, when non-empty, generates OUTPUT chain rules per-line
 // so Xray traffic gets branch-based split tunneling via iptables.
 func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes []api.XrayLineRoute) error {
-	if cfg == nil || !cfg.Enabled || len(cfg.Branches) == 0 {
+	if cfg == nil || !cfg.Enabled {
 		m.Cleanup()
+		return nil
+	}
+
+	// Manage DNS proxy lifecycle based on cfg.DNS.Listen being set.
+	// DNS proxy runs even for nodes with no multi-branch lines — it provides
+	// DoT-based DNS forwarding for WG clients to prevent GFW poisoning.
+	// BindDevice (e.g. "wm-tun1") forces upstream queries through a tunnel.
+	if cfg.DNS.Listen != "" {
+		if m.dnsProxy == nil {
+			m.dnsProxy = dns.NewProxyWithBind(cfg.DNS.Listen, cfg.DNS.Upstream, cfg.DNS.BindDevice)
+			m.dnsProxy.Start()
+		}
+	} else if m.dnsProxy != nil {
+		m.dnsProxy.Stop()
+		m.dnsProxy = nil
+	}
+
+	if len(cfg.Branches) == 0 {
+		// No multi-branch lines: no branch routing needed. DNS proxy stays up
+		// (plain forwarder mode). Clean any leftover branch rules.
+		m.cleanIPRules()
+		m.cleanMangleRules()
+		if m.dnsProxy != nil {
+			m.dnsProxy.UpdateRules(nil)
+		}
+		m.lastConfig = cfg
 		return nil
 	}
 
@@ -161,16 +187,10 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes []api.XrayLineRoute) e
 	// MASQUERADE for SOCKS5 traffic going through tunnels (independent of Xray)
 	addNatRule("-A POSTROUTING -o wm-tun+ -j MASQUERADE -m comment --comment wm-socks5-masq")
 
-	// 3. Start/update DNS proxy
-	if len(domainRules) > 0 {
-		if m.dnsProxy == nil {
-			m.dnsProxy = dns.NewProxy(cfg.DNS.Listen, cfg.DNS.Upstream)
-			m.dnsProxy.Start()
-		}
+	// 3. Update DNS proxy domain rules (proxy lifecycle is already managed above
+	// based on cfg.DNS.Listen, independent of domain rules)
+	if m.dnsProxy != nil {
 		m.dnsProxy.UpdateRules(domainRules)
-	} else if m.dnsProxy != nil {
-		m.dnsProxy.Stop()
-		m.dnsProxy = nil
 	}
 
 	// 4. Start/update external rule source syncer

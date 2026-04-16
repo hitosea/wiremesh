@@ -465,7 +465,7 @@ export async function GET(request: NextRequest) {
   // ---- Routing config (entry nodes only) ----
   let routingConfig: {
     enabled: boolean;
-    dns: { listen: string; upstream: string[] };
+    dns: { listen: string; upstream: string[]; bindDevice?: string };
     branches: {
       id: number;
       name: string;
@@ -597,11 +597,20 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Pick the first "from" tunnel interface as the DNS upstream bind device.
+    // This forces upstream queries out through the tunnel (reaching the
+    // internet via a downstream relay/exit node) so domestic entry nodes
+    // bypass local DNS tampering (UDP poisoning or TLS SNI blocking on DoT).
+    // For single-node lines (entry==exit, no tunnels) bindDevice stays empty
+    // and queries go out the node's default route normally.
+    const dnsBindDevice = interfaces.find((i) => i.role === "from")?.name ?? "";
+
     routingConfig = {
       enabled: true,
       dns: {
         listen: node.wgAddress.split("/")[0] + ":53",
         upstream: dnsUpstream,
+        ...(dnsBindDevice ? { bindDevice: dnsBindDevice } : {}),
       },
       branches,
     };

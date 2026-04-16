@@ -97,8 +97,9 @@ type RoutingConfig struct {
 }
 
 type DNSConfig struct {
-	Listen   string   `json:"listen"`
-	Upstream []string `json:"upstream"`
+	Listen     string   `json:"listen"`
+	Upstream   []string `json:"upstream"`
+	BindDevice string   `json:"bindDevice,omitempty"` // interface to bind upstream queries to (e.g. "wm-tun1"), empty = no binding
 }
 
 type RoutingBranch struct {

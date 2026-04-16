@@ -7,6 +7,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	mdns "github.com/miekg/dns"
@@ -63,18 +64,52 @@ func parseUpstream(raw []string) []upstreamServer {
 	return servers
 }
 
+// bindDialer returns a net.Dialer that binds outbound sockets to iface via
+// SO_BINDTODEVICE. Used to force DNS upstream queries through a tunnel
+// interface so GFW on the host's public path can't interfere.
+func bindDialer(iface string, timeout time.Duration) *net.Dialer {
+	d := &net.Dialer{Timeout: timeout}
+	if iface == "" {
+		return d
+	}
+	d.Control = func(network, address string, c syscall.RawConn) error {
+		var opErr error
+		err := c.Control(func(fd uintptr) {
+			opErr = syscall.SetsockoptString(int(fd), syscall.SOL_SOCKET, syscall.SO_BINDTODEVICE, iface)
+		})
+		if err != nil {
+			return err
+		}
+		return opErr
+	}
+	return d
+}
+
 func NewProxy(listenAddr string, upstream []string) *Proxy {
+	return NewProxyWithBind(listenAddr, upstream, "")
+}
+
+// NewProxyWithBind creates a DNS proxy whose upstream queries are bound to
+// the given network interface via SO_BINDTODEVICE. Use an empty bindDevice
+// to disable binding.
+func NewProxyWithBind(listenAddr string, upstream []string, bindDevice string) *Proxy {
+	timeout := 3 * time.Second
+	dialer := bindDialer(bindDevice, timeout)
 	return &Proxy{
 		listenAddr: listenAddr,
 		upstream:   parseUpstream(upstream),
 		matcher:    NewDomainMatcher(),
-		udpClient:  &mdns.Client{Timeout: 3 * time.Second},
+		udpClient: &mdns.Client{
+			Timeout: timeout,
+			Dialer:  dialer,
+		},
 		tlsClient: &mdns.Client{
 			Net:     "tcp-tls",
-			Timeout: 3 * time.Second,
+			Timeout: timeout,
 			TLSConfig: &tls.Config{
 				MinVersion: tls.VersionTLS12,
 			},
+			Dialer: dialer,
 		},
 		tlsConns: make(map[string]*mdns.Conn),
 	}
