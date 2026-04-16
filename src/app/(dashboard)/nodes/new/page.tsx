@@ -128,6 +128,7 @@ export default function NewNodePage() {
                 onChange={(e) => setDomain(e.target.value)}
                 placeholder={t("domainPlaceholder")}
               />
+              <p className="text-xs text-muted-foreground">{t("domainHint")}</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="port">{t("wgPort")}</Label>

@@ -5,7 +5,7 @@ import { nodes } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
 import { eq, ne, and } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
-import { encrypt } from "@/lib/crypto";
+import { encrypt, decrypt } from "@/lib/crypto";
 import { generateRealityKeypair, generateShortId } from "@/lib/reality";
 import { normalizeRealityDest } from "@/lib/reality-dest";
 import { sseManager } from "@/lib/sse-manager";
@@ -35,6 +35,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       xrayWsPath: nodes.xrayWsPath,
       xrayTlsDomain: nodes.xrayTlsDomain,
       xrayTlsCert: nodes.xrayTlsCert,
+      xrayTlsKey: nodes.xrayTlsKey,
       status: nodes.status,
       errorMessage: nodes.errorMessage,
       remark: nodes.remark,
@@ -51,8 +52,17 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   if (!node) return error("NOT_FOUND", "notFound.node");
 
+  let xrayTlsKey: string | null = null;
+  if (node.xrayTlsKey) {
+    try {
+      xrayTlsKey = decrypt(node.xrayTlsKey);
+    } catch (e) {
+      console.warn(`[nodes/${nodeId}] Failed to decrypt xrayTlsKey:`, e);
+    }
+  }
+
   const ports = getNodePorts(node.id, node.port);
-  return success({ ...node, ports });
+  return success({ ...node, xrayTlsKey, ports });
 }
 
 export async function PUT(request: NextRequest, { params }: Params) {

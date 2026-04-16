@@ -20,6 +20,7 @@ export default function NodeScriptPage() {
   const [script, setScript] = useState("");
   const [showFull, setShowFull] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [nodeName, setNodeName] = useState("");
 
   useEffect(() => {
     // Fetch node detail to get agentToken
@@ -27,6 +28,7 @@ export default function NodeScriptPage() {
       .then((res) => res.json())
       .then((res) => {
         const token = res.data?.agentToken;
+        setNodeName(res.data?.name ?? "");
         const origin = window.location.origin;
         setOneliner(
           `curl -fsSL '${origin}/api/nodes/${nodeId}/script?token=${token}' | bash`
@@ -58,8 +60,13 @@ export default function NodeScriptPage() {
   return (
     <div className="space-y-6 w-full max-w-4xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{t("title")}</h1>
-        <Button variant="outline" onClick={() => router.push(`/nodes/${nodeId}`)}>
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-2xl font-semibold">{t("title")}</h1>
+          {nodeName && (
+            <span className="text-base text-muted-foreground">{nodeName}</span>
+          )}
+        </div>
+        <Button variant="outline" onClick={() => router.push("/nodes")}>
           {tc("back")}
         </Button>
       </div>

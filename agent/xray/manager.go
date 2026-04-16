@@ -33,7 +33,12 @@ func Sync(cfg *api.XrayConfig, client *api.Client) error {
 		log.Printf("[xray] Auto-cert failed: %v", err)
 	}
 
-	if err := writeCertFiles(cfg); err != nil {
+	if err := os.MkdirAll(XrayConfigDir, 0755); err != nil {
+		return fmt.Errorf("create xray config dir: %w", err)
+	}
+
+	certsChanged, err := writeCertFiles(cfg)
+	if err != nil {
 		return fmt.Errorf("write cert files: %w", err)
 	}
 
@@ -42,13 +47,14 @@ func Sync(cfg *api.XrayConfig, client *api.Client) error {
 		return fmt.Errorf("generate xray config: %w", err)
 	}
 
-	if err := os.MkdirAll(XrayConfigDir, 0755); err != nil {
-		return fmt.Errorf("create xray config dir: %w", err)
-	}
-
-	// Check if config changed
+	// The Xray config JSON only references cert/key file paths, so cert/key
+	// content changes don't show up in this comparison.
 	existing, _ := os.ReadFile(XrayConfigFile)
 	if string(existing) == string(configBytes) {
+		if certsChanged && IsRunning() {
+			log.Println("[xray] Config unchanged but certs updated, restarting")
+			return restart()
+		}
 		log.Println("[xray] Config unchanged, skipping")
 		return ensureRunning()
 	}
@@ -122,34 +128,38 @@ func ensureRunning() error {
 	return nil
 }
 
-func writeCertFiles(cfg *api.XrayConfig) error {
+func writeCertFiles(cfg *api.XrayConfig) (bool, error) {
 	if cfg.Transport != "ws-tls" || cfg.TlsDomain == "" || cfg.TlsCert == "" {
-		return nil
+		return false, nil
 	}
 
 	certPath := fmt.Sprintf("%s/%s.crt", XrayConfigDir, cfg.TlsDomain)
 	keyPath := fmt.Sprintf("%s/%s.key", XrayConfigDir, cfg.TlsDomain)
 
-	if err := os.MkdirAll(XrayConfigDir, 0755); err != nil {
-		return fmt.Errorf("create xray config dir: %w", err)
+	certChanged, err := writeIfChanged(certPath, cfg.TlsCert, 0644)
+	if err != nil {
+		return false, fmt.Errorf("write cert file: %w", err)
 	}
-
-	certChanged := writeIfChanged(certPath, cfg.TlsCert, 0644)
-	keyChanged := writeIfChanged(keyPath, cfg.TlsKey, 0600)
+	keyChanged, err := writeIfChanged(keyPath, cfg.TlsKey, 0600)
+	if err != nil {
+		return false, fmt.Errorf("write key file: %w", err)
+	}
 
 	if certChanged || keyChanged {
 		log.Printf("[xray] TLS cert files updated for %s", cfg.TlsDomain)
 	}
-	return nil
+	return certChanged || keyChanged, nil
 }
 
-func writeIfChanged(path, content string, perm os.FileMode) bool {
+func writeIfChanged(path, content string, perm os.FileMode) (bool, error) {
 	existing, _ := os.ReadFile(path)
 	if string(existing) == content {
-		return false
+		return false, nil
 	}
-	os.WriteFile(path, []byte(content), perm)
-	return true
+	if err := os.WriteFile(path, []byte(content), perm); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func systemctl(action, service string) error {

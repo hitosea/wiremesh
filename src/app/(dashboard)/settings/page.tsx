@@ -16,38 +16,49 @@ import { useTranslations } from "next-intl";
 
 type SettingsData = Record<string, string>;
 
-const SETTING_GROUPS = [
+type FieldDef = {
+  key: string;
+  placeholder: string;
+  type?: string;
+  min?: number;
+  max?: number;
+};
+
+type SettingGroup = {
+  titleKey: string;
+  descriptionKey?: string;
+  fields: FieldDef[];
+};
+
+const SETTING_GROUPS: SettingGroup[] = [
   {
     titleKey: "wg.title",
     descriptionKey: "wg.description",
     fields: [
-      { key: "wg_default_port", placeholder: "41820", type: "number" },
+      { key: "wg_default_port", placeholder: "41820", type: "number", min: 1, max: 65535 },
       { key: "wg_default_subnet", placeholder: "10.210.0.0/24" },
       { key: "wg_default_dns", placeholder: "1.1.1.1" },
-      { key: "wg_node_ip_start", placeholder: "1", type: "number" },
-      { key: "wg_device_ip_start", placeholder: "100", type: "number" },
+      { key: "wg_node_ip_start", placeholder: "1", type: "number", min: 1, max: 254 },
+      { key: "wg_device_ip_start", placeholder: "100", type: "number", min: 1, max: 254 },
     ],
   },
   {
     titleKey: "xray.title",
-    descriptionKey: undefined,
     fields: [
-      { key: "xray_default_port", placeholder: "41443", type: "number" },
+      { key: "xray_default_port", placeholder: "41443", type: "number", min: 1, max: 65535 },
     ],
   },
   {
     titleKey: "tunnel.title",
-    descriptionKey: undefined,
     fields: [
       { key: "tunnel_subnet", placeholder: "10.211.0.0/16" },
-      { key: "tunnel_port_start", placeholder: "41830", type: "number" },
+      { key: "tunnel_port_start", placeholder: "41830", type: "number", min: 1, max: 65535 },
     ],
   },
   {
     titleKey: "filter.title",
-    descriptionKey: undefined,
     fields: [
-      { key: "filter_sync_interval", placeholder: "86400", type: "number" },
+      { key: "filter_sync_interval", placeholder: "86400", type: "number", min: 60 },
       { key: "dns_upstream", placeholder: "tls://8.8.8.8,tls://1.1.1.1" },
     ],
   },
@@ -170,6 +181,8 @@ export default function SettingsPage() {
                   <Input
                     id={field.key}
                     type={field.type ?? "text"}
+                    min={field.min}
+                    max={field.max}
                     value={values[field.key] ?? ""}
                     onChange={(e) => handleChange(field.key, e.target.value)}
                     placeholder={field.placeholder ?? field.key}

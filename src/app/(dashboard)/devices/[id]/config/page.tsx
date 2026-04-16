@@ -101,6 +101,7 @@ export default function DeviceConfigPage() {
   const [configData, setConfigData] = useState<ConfigData | null>(null);
   const [loading, setLoading] = useState(true);
   const [lineName, setLineName] = useState<string | null>(null);
+  const [deviceName, setDeviceName] = useState<string>("");
 
   useEffect(() => {
     // Fetch config
@@ -119,6 +120,7 @@ export default function DeviceConfigPage() {
       .then((res) => res.json())
       .then((json) => {
         const d = json.data as DeviceInfo | undefined;
+        if (d?.name) setDeviceName(d.name);
         if (d?.lineId) {
           fetch(`/api/lines/${d.lineId}`)
             .then((res) => res.json())
@@ -157,7 +159,12 @@ export default function DeviceConfigPage() {
   return (
     <div className="space-y-6 w-full max-w-3xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{t("title")}</h1>
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-2xl font-semibold">{t("title")}</h1>
+          {deviceName && (
+            <span className="text-base text-muted-foreground">{deviceName}</span>
+          )}
+        </div>
         <Button variant="outline" onClick={() => router.push("/devices")}>
           {tc("back")}
         </Button>

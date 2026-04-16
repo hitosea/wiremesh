@@ -44,6 +44,7 @@ type NodeDetail = {
   xrayWsPath: string | null;
   xrayTlsDomain: string | null;
   xrayTlsCert: string | null;
+  xrayTlsKey: string | null;
   status: string;
   errorMessage: string | null;
   externalInterface: string;
@@ -123,6 +124,9 @@ export default function NodeDetailPage() {
         if (n.xrayTlsCert) {
           setTlsCertMode("manual");
           setTlsCert(n.xrayTlsCert);
+        }
+        if (n.xrayTlsKey) {
+          setTlsKey(n.xrayTlsKey);
         }
       })
       .catch(() => toast.error(ts("loadNodeFailed")))
@@ -285,6 +289,7 @@ export default function NodeDetailPage() {
               onChange={(e) => setDomain(e.target.value)}
               placeholder={tn("domainPlaceholder")}
             />
+            <p className="text-xs text-muted-foreground">{tn("domainHint")}</p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="port">{tn("wgPort")}</Label>
@@ -402,7 +407,7 @@ export default function NodeDetailPage() {
                         onChange={(e) => setTlsCert(e.target.value)}
                         placeholder="-----BEGIN CERTIFICATE-----"
                         rows={4}
-                        className="font-mono text-xs"
+                        className="font-mono text-xs max-h-60 overflow-auto"
                       />
                       <p className="text-xs text-muted-foreground">{ts("tlsCertHint")}</p>
                     </div>
@@ -414,7 +419,7 @@ export default function NodeDetailPage() {
                         onChange={(e) => setTlsKey(e.target.value)}
                         placeholder="-----BEGIN PRIVATE KEY-----"
                         rows={4}
-                        className="font-mono text-xs"
+                        className="font-mono text-xs max-h-60 overflow-auto"
                       />
                       <p className="text-xs text-muted-foreground">{ts("tlsKeyHint")}</p>
                     </div>

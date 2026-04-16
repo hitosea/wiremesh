@@ -66,11 +66,18 @@ export async function PUT(request: NextRequest) {
 
   const wgPort = parseInt(merged["wg_default_port"] ?? "41820");
   const tunnelPortStart = parseInt(merged["tunnel_port_start"] ?? "41830");
+  const xrayPort = parseInt(merged["xray_default_port"] ?? "41443");
   if (merged["tunnel_port_start"] && !isValidPort(merged["tunnel_port_start"])) {
     validationErrors.push("validation.tunnelPortRange");
   }
+  if (merged["xray_default_port"] && !isValidPort(merged["xray_default_port"])) {
+    validationErrors.push("validation.xrayPortRange");
+  }
   if (wgPort >= tunnelPortStart) {
     validationErrors.push("validation.portConflict");
+  }
+  if (xrayPort === wgPort || xrayPort === tunnelPortStart) {
+    validationErrors.push("validation.xrayPortConflict");
   }
 
   const syncInterval = parseInt(merged["filter_sync_interval"] ?? "86400");
