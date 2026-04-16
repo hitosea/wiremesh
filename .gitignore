@@ -48,7 +48,7 @@ public/agent/
 public/xray/
 
 # claude skills (project-local, contains credentials)
-.claude/
+.claude/settings.json
 agent/.next/
 
 # playwright-mcp
