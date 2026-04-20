@@ -47,7 +47,12 @@ WireGuard mesh network management platform for managing VPN nodes, client device
 **Using pre-built image (recommended):**
 
 ```bash
-# Download docker-compose.yml and set PUBLIC_URL
+# Download docker-compose.yml, then create .env with required variables
+cat > .env <<EOF
+PUBLIC_URL=https://your-server-address:3456
+JWT_SECRET=$(openssl rand -base64 48)
+ENCRYPTION_KEY=$(openssl rand -hex 32)
+EOF
 docker compose up -d
 ```
 
@@ -59,9 +64,13 @@ Image: `ghcr.io/hitosea/wiremesh:latest`, supports amd64 and arm64.
 git clone <repo-url> wiremesh
 cd wiremesh
 cp .env.example .env
-# Edit .env, set PUBLIC_URL
+# Edit .env: set PUBLIC_URL, and fill JWT_SECRET / ENCRYPTION_KEY
+#   JWT_SECRET=$(openssl rand -base64 48)
+#   ENCRYPTION_KEY=$(openssl rand -hex 32)
 docker compose up -d --build
 ```
+
+> **Important:** `JWT_SECRET` and `ENCRYPTION_KEY` are required — the container will refuse to start without them. Keep `ENCRYPTION_KEY` safe: losing it means all encrypted fields (node private keys, SOCKS5 passwords) become unrecoverable.
 
 Visit `http://your-server-ip:3456`. The setup page will appear on first launch.
 
@@ -110,8 +119,8 @@ docker compose pull && docker compose up -d
 | Variable | Description | Default |
 |----------|------------|---------|
 | `PUBLIC_URL` | Public URL of the management platform (used in install scripts) | `http://localhost:3456` |
-| `JWT_SECRET` | JWT signing key (at least 32 characters) | Built-in |
-| `ENCRYPTION_KEY` | AES-256-GCM key (64-character hex string) | Built-in |
+| `JWT_SECRET` | JWT signing key (at least 32 chars). Generate: `openssl rand -base64 48` | **Required** |
+| `ENCRYPTION_KEY` | AES-256-GCM key (64-character hex string). Generate: `openssl rand -hex 32` | **Required** |
 
 ## License
 
