@@ -139,15 +139,18 @@ func collectHandshakes() []api.HandshakeReport {
 }
 
 func collectXrayOnlineUsers() []string {
-	cmd := exec.Command("xray", "api", "statsgetallonlineusers", "-s", fmt.Sprintf("127.0.0.1:%d", xray.XrayAPIPort))
+	cmd := exec.Command(xray.XrayBinary, "api", "statsgetallonlineusers", "-s", fmt.Sprintf("127.0.0.1:%d", xray.XrayAPIPort))
 	output, err := cmd.Output()
 	if err != nil {
-		// Xray not running or command failed — silently return empty
 		return nil
 	}
 	return parseXrayOnlineUsers(string(output))
 }
 
+// parseXrayOnlineUsers parses `xray api statsgetallonlineusers`. Xray returns
+// the OnlineMap registration names directly: {"users": ["user>>>email>>>online",
+// ...]}. See /app/dispatcher/default.go:trackOnlineIP in xray-core source —
+// the registration key is "user>>>"+email+">>>online". Extract the email.
 func parseXrayOnlineUsers(output string) []string {
 	var result struct {
 		Users []string `json:"users"`
@@ -155,12 +158,16 @@ func parseXrayOnlineUsers(output string) []string {
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
 		return nil
 	}
-	// Xray returns users in format "user>>>email>>>online", extract the email (our UUID)
-	var users []string
+	users := make([]string, 0, len(result.Users))
 	for _, u := range result.Users {
-		parts := strings.SplitN(u, ">>>", 3)
-		if len(parts) >= 2 {
+		u = strings.TrimSpace(u)
+		if u == "" {
+			continue
+		}
+		if parts := strings.SplitN(u, ">>>", 3); len(parts) >= 2 {
 			users = append(users, parts[1])
+		} else {
+			users = append(users, u)
 		}
 	}
 	return users

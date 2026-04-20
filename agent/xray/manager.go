@@ -14,6 +14,7 @@ const (
 	XrayConfigDir  = "/etc/wiremesh/xray"
 	XrayConfigFile = "/etc/wiremesh/xray/config.json"
 	XrayService    = "wiremesh-xray"
+	XrayBinary     = "wiremesh-xray"
 	XrayAPIPort    = 41380 // Stats gRPC API, localhost only
 )
 
@@ -79,7 +80,7 @@ func Stop() {
 }
 
 func isInstalled() bool {
-	_, err := exec.LookPath("wiremesh-xray")
+	_, err := exec.LookPath(XrayBinary)
 	return err == nil
 }
 
@@ -88,7 +89,7 @@ func IsRunning() bool {
 }
 
 func GetVersion() string {
-	out, err := exec.Command("wiremesh-xray", "version").CombinedOutput()
+	out, err := exec.Command(XrayBinary, "version").CombinedOutput()
 	if err != nil {
 		return ""
 	}
