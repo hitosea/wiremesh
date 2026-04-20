@@ -93,7 +93,7 @@ export default function DashboardPage() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debouncedFetch = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => fetchDashboard(), 200);
+    debounceRef.current = setTimeout(() => fetchDashboard(), 1500);
   }, [fetchDashboard]);
 
   useAdminSSE("node_status", debouncedFetch);

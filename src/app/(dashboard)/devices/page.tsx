@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -128,8 +128,43 @@ function DevicesContent() {
     fetchLineOptions();
   }, []);
 
-  // SSE real-time updates
-  useAdminSSE("device_status", () => fetchDevices(pagination.page));
+  // Silent refetch: no loading flicker, used for SSE-driven updates.
+  // Latest page/search read from a ref so a pending timer always fetches
+  // the current view even if the user navigated during the throttle window.
+  const latestParamsRef = useRef({ page: pagination.page, search });
+  latestParamsRef.current = { page: pagination.page, search };
+  const throttleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (throttleTimerRef.current) clearTimeout(throttleTimerRef.current);
+    };
+  }, []);
+
+  const scheduleSilentRefetch = () => {
+    if (throttleTimerRef.current) return;
+    throttleTimerRef.current = setTimeout(async () => {
+      throttleTimerRef.current = null;
+      const { page, search: q } = latestParamsRef.current;
+      try {
+        const params = new URLSearchParams({
+          page: String(page),
+          pageSize: "20",
+        });
+        if (q) params.set("search", q);
+        if (lineId) params.set("lineId", lineId);
+        const res = await fetch(`/api/devices?${params}`);
+        const json = await res.json();
+        setData(json.data ?? []);
+        if (json.pagination) setPagination(json.pagination);
+      } catch {
+        // silent: SSE-driven refresh shouldn't surface errors to the user
+      }
+    }, 1000);
+  };
+
+  // SSE real-time updates (throttled + silent)
+  useAdminSSE("device_status", () => scheduleSilentRefetch());
 
   const handleSearch = (q: string) => {
     setSearch(q);
