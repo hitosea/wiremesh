@@ -9,6 +9,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2 } from "lucide-react";
 
 type ConfigData = {
   format: string;
@@ -101,6 +102,8 @@ export default function DeviceConfigPage() {
   const [configData, setConfigData] = useState<ConfigData | null>(null);
   const [loading, setLoading] = useState(true);
   const [lineName, setLineName] = useState<string | null>(null);
+  const [lineLoading, setLineLoading] = useState(true);
+  const [lineError, setLineError] = useState<string | null>(null);
   const [deviceName, setDeviceName] = useState<string>("");
 
   useEffect(() => {
@@ -117,18 +120,28 @@ export default function DeviceConfigPage() {
 
     // Fetch device info to get lineId, then resolve line name
     fetch(`/api/devices/${deviceId}`)
-      .then((res) => res.json())
-      .then((json) => {
-        const d = json.data as DeviceInfo | undefined;
+      .then(async (res) => {
+        const json = await res.json();
+        if (!res.ok) throw new Error(translateError(json.error, te, t("lineLoadFailed")));
+        return json.data as DeviceInfo | undefined;
+      })
+      .then((d) => {
         if (d?.name) setDeviceName(d.name);
         if (d?.lineId) {
-          fetch(`/api/lines/${d.lineId}`)
-            .then((res) => res.json())
-            .then((lj) => setLineName((lj.data as LineInfo)?.name ?? null))
-            .catch(() => {});
+          return fetch(`/api/lines/${d.lineId}`)
+            .then(async (res) => {
+              const json = await res.json();
+              if (!res.ok) throw new Error(translateError(json.error, te, t("lineLoadFailed")));
+              setLineName((json.data as LineInfo)?.name ?? null);
+            })
+            .finally(() => setLineLoading(false));
         }
+        setLineLoading(false);
       })
-      .catch(() => {});
+      .catch((err) => {
+        setLineError(err.message ?? t("lineLoadFailed"));
+        setLineLoading(false);
+      });
   }, [deviceId]);
 
   const handleCopy = (text?: string) => {
@@ -195,11 +208,18 @@ export default function DeviceConfigPage() {
       ) : (
         <>
           {/* Line info */}
-          {lineName && (
-            <div className="text-sm text-muted-foreground">
-              {t("belongsToLine")}<span className="font-medium text-foreground">{lineName}</span>
-            </div>
-          )}
+          <div className="text-sm text-muted-foreground flex items-center">
+            {t("belongsToLine")}
+            {lineLoading ? (
+              <Loader2 className="ml-1 size-3.5 animate-spin" />
+            ) : lineError ? (
+              <span className="text-destructive">{lineError}</span>
+            ) : lineName ? (
+              <span className="font-medium text-foreground">{lineName}</span>
+            ) : (
+              <span>—</span>
+            )}
+          </div>
 
           {/* Config card */}
           <Card>

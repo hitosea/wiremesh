@@ -306,6 +306,7 @@
     "title": "Client Config",
     "cannotLoad": "Cannot load config, please ensure the device is bound to a line",
     "belongsToLine": "Line:",
+    "lineLoadFailed": "Load failed",
     "configTitle": "{format} Config",
     "qrCode": "QR Code",
     "xrayQrHint": "Scan with Shadowrocket, v2rayN, etc.",

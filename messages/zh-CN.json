@@ -306,6 +306,7 @@
     "title": "客户端配置",
     "cannotLoad": "无法加载配置，请确认设备已绑定线路",
     "belongsToLine": "所属线路：",
+    "lineLoadFailed": "加载失败",
     "configTitle": "{format} 配置",
     "qrCode": "二维码",
     "xrayQrHint": "使用 Shadowrocket、v2rayN 等客户端扫码导入",
