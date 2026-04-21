@@ -63,6 +63,8 @@ export async function GET(request: NextRequest) {
 
   const totalUploadBytes = trafficWithNames.reduce((sum, r) => sum + r.uploadBytes, 0);
   const totalDownloadBytes = trafficWithNames.reduce((sum, r) => sum + r.downloadBytes, 0);
+  const totalForwardUploadBytes = trafficWithNames.reduce((sum, r) => sum + r.forwardUploadBytes, 0);
+  const totalForwardDownloadBytes = trafficWithNames.reduce((sum, r) => sum + r.forwardDownloadBytes, 0);
 
   // Recent nodes (top 10)
   const recentNodes = db
@@ -120,6 +122,8 @@ export async function GET(request: NextRequest) {
     traffic: {
       totalUploadBytes,
       totalDownloadBytes,
+      totalForwardUploadBytes,
+      totalForwardDownloadBytes,
       nodes: trafficWithNames,
     },
     recentNodes,

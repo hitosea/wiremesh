@@ -38,6 +38,8 @@ type TrafficNode = {
 type TrafficStat = {
   totalUploadBytes: number;
   totalDownloadBytes: number;
+  totalForwardUploadBytes: number;
+  totalForwardDownloadBytes: number;
   nodes: TrafficNode[];
 };
 type RecentNode = {
@@ -320,7 +322,8 @@ export default function DashboardPage() {
                   <TableCell colSpan={2}>{t("total")}</TableCell>
                   <TableCell>{formatBytes(data.traffic.totalUploadBytes)}</TableCell>
                   <TableCell>{formatBytes(data.traffic.totalDownloadBytes)}</TableCell>
-                  <TableCell colSpan={2} />
+                  <TableCell>{formatBytes(data.traffic.totalForwardUploadBytes)}</TableCell>
+                  <TableCell>{formatBytes(data.traffic.totalForwardDownloadBytes)}</TableCell>
                 </TableRow>
               </TableBody>
             </Table>

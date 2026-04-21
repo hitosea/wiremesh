@@ -97,10 +97,10 @@ export function NodeStatusChart({ nodeId }: { nodeId: string }) {
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={250}>
-            <LineChart data={points}>
+            <LineChart data={points} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="time" fontSize={12} tick={{ fill: "hsl(var(--muted-foreground))" }} />
-              <YAxis fontSize={12} tick={{ fill: "hsl(var(--muted-foreground))" }} />
+              <YAxis width={72} fontSize={12} tick={{ fill: "hsl(var(--muted-foreground))" }} />
               <Tooltip
                 contentStyle={{
                   backgroundColor: "hsl(var(--popover))",
@@ -127,10 +127,10 @@ export function NodeStatusChart({ nodeId }: { nodeId: string }) {
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={250}>
-            <AreaChart data={points}>
+            <AreaChart data={points} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="time" fontSize={12} tick={{ fill: "hsl(var(--muted-foreground))" }} />
-              <YAxis tickFormatter={formatBytes} fontSize={12} tick={{ fill: "hsl(var(--muted-foreground))" }} />
+              <YAxis width={72} tickFormatter={formatBytes} fontSize={12} tick={{ fill: "hsl(var(--muted-foreground))" }} />
               <Tooltip
                 formatter={(value) => formatBytes(Number(value))}
                 contentStyle={{

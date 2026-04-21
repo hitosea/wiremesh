@@ -165,9 +165,15 @@ export default function DeviceConfigPage() {
             <span className="text-base text-muted-foreground">{deviceName}</span>
           )}
         </div>
-        <Button variant="outline" onClick={() => router.push("/devices")}>
-          {tc("back")}
-        </Button>
+
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => router.push(`/devices/${deviceId}`)}>
+            {tc("edit")}
+          </Button>
+          <Button variant="outline" onClick={() => router.push("/devices")}>
+            {tc("back")}
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -208,9 +214,6 @@ export default function DeviceConfigPage() {
                 <Button size="sm" variant="outline" onClick={handleDownload}>
                   {tc("download")}
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => router.push(`/devices/${deviceId}?from=config`)}>
-                  {tc("edit")}
-                </Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -231,8 +234,10 @@ export default function DeviceConfigPage() {
                   <p className="text-sm text-muted-foreground">
                     {t("xrayQrHint")}
                   </p>
-                  <div className="flex justify-center rounded-lg bg-white p-4">
-                    <QRCodeSVG value={configData.shareLink} size={260} />
+                  <div className="flex justify-center items-center mt-4">
+                    <div className="flex justify-center rounded-lg bg-white p-4">
+                      <QRCodeSVG value={configData.shareLink} size={260} />
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -240,8 +245,10 @@ export default function DeviceConfigPage() {
                   <p className="text-sm text-muted-foreground">
                     {t("wgQrHint")}
                   </p>
-                  <div className="flex justify-center rounded-lg bg-white p-4">
-                    <QRCodeSVG value={configData.config} size={260} />
+                  <div className="flex justify-center items-center mt-4">
+                    <div className="flex justify-center rounded-lg bg-white p-4">
+                      <QRCodeSVG value={configData.config} size={260} />
+                    </div>
                   </div>
                 </div>
               )}

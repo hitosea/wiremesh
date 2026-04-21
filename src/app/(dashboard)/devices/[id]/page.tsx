@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useRouter, useParams, useSearchParams } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { toast } from "sonner";
 import { translateError } from "@/lib/translate-error";
 import { useTranslations } from "next-intl";
@@ -63,10 +63,7 @@ function DeviceDetailContent() {
   const te = useTranslations("errors");
   const router = useRouter();
   const params = useParams();
-  const searchParams = useSearchParams();
   const deviceId = params.id as string;
-  const from = searchParams.get("from");
-  const backPath = from === "config" ? `/devices/${deviceId}/config` : "/devices";
 
   const [device, setDevice] = useState<DeviceDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -171,9 +168,14 @@ function DeviceDetailContent() {
             />
           )}
         </div>
-        <Button variant="outline" onClick={() => router.push(backPath)}>
-          {tc("back")}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => router.push(`/devices/${deviceId}/config`)}>
+            {ts("config")}
+          </Button>
+          <Button variant="outline" onClick={() => router.push("/devices")}>
+            {tc("back")}
+          </Button>
+        </div>
       </div>
 
       {/* Read-only info */}
@@ -329,7 +331,7 @@ function DeviceDetailContent() {
         <Button onClick={handleSave} disabled={saving}>
           {saving ? tc("saving") : tc("save")}
         </Button>
-        <Button variant="outline" onClick={() => router.push(backPath)}>
+        <Button variant="outline" onClick={() => router.push("/devices")}>
           {tc("back")}
         </Button>
       </div>
