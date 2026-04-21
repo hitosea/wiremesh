@@ -132,10 +132,11 @@ func parseRawTransfers(iface string) []api.TransferReport {
 		if len(parts) != 3 {
 			continue
 		}
+		// wg show is node-perspective; flip to peer-perspective for TransferReport.
 		rx, _ := strconv.ParseInt(parts[1], 10, 64)
 		tx, _ := strconv.ParseInt(parts[2], 10, 64)
 		transfers = append(transfers, api.TransferReport{
-			PeerPublicKey: parts[0], UploadBytes: tx, DownloadBytes: rx,
+			PeerPublicKey: parts[0], UploadBytes: rx, DownloadBytes: tx,
 		})
 	}
 	return transfers

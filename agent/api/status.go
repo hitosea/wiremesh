@@ -15,6 +15,9 @@ type StatusReport struct {
 	XrayRunning      bool                   `json:"xray_running"`
 }
 
+// TransferReport: per-peer traffic delta since last report, from the peer's
+// (device's) perspective — UploadBytes is what the peer sent us, DownloadBytes
+// is what we sent to the peer. Matches XrayTransferReport's uplink/downlink.
 type TransferReport struct {
 	PeerPublicKey string `json:"peer_public_key"`
 	UploadBytes   int64  `json:"upload_bytes"`
