@@ -66,6 +66,8 @@ export const nodeStatus = sqliteTable("node_status", {
   latency: integer("latency"),
   uploadBytes: integer("upload_bytes").notNull().default(0),
   downloadBytes: integer("download_bytes").notNull().default(0),
+  forwardUploadBytes: integer("forward_upload_bytes").notNull().default(0),
+  forwardDownloadBytes: integer("forward_download_bytes").notNull().default(0),
   checkedAt: text("checked_at").notNull().default(sql`(datetime('now'))`),
 });
 
@@ -134,6 +136,8 @@ export const devices = sqliteTable("devices", {
   lastHandshake: text("last_handshake"),
   uploadBytes: integer("upload_bytes").notNull().default(0),
   downloadBytes: integer("download_bytes").notNull().default(0),
+  connectionCount: integer("connection_count").notNull().default(0),
+  activeIps: text("active_ips"),
   remark: text("remark"),
   ...timestamps,
 });

@@ -23,6 +23,18 @@ var (
 	prevMu           sync.Mutex
 )
 
+var (
+	previousXrayUpload   = make(map[string]int64)
+	previousXrayDownload = make(map[string]int64)
+	xrayMu               sync.Mutex
+)
+
+var (
+	previousForwardUpload   = make(map[string]int64)
+	previousForwardDownload = make(map[string]int64)
+	forwardMu               sync.Mutex
+)
+
 func Collect(serverURL string, agentVersion string) *api.StatusReport {
 	report := &api.StatusReport{IsOnline: true}
 	latency := measureLatency(serverURL)
@@ -32,6 +44,11 @@ func Collect(serverURL string, agentVersion string) *api.StatusReport {
 	report.Transfers = collectTransfers()
 	report.Handshakes = collectHandshakes()
 	report.XrayOnlineUsers = collectXrayOnlineUsers()
+	report.XrayTransfers = collectXrayTransfers()
+	report.XrayConnections = collectXrayConnections(report.XrayOnlineUsers)
+	fwUp, fwDown := collectForwardTransfers()
+	report.ForwardUpload = fwUp
+	report.ForwardDownload = fwDown
 	report.AgentVersion = agentVersion
 	report.XrayVersion = xray.GetVersion()
 	report.XrayRunning = xray.IsRunning()
@@ -184,4 +201,194 @@ func FormatBytes(bytes int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %ciB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
+
+type xrayUserTraffic struct {
+	uplink   int64
+	downlink int64
+}
+
+// parseXrayTransfers turns `xray api statsquery -pattern "user>>>"` output
+// into a uuid -> (uplink, downlink) map of cumulative byte counters.
+// Stat keys look like "user>>>uuid>>>traffic>>>uplink" or ">>>downlink".
+func parseXrayTransfers(output string) map[string]xrayUserTraffic {
+	var result struct {
+		Stat []struct {
+			Name  string `json:"name"`
+			Value int64  `json:"value"`
+		} `json:"stat"`
+	}
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		return nil
+	}
+	out := make(map[string]xrayUserTraffic)
+	for _, s := range result.Stat {
+		parts := strings.Split(s.Name, ">>>")
+		if len(parts) != 4 || parts[0] != "user" || parts[2] != "traffic" {
+			continue
+		}
+		uuid := parts[1]
+		entry := out[uuid]
+		switch parts[3] {
+		case "uplink":
+			entry.uplink = s.Value
+		case "downlink":
+			entry.downlink = s.Value
+		}
+		out[uuid] = entry
+	}
+	return out
+}
+
+func parseXrayOnlineIpList(output string) []api.XrayActiveIp {
+	var result struct {
+		Ips map[string]int64 `json:"ips"`
+	}
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		return nil
+	}
+	ips := make([]api.XrayActiveIp, 0, len(result.Ips))
+	for ip, lastSeen := range result.Ips {
+		ips = append(ips, api.XrayActiveIp{Ip: ip, LastSeen: lastSeen})
+	}
+	return ips
+}
+
+func collectXrayTransfers() []api.XrayTransferReport {
+	cmd := exec.Command(xray.XrayBinary, "api", "statsquery",
+		"-pattern", "user>>>", "-s",
+		fmt.Sprintf("127.0.0.1:%d", xray.XrayAPIPort))
+	out, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+	current := parseXrayTransfers(string(out))
+	if len(current) == 0 {
+		return nil
+	}
+
+	xrayMu.Lock()
+	defer xrayMu.Unlock()
+
+	var reports []api.XrayTransferReport
+	for uuid, v := range current {
+		prevUp := previousXrayUpload[uuid]
+		prevDown := previousXrayDownload[uuid]
+		deltaUp := v.uplink - prevUp
+		deltaDown := v.downlink - prevDown
+		if deltaUp < 0 {
+			deltaUp = v.uplink
+		}
+		if deltaDown < 0 {
+			deltaDown = v.downlink
+		}
+		previousXrayUpload[uuid] = v.uplink
+		previousXrayDownload[uuid] = v.downlink
+		if deltaUp > 0 || deltaDown > 0 {
+			reports = append(reports, api.XrayTransferReport{
+				Uuid:          uuid,
+				UploadBytes:   deltaUp,
+				DownloadBytes: deltaDown,
+			})
+		}
+	}
+	return reports
+}
+
+func collectXrayConnections(onlineUuids []string) []api.XrayConnectionReport {
+	if len(onlineUuids) == 0 {
+		return nil
+	}
+	reports := make([]api.XrayConnectionReport, 0, len(onlineUuids))
+	for _, uuid := range onlineUuids {
+		cmd := exec.Command(xray.XrayBinary, "api", "statsonlineiplist",
+			"-email", uuid, "-s",
+			fmt.Sprintf("127.0.0.1:%d", xray.XrayAPIPort))
+		out, err := cmd.Output()
+		if err != nil {
+			continue
+		}
+		ips := parseXrayOnlineIpList(string(out))
+		reports = append(reports, api.XrayConnectionReport{
+			Uuid: uuid,
+			Ips:  ips,
+		})
+	}
+	return reports
+}
+
+// collectForwardTransfers sums per-peer transfer across all wm-tun* interfaces
+// on this node. This represents inter-node forward traffic (for exit/relay
+// nodes this is the dominant contribution; for entry nodes it roughly equals
+// the wm-wg0 traffic, but is counted separately so the UI can distinguish
+// "client-side traffic" from "transit traffic").
+//
+// Returns (uploadDelta, downloadDelta) since last call.
+func collectForwardTransfers() (int64, int64) {
+	ifaces := listTunnelInterfaces()
+	if len(ifaces) == 0 {
+		return 0, 0
+	}
+	var totalUp, totalDown int64
+	for _, iface := range ifaces {
+		output, err := wg.WgShow(iface, "transfer")
+		if err != nil {
+			continue
+		}
+		for _, line := range strings.Split(output, "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			parts := strings.Split(line, "\t")
+			if len(parts) != 3 {
+				continue
+			}
+			rx, _ := strconv.ParseInt(parts[1], 10, 64)
+			tx, _ := strconv.ParseInt(parts[2], 10, 64)
+			// Peer key is unique across tunnels; safe to key on it.
+			key := iface + "\t" + parts[0]
+
+			forwardMu.Lock()
+			prevUp := previousForwardUpload[key]
+			prevDown := previousForwardDownload[key]
+			deltaUp := tx - prevUp
+			deltaDown := rx - prevDown
+			if deltaUp < 0 {
+				deltaUp = tx
+			}
+			if deltaDown < 0 {
+				deltaDown = rx
+			}
+			previousForwardUpload[key] = tx
+			previousForwardDownload[key] = rx
+			forwardMu.Unlock()
+
+			totalUp += deltaUp
+			totalDown += deltaDown
+		}
+	}
+	return totalUp, totalDown
+}
+
+// listTunnelInterfaces returns all `wm-tun*` interface names currently up.
+func listTunnelInterfaces() []string {
+	out, err := exec.Command("ip", "-o", "link", "show").Output()
+	if err != nil {
+		return nil
+	}
+	var ifaces []string
+	for _, line := range strings.Split(string(out), "\n") {
+		// Lines look like: "6: wm-tun1: <POINTOPOINT,...>"
+		parts := strings.Fields(line)
+		if len(parts) < 2 {
+			continue
+		}
+		name := strings.TrimSuffix(parts[1], ":")
+		name = strings.TrimSuffix(name, "@NONE")
+		if strings.HasPrefix(name, "wm-tun") {
+			ifaces = append(ifaces, name)
+		}
+	}
+	return ifaces
 }

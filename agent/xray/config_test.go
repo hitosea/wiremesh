@@ -60,8 +60,10 @@ func TestGenerateConfig_StatsAndAPI(t *testing.T) {
 	}
 	levels := policySection["levels"].(map[string]interface{})
 	level0 := levels["0"].(map[string]interface{})
-	if level0["statsUserOnline"] != true {
-		t.Errorf("Expected statsUserOnline=true, got %v", level0["statsUserOnline"])
+	for _, key := range []string{"statsUserOnline", "statsUserUplink", "statsUserDownlink"} {
+		if level0[key] != true {
+			t.Errorf("policy.levels.0.%s = %v, want true", key, level0[key])
+		}
 	}
 
 	// Check dokodemo-door inbound exists

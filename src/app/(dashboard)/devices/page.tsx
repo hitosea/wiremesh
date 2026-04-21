@@ -8,7 +8,8 @@ import { translateError } from "@/lib/translate-error";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { StatusDot } from "@/components/status-dot";
+import { StatusDotWithCount } from "@/components/status-dot-with-count";
+import { formatBytes } from "@/lib/format-bytes";
 import { useAdminSSE } from "@/components/admin-sse-provider";
 import {
   Dialog,
@@ -33,6 +34,9 @@ type Device = {
   xrayUuid: string | null;
   lineId: number | null;
   status: string;
+  uploadBytes: number;
+  downloadBytes: number;
+  connectionCount: number;
 };
 
 type LineOption = {
@@ -295,10 +299,23 @@ function DevicesContent() {
       },
     },
     {
+      key: "traffic",
+      label: t("traffic"),
+      render: (row) => (
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
+          ↑ {formatBytes(row.uploadBytes)} / ↓ {formatBytes(row.downloadBytes)}
+        </span>
+      ),
+    },
+    {
       key: "status",
       label: t("statusCol"),
       render: (row) => (
-        <StatusDot status={row.status} label={t(`status.${row.status}`)} />
+        <StatusDotWithCount
+          status={row.status}
+          label={t(`status.${row.status}`)}
+          count={row.connectionCount}
+        />
       ),
     },
     {

@@ -35,6 +35,8 @@ export async function GET(request: NextRequest) {
       nodeId: nodeStatus.nodeId,
       uploadBytes: sql<number>`sum(${nodeStatus.uploadBytes})`,
       downloadBytes: sql<number>`sum(${nodeStatus.downloadBytes})`,
+      forwardUploadBytes: sql<number>`COALESCE(SUM(${nodeStatus.forwardUploadBytes}), 0)`,
+      forwardDownloadBytes: sql<number>`COALESCE(SUM(${nodeStatus.forwardDownloadBytes}), 0)`,
     })
     .from(nodeStatus)
     .groupBy(nodeStatus.nodeId)
@@ -54,6 +56,8 @@ export async function GET(request: NextRequest) {
       nodeIp: node?.ip ?? "",
       uploadBytes: row.uploadBytes ?? 0,
       downloadBytes: row.downloadBytes ?? 0,
+      forwardUploadBytes: row.forwardUploadBytes ?? 0,
+      forwardDownloadBytes: row.forwardDownloadBytes ?? 0,
     };
   });
 
@@ -84,6 +88,7 @@ export async function GET(request: NextRequest) {
       wgAddress: devices.wgAddress,
       lastHandshake: devices.lastHandshake,
       lineId: devices.lineId,
+      connectionCount: devices.connectionCount,
       updatedAt: devices.updatedAt,
     })
     .from(devices)

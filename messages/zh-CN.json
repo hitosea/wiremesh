@@ -102,7 +102,11 @@
     "nodeTraffic": "节点流量",
     "upload": "上传",
     "download": "下载",
-    "total": "合计"
+    "total": "合计",
+    "entryUpload": "入口 ↑",
+    "entryDownload": "入口 ↓",
+    "forwardUpload": "转发 ↑",
+    "forwardDownload": "转发 ↓"
   },
   "nodes": {
     "status": {
@@ -251,7 +255,8 @@
     "selectLine": "选择线路",
     "unbind": "无（取消绑定）",
     "confirmSwitch": "确认切换",
-    "lineId": "线路 {id}"
+    "lineId": "线路 {id}",
+    "traffic": "流量"
   },
   "deviceNew": {
     "title": "新增设备",
@@ -285,7 +290,14 @@
     "wgPublicKey": "WireGuard 公钥",
     "xrayUuid": "Xray UUID",
     "lastHandshake": "最后握手时间",
-    "editDevice": "编辑设备"
+    "editDevice": "编辑设备",
+    "trafficStats": "流量统计",
+    "cumulativeUpload": "累计上行",
+    "cumulativeDownload": "累计下行",
+    "activeConnections": "活跃连接",
+    "sourceIp": "来源 IP",
+    "lastSeen": "最近活跃",
+    "noActiveConnections": "当前没有活跃连接"
   },
   "deviceConfig": {
     "loadFailed": "加载配置失败",
@@ -551,7 +563,9 @@
     "latency": "延迟 (ms)",
     "traffic": "流量",
     "upload": "上传",
-    "download": "下载"
+    "download": "下载",
+    "forwardUpload": "转发上行",
+    "forwardDownload": "转发下行"
   },
   "sidebar": {
     "navMenu": "导航菜单"

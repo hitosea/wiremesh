@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { StatusDot } from "@/components/status-dot";
+import { StatusDotWithCount } from "@/components/status-dot-with-count";
+import { formatBytes } from "@/lib/format-bytes";
 import { useAdminSSE } from "@/components/admin-sse-provider";
 import {
   Card,
@@ -30,6 +32,8 @@ type TrafficNode = {
   nodeIp: string;
   uploadBytes: number;
   downloadBytes: number;
+  forwardUploadBytes: number;
+  forwardDownloadBytes: number;
 };
 type TrafficStat = {
   totalUploadBytes: number;
@@ -51,6 +55,7 @@ type RecentDevice = {
   wgAddress: string | null;
   status: string;
   lineId: number | null;
+  connectionCount: number;
   updatedAt: string;
 };
 
@@ -62,14 +67,6 @@ type DashboardData = {
   recentNodes: RecentNode[];
   recentDevices: RecentDevice[];
 };
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(1024));
-  return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${units[i]}`;
-}
-
 
 export default function DashboardPage() {
   const t = useTranslations("dashboard");
@@ -249,7 +246,11 @@ export default function DashboardPage() {
                         {device.status === "-" ? (
                           <span className="text-muted-foreground text-sm">-</span>
                         ) : (
-                          <StatusDot status={device.status} label={t(device.status as "online" | "offline" | "error")} />
+                          <StatusDotWithCount
+                            status={device.status}
+                            label={t(device.status as "online" | "offline" | "error")}
+                            count={device.connectionCount}
+                          />
                         )}
                       </TableCell>
                     </TableRow>
@@ -273,8 +274,10 @@ export default function DashboardPage() {
                 <TableRow>
                   <TableHead>{t("nodes")}</TableHead>
                   <TableHead>{t("ip")}</TableHead>
-                  <TableHead>{t("upload")}</TableHead>
-                  <TableHead>{t("download")}</TableHead>
+                  <TableHead>{t("entryUpload")}</TableHead>
+                  <TableHead>{t("entryDownload")}</TableHead>
+                  <TableHead>{t("forwardUpload")}</TableHead>
+                  <TableHead>{t("forwardDownload")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -291,11 +294,25 @@ export default function DashboardPage() {
                     <TableCell className="text-sm text-muted-foreground">
                       {tn.nodeIp}
                     </TableCell>
-                    <TableCell className="text-sm">
-                      {formatBytes(tn.uploadBytes)}
+                    <TableCell>
+                      <span className="text-xs whitespace-nowrap">
+                        {tn.uploadBytes > 0 ? formatBytes(tn.uploadBytes) : "—"}
+                      </span>
                     </TableCell>
-                    <TableCell className="text-sm">
-                      {formatBytes(tn.downloadBytes)}
+                    <TableCell>
+                      <span className="text-xs whitespace-nowrap">
+                        {tn.downloadBytes > 0 ? formatBytes(tn.downloadBytes) : "—"}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs whitespace-nowrap">
+                        {tn.forwardUploadBytes > 0 ? formatBytes(tn.forwardUploadBytes) : "—"}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs whitespace-nowrap">
+                        {tn.forwardDownloadBytes > 0 ? formatBytes(tn.forwardDownloadBytes) : "—"}
+                      </span>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -303,6 +320,7 @@ export default function DashboardPage() {
                   <TableCell colSpan={2}>{t("total")}</TableCell>
                   <TableCell>{formatBytes(data.traffic.totalUploadBytes)}</TableCell>
                   <TableCell>{formatBytes(data.traffic.totalDownloadBytes)}</TableCell>
+                  <TableCell colSpan={2} />
                 </TableRow>
               </TableBody>
             </Table>

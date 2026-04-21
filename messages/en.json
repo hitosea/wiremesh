@@ -102,7 +102,11 @@
     "nodeTraffic": "Node Traffic",
     "upload": "Upload",
     "download": "Download",
-    "total": "Total"
+    "total": "Total",
+    "entryUpload": "Entry ↑",
+    "entryDownload": "Entry ↓",
+    "forwardUpload": "Forward ↑",
+    "forwardDownload": "Forward ↓"
   },
   "nodes": {
     "status": {
@@ -251,7 +255,8 @@
     "selectLine": "Select Line",
     "unbind": "None (unbind)",
     "confirmSwitch": "Confirm Switch",
-    "lineId": "Line {id}"
+    "lineId": "Line {id}",
+    "traffic": "Traffic"
   },
   "deviceNew": {
     "title": "Add Device",
@@ -285,7 +290,14 @@
     "wgPublicKey": "WireGuard Public Key",
     "xrayUuid": "Xray UUID",
     "lastHandshake": "Last Handshake",
-    "editDevice": "Edit Device"
+    "editDevice": "Edit Device",
+    "trafficStats": "Traffic Statistics",
+    "cumulativeUpload": "Cumulative Upload",
+    "cumulativeDownload": "Cumulative Download",
+    "activeConnections": "Active Connections",
+    "sourceIp": "Source IP",
+    "lastSeen": "Last Seen",
+    "noActiveConnections": "No active connections"
   },
   "deviceConfig": {
     "loadFailed": "Failed to load config",
@@ -551,7 +563,9 @@
     "latency": "Latency (ms)",
     "traffic": "Traffic",
     "upload": "Upload",
-    "download": "Download"
+    "download": "Download",
+    "forwardUpload": "Forward Up",
+    "forwardDownload": "Forward Down"
   },
   "sidebar": {
     "navMenu": "Navigation Menu"

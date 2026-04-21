@@ -157,7 +157,9 @@ func GenerateConfig(cfg *api.XrayConfig) ([]byte, error) {
 		"policy": map[string]interface{}{
 			"levels": map[string]interface{}{
 				"0": map[string]interface{}{
-					"statsUserOnline": true,
+					"statsUserOnline":   true,
+					"statsUserUplink":   true,
+					"statsUserDownlink": true,
 				},
 			},
 		},

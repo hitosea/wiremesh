@@ -20,12 +20,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { formatBytes } from "@/lib/format-bytes";
 
 type StatusRecord = {
   isOnline: boolean;
   latency: number | null;
   uploadBytes: number;
   downloadBytes: number;
+  forwardUploadBytes: number;
+  forwardDownloadBytes: number;
   checkedAt: string;
 };
 
@@ -34,20 +37,10 @@ type ChartPoint = {
   latency: number | null;
   upload: number;
   download: number;
+  forwardUpload: number;
+  forwardDownload: number;
 };
 
-function formatBytes(bytes: number): string {
-  if (bytes >= 1024 * 1024 * 1024) {
-    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)}GB`;
-  }
-  if (bytes >= 1024 * 1024) {
-    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
-  }
-  if (bytes >= 1024) {
-    return `${(bytes / 1024).toFixed(1)}KB`;
-  }
-  return `${bytes}B`;
-}
 
 export function NodeStatusChart({ nodeId }: { nodeId: string }) {
   const t = useTranslations("nodeStatusChart");
@@ -70,6 +63,8 @@ export function NodeStatusChart({ nodeId }: { nodeId: string }) {
             latency: r.latency,
             upload: r.uploadBytes,
             download: r.downloadBytes,
+            forwardUpload: r.forwardUploadBytes ?? 0,
+            forwardDownload: r.forwardDownloadBytes ?? 0,
           };
         });
         setPoints(mapped);
@@ -160,6 +155,22 @@ export function NodeStatusChart({ nodeId }: { nodeId: string }) {
                 fill="hsl(var(--chart-2))"
                 fillOpacity={0.2}
                 name={t("download")}
+              />
+              <Area
+                type="monotone"
+                dataKey="forwardUpload"
+                stroke="hsl(var(--chart-3))"
+                fill="hsl(var(--chart-3))"
+                fillOpacity={0.15}
+                name={t("forwardUpload")}
+              />
+              <Area
+                type="monotone"
+                dataKey="forwardDownload"
+                stroke="hsl(var(--chart-4))"
+                fill="hsl(var(--chart-4))"
+                fillOpacity={0.15}
+                name={t("forwardDownload")}
               />
             </AreaChart>
           </ResponsiveContainer>

@@ -64,6 +64,13 @@
       "when": 1776268800000,
       "tag": "0008_add_xray_ws_tls_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1776729600000,
+      "tag": "0009_traffic_and_connection_stats",
+      "breakpoints": true
     }
   ]
 }

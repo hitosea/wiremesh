@@ -15,7 +15,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { StatusDot } from "@/components/status-dot";
+import { StatusDotWithCount } from "@/components/status-dot-with-count";
+import { formatBytes } from "@/lib/format-bytes";
 import {
   Select,
   SelectContent,
@@ -39,6 +40,10 @@ type DeviceDetail = {
   status: string;
   lastHandshake: string | null;
   remark: string | null;
+  uploadBytes: number;
+  downloadBytes: number;
+  connectionCount: number;
+  activeIps: string | null;
 };
 
 export default function DeviceDetailPage() {
@@ -159,7 +164,11 @@ function DeviceDetailContent() {
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold">{device.name}</h1>
           {device.status !== "-" && (
-            <StatusDot status={device.status} label={ts(`status.${device.status}`)} />
+            <StatusDotWithCount
+              status={device.status}
+              label={ts(`status.${device.status}`)}
+              count={device.connectionCount}
+            />
           )}
         </div>
         <Button variant="outline" onClick={() => router.push(backPath)}>
@@ -211,6 +220,60 @@ function DeviceDetailContent() {
           )}
         </CardContent>
       </Card>
+
+      {/* Traffic stats */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("trafficStats")}</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 gap-4">
+          <div>
+            <div className="text-sm text-muted-foreground">{t("cumulativeUpload")}</div>
+            <div className="text-2xl font-semibold">{formatBytes(device.uploadBytes)}</div>
+          </div>
+          <div>
+            <div className="text-sm text-muted-foreground">{t("cumulativeDownload")}</div>
+            <div className="text-2xl font-semibold">{formatBytes(device.downloadBytes)}</div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Active connections (Xray only) */}
+      {device.protocol === "xray" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("activeConnections")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              const ips: { ip: string; last_seen: number }[] = device.activeIps
+                ? JSON.parse(device.activeIps)
+                : [];
+              if (ips.length === 0) {
+                return <div className="text-sm text-muted-foreground">{t("noActiveConnections")}</div>;
+              }
+              return (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-muted-foreground">
+                      <th className="py-1 font-medium">{t("sourceIp")}</th>
+                      <th className="py-1 font-medium">{t("lastSeen")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ips.map((entry) => (
+                      <tr key={entry.ip} className="border-t">
+                        <td className="py-1 font-mono">{entry.ip}</td>
+                        <td className="py-1">{new Date(entry.last_seen * 1000).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Edit form */}
       <Card>
