@@ -35,6 +35,19 @@ var (
 	forwardMu               sync.Mutex
 )
 
+// xrayIpCache stabilizes per-UUID active-IP observations. Xray's OnlineMap
+// ref-counts by live TCP connection, so a client briefly reopening its
+// Reality connection can drop its IP from the map for one polling interval
+// — causing the "online x N" badge to flicker between 2 and 1. Keeping
+// recently observed IPs for xrayIpStabilizationWindow smooths that out while
+// still dropping truly-gone clients within a few minutes.
+const xrayIpStabilizationWindow = 180 * time.Second
+
+var (
+	xrayIpCache   = make(map[string]map[string]int64) // uuid -> ip -> observed unix seconds
+	xrayIpCacheMu sync.Mutex
+)
+
 func Collect(serverURL string, agentVersion string) *api.StatusReport {
 	report := &api.StatusReport{IsOnline: true}
 	latency := measureLatency(serverURL)
@@ -296,6 +309,8 @@ func collectXrayTransfers() []api.XrayTransferReport {
 }
 
 func collectXrayConnections(onlineUuids []string) []api.XrayConnectionReport {
+	now := time.Now().Unix()
+	sweepStaleXrayIpCache(now)
 	if len(onlineUuids) == 0 {
 		return nil
 	}
@@ -308,13 +323,67 @@ func collectXrayConnections(onlineUuids []string) []api.XrayConnectionReport {
 		if err != nil {
 			continue
 		}
-		ips := parseXrayOnlineIpList(string(out))
+		current := parseXrayOnlineIpList(string(out))
+		stabilized := stabilizeXrayIps(uuid, current, now)
 		reports = append(reports, api.XrayConnectionReport{
 			Uuid: uuid,
-			Ips:  ips,
+			Ips:  stabilized,
 		})
 	}
 	return reports
+}
+
+// stabilizeXrayIps merges fresh `current` observations into a per-UUID sticky
+// cache and returns all IPs observed within xrayIpStabilizationWindow.
+func stabilizeXrayIps(uuid string, current []api.XrayActiveIp, now int64) []api.XrayActiveIp {
+	cutoff := now - int64(xrayIpStabilizationWindow/time.Second)
+
+	xrayIpCacheMu.Lock()
+	defer xrayIpCacheMu.Unlock()
+
+	cache, ok := xrayIpCache[uuid]
+	if !ok {
+		cache = make(map[string]int64)
+		xrayIpCache[uuid] = cache
+	}
+	for _, ip := range current {
+		cache[ip.Ip] = now
+	}
+	for ip, t := range cache {
+		if t < cutoff {
+			delete(cache, ip)
+		}
+	}
+	if len(cache) == 0 {
+		delete(xrayIpCache, uuid)
+		return nil
+	}
+
+	out := make([]api.XrayActiveIp, 0, len(cache))
+	for ip, t := range cache {
+		out = append(out, api.XrayActiveIp{Ip: ip, LastSeen: t})
+	}
+	return out
+}
+
+// sweepStaleXrayIpCache evicts IP entries older than the stabilization window
+// across all UUIDs. Needed because stabilizeXrayIps only runs for UUIDs still
+// in Xray's online list — a deleted or long-term-offline user's cache would
+// otherwise persist forever.
+func sweepStaleXrayIpCache(now int64) {
+	cutoff := now - int64(xrayIpStabilizationWindow/time.Second)
+	xrayIpCacheMu.Lock()
+	defer xrayIpCacheMu.Unlock()
+	for uuid, cache := range xrayIpCache {
+		for ip, t := range cache {
+			if t < cutoff {
+				delete(cache, ip)
+			}
+		}
+		if len(cache) == 0 {
+			delete(xrayIpCache, uuid)
+		}
+	}
 }
 
 // collectForwardTransfers sums per-peer transfer across all wm-tun* interfaces

@@ -1,6 +1,10 @@
 package collector
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/wiremesh/agent/api"
+)
 
 func TestParseXrayOnlineUsers(t *testing.T) {
 	tests := []struct {
@@ -92,6 +96,106 @@ func TestParseXrayOnlineIpListEmpty(t *testing.T) {
 	if got := parseXrayOnlineIpList(`{"name":"user>>>x>>>online"}`); len(got) != 0 {
 		t.Errorf("expected empty, got %v", got)
 	}
+}
+
+func resetStabilizer(t *testing.T, uuids ...string) {
+	t.Cleanup(func() {
+		xrayIpCacheMu.Lock()
+		defer xrayIpCacheMu.Unlock()
+		for _, uuid := range uuids {
+			delete(xrayIpCache, uuid)
+		}
+	})
+}
+
+func TestStabilizeXrayIpsKeepsBrieflyMissingIp(t *testing.T) {
+	uuid := "test-stabilize-brief"
+	resetStabilizer(t, uuid)
+
+	base := int64(1_800_000_000)
+	// Poll 1: both IPs seen.
+	_ = stabilizeXrayIps(uuid, []api.XrayActiveIp{
+		{Ip: "1.1.1.1", LastSeen: base},
+		{Ip: "2.2.2.2", LastSeen: base},
+	}, base)
+
+	// Poll 2 (30s later): only one IP — the other briefly dropped.
+	got := stabilizeXrayIps(uuid, []api.XrayActiveIp{
+		{Ip: "1.1.1.1", LastSeen: base + 30},
+	}, base+30)
+
+	if len(got) != 2 {
+		t.Fatalf("expected 2 stabilized IPs (sticky cache), got %d: %v", len(got), got)
+	}
+	ips := ipSet(got)
+	if !ips["1.1.1.1"] || !ips["2.2.2.2"] {
+		t.Errorf("expected both IPs present, got %v", ips)
+	}
+}
+
+func TestStabilizeXrayIpsEvictsAfterWindow(t *testing.T) {
+	uuid := "test-stabilize-evict"
+	resetStabilizer(t, uuid)
+
+	base := int64(1_800_000_000)
+	_ = stabilizeXrayIps(uuid, []api.XrayActiveIp{
+		{Ip: "1.1.1.1", LastSeen: base},
+		{Ip: "2.2.2.2", LastSeen: base},
+	}, base)
+
+	// Poll well past the 180s window: only one IP is still active.
+	got := stabilizeXrayIps(uuid, []api.XrayActiveIp{
+		{Ip: "1.1.1.1", LastSeen: base + 200},
+	}, base+200)
+
+	if len(got) != 1 || got[0].Ip != "1.1.1.1" {
+		t.Errorf("expected only 1.1.1.1 after eviction, got %v", got)
+	}
+}
+
+func TestStabilizeXrayIpsEmptyAfterWindow(t *testing.T) {
+	uuid := "test-stabilize-empty"
+	resetStabilizer(t, uuid)
+
+	base := int64(1_800_000_000)
+	_ = stabilizeXrayIps(uuid, []api.XrayActiveIp{
+		{Ip: "1.1.1.1", LastSeen: base},
+	}, base)
+
+	got := stabilizeXrayIps(uuid, nil, base+200)
+	if len(got) != 0 {
+		t.Errorf("expected empty after full eviction, got %v", got)
+	}
+	if _, stillCached := xrayIpCache[uuid]; stillCached {
+		t.Errorf("expected cache entry to be removed when empty")
+	}
+}
+
+func TestSweepStaleXrayIpCacheEvictsOrphanUuids(t *testing.T) {
+	orphan := "test-sweep-orphan"
+	live := "test-sweep-live"
+	resetStabilizer(t, orphan, live)
+
+	base := int64(1_800_000_000)
+	_ = stabilizeXrayIps(orphan, []api.XrayActiveIp{{Ip: "1.1.1.1", LastSeen: base}}, base)
+	_ = stabilizeXrayIps(live, []api.XrayActiveIp{{Ip: "2.2.2.2", LastSeen: base + 100}}, base+100)
+
+	sweepStaleXrayIpCache(base + 200)
+
+	if _, ok := xrayIpCache[orphan]; ok {
+		t.Errorf("expected orphan UUID to be swept, still present")
+	}
+	if _, ok := xrayIpCache[live]; !ok {
+		t.Errorf("expected live UUID to remain, was swept")
+	}
+}
+
+func ipSet(list []api.XrayActiveIp) map[string]bool {
+	out := make(map[string]bool, len(list))
+	for _, ip := range list {
+		out[ip.Ip] = true
+	}
+	return out
 }
 
 func TestFormatBytes(t *testing.T) {
