@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { nodes, nodeStatus, devices } from "@/lib/db/schema";
-import { eq, sql, and, gt, notInArray } from "drizzle-orm";
+import { eq, sql, and, gt, lt } from "drizzle-orm";
 import { authenticateAgent } from "@/lib/agent-auth";
 import { adminSseManager } from "@/lib/admin-sse-manager";
 
@@ -158,21 +158,19 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Zero out connection_count for Xray devices no longer reported as online
-  const stalePredicate = xray_online_users.length > 0
-    ? and(
-        eq(devices.protocol, "xray"),
-        gt(devices.connectionCount, 0),
-        notInArray(devices.xrayUuid, xray_online_users),
-      )
-    : and(
-        eq(devices.protocol, "xray"),
-        gt(devices.connectionCount, 0),
-      );
+  // Zero out connection_count for xray devices no node has reported on
+  // recently. Must be time-windowed, not `NOT IN this_report.online_users`:
+  // devices aren't node-scoped, so a poll from a node that doesn't host the
+  // device would otherwise clobber another node's fresh write.
+  const staleThreshold = new Date(Date.now() - 180_000).toISOString();
   const staleUpdated = db
     .update(devices)
     .set({ connectionCount: 0, activeIps: null, updatedAt: now })
-    .where(stalePredicate)
+    .where(and(
+      eq(devices.protocol, "xray"),
+      gt(devices.connectionCount, 0),
+      lt(devices.updatedAt, staleThreshold),
+    ))
     .returning({ id: devices.id })
     .all();
   for (const d of staleUpdated) {
