@@ -160,10 +160,22 @@ export async function POST(request: NextRequest) {
     xrayPort,
     externalInterface,
     remark,
+    xrayTransport,
+    xrayTlsDomain,
+    xrayTlsCert,
+    xrayTlsKey,
   } = body;
 
   if (!name || !ip) {
     return error("VALIDATION_ERROR", "validation.nameAndIpRequired");
+  }
+
+  const transport: "reality" | "ws-tls" =
+    xrayTransport === "ws-tls" ? "ws-tls" : "reality";
+  const normalizedTlsDomain = String(xrayTlsDomain ?? "").trim();
+
+  if (transport === "ws-tls" && !normalizedTlsDomain) {
+    return error("VALIDATION_ERROR", "validation.wsTlsDomainRequired");
   }
 
   // Check IP uniqueness (exclude soft-deleted nodes)
@@ -230,8 +242,12 @@ export async function POST(request: NextRequest) {
       wgPublicKey: publicKey,
       wgAddress,
       xrayProtocol: "vless",
-      xrayTransport: "reality",
+      xrayTransport: transport,
       xrayWsPath,
+      xrayTlsDomain: transport === "ws-tls" ? normalizedTlsDomain : null,
+      xrayTlsCert: transport === "ws-tls" && xrayTlsCert ? xrayTlsCert : null,
+      xrayTlsKey:
+        transport === "ws-tls" && xrayTlsKey ? encrypt(xrayTlsKey) : null,
       xrayPort: xrayPort ?? parseInt(settingsMap["xray_default_port"] ?? String(DEFAULT_PROXY_PORT)),
       xrayConfig: resolvedXrayConfig,
       externalInterface: externalInterface ?? "eth0",

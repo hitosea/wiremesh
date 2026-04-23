@@ -10,6 +10,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
+import {
   Card,
   CardContent,
   CardHeader,
@@ -23,6 +30,7 @@ export default function NewNodePage() {
   const t = useTranslations("nodeNew");
   const tc = useTranslations("common");
   const te = useTranslations("errors");
+  const ts = useTranslations("nodes");
   const [submitting, setSubmitting] = useState(false);
 
   const [name, setName] = useState("");
@@ -33,6 +41,11 @@ export default function NewNodePage() {
   const [externalInterface, setExternalInterface] = useState("eth0");
   const [xrayPort, setXrayPort] = useState("");
   const [realityDest, setRealityDest] = useState(DEFAULT_REALITY_DEST);
+  const [xrayTransport, setXrayTransport] = useState<"reality" | "ws-tls">("reality");
+  const [tlsDomain, setTlsDomain] = useState("");
+  const [tlsCertMode, setTlsCertMode] = useState<"auto" | "manual">("auto");
+  const [tlsCert, setTlsCert] = useState("");
+  const [tlsKey, setTlsKey] = useState("");
   const [defaults, setDefaults] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -60,8 +73,18 @@ export default function NewNodePage() {
         remark: remark.trim() || null,
         externalInterface: externalInterface.trim() || "eth0",
         xrayPort: xrayPort ? parseInt(xrayPort) : null,
-        realityDest: realityDest || undefined,
+        xrayTransport,
       };
+
+      if (xrayTransport === "reality") {
+        body.realityDest = realityDest || undefined;
+      } else {
+        body.xrayTlsDomain = tlsDomain.trim();
+        if (tlsCertMode === "manual") {
+          body.xrayTlsCert = tlsCert;
+          body.xrayTlsKey = tlsKey;
+        }
+      }
 
       const res = await fetch("/api/nodes", {
         method: "POST",
@@ -183,18 +206,102 @@ export default function NewNodePage() {
                 {t("xrayPortHint", xrayPortHintParams(xrayPort, defaults.xray_default_port))}
               </p>
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="realityDest">{t("realityTarget")}</Label>
-              <Input
-                id="realityDest"
-                value={realityDest}
-                onChange={(e) => setRealityDest(e.target.value)}
-                placeholder="www.microsoft.com:443"
-              />
-              <p className="text-xs text-muted-foreground">
-                {t("realityTargetHint")}
-              </p>
+              <Label>{ts("xrayTransport")}</Label>
+              <Select
+                value={xrayTransport}
+                onValueChange={(v: string) =>
+                  setXrayTransport(v as "reality" | "ws-tls")
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="reality">{ts("xrayTransportReality")}</SelectItem>
+                  <SelectItem value="ws-tls">{ts("xrayTransportWsTls")}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+
+            {xrayTransport === "reality" && (
+              <div className="space-y-2">
+                <Label htmlFor="realityDest">{t("realityTarget")}</Label>
+                <Input
+                  id="realityDest"
+                  value={realityDest}
+                  onChange={(e) => setRealityDest(e.target.value)}
+                  placeholder="www.microsoft.com:443"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {t("realityTargetHint")}
+                </p>
+              </div>
+            )}
+
+            {xrayTransport === "ws-tls" && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="tlsDomain">{ts("tlsDomain")}</Label>
+                  <Input
+                    id="tlsDomain"
+                    value={tlsDomain}
+                    onChange={(e) => setTlsDomain(e.target.value)}
+                    placeholder="vpn.example.com"
+                  />
+                  <p className="text-xs text-muted-foreground">{ts("tlsDomainHint")}</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>{ts("tlsCertMode")}</Label>
+                  <Select
+                    value={tlsCertMode}
+                    onValueChange={(v: string) =>
+                      setTlsCertMode(v as "auto" | "manual")
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">{ts("tlsCertModeAuto")}</SelectItem>
+                      <SelectItem value="manual">{ts("tlsCertModeManual")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {tlsCertMode === "auto" && (
+                    <p className="text-xs text-muted-foreground">{ts("tlsCertAutoHint")}</p>
+                  )}
+                </div>
+                {tlsCertMode === "manual" && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="tlsCert">{ts("tlsCert")}</Label>
+                      <Textarea
+                        id="tlsCert"
+                        value={tlsCert}
+                        onChange={(e) => setTlsCert(e.target.value)}
+                        placeholder="-----BEGIN CERTIFICATE-----"
+                        rows={4}
+                        className="font-mono text-xs max-h-60 overflow-auto"
+                      />
+                      <p className="text-xs text-muted-foreground">{ts("tlsCertHint")}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="tlsKey">{ts("tlsKey")}</Label>
+                      <Textarea
+                        id="tlsKey"
+                        value={tlsKey}
+                        onChange={(e) => setTlsKey(e.target.value)}
+                        placeholder="-----BEGIN PRIVATE KEY-----"
+                        rows={4}
+                        className="font-mono text-xs max-h-60 overflow-auto"
+                      />
+                      <p className="text-xs text-muted-foreground">{ts("tlsKeyHint")}</p>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
 
