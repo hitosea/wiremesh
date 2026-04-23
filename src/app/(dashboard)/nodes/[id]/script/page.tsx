@@ -5,8 +5,10 @@ import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { translateError } from "@/lib/translate-error";
 import { useTranslations } from "next-intl";
+import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { usePublicUrlCheck } from "@/components/public-url-check-provider";
 
 export default function NodeScriptPage() {
   const params = useParams();
@@ -15,6 +17,8 @@ export default function NodeScriptPage() {
   const t = useTranslations("nodeScript");
   const tc = useTranslations("common");
   const te = useTranslations("errors");
+  const tp = useTranslations("publicUrlCheck");
+  const { mismatch, publicUrl, currentOrigin } = usePublicUrlCheck();
 
   const [oneliner, setOneliner] = useState("");
   const [script, setScript] = useState("");
@@ -79,6 +83,20 @@ export default function NodeScriptPage() {
           <p className="text-sm text-muted-foreground">
             {t("instruction")}
           </p>
+          {mismatch && (
+            <div className="flex items-start gap-3 rounded-lg border border-amber-300 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-100 px-3 py-2.5 text-sm">
+              <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <div className="space-y-1 min-w-0 break-all">
+                <div className="font-medium">{tp("inlineTitle")}</div>
+                <div className="text-xs opacity-90">
+                  {tp("inlineBody", {
+                    publicUrl: publicUrl ?? "",
+                    currentOrigin,
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
           <div className="flex gap-2">
             <pre className="flex-1 code-block p-3 rounded-lg text-sm overflow-x-auto whitespace-pre-wrap break-all">
               {oneliner || tc("loading")}

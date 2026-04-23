@@ -578,6 +578,13 @@
     "zh-CN": "简体中文",
     "en": "English"
   },
+  "publicUrlCheck": {
+    "bannerTitle": "PUBLIC_URL does not match your current access address",
+    "bannerBody": "PUBLIC_URL is set to {publicUrl}, but you are accessing the admin at {currentOrigin}. Install scripts will use PUBLIC_URL — if nodes cannot reach that address, update PUBLIC_URL in .env and restart the service.",
+    "inlineTitle": "This install script uses PUBLIC_URL, which differs from your current access address",
+    "inlineBody": "PUBLIC_URL is {publicUrl}, your current access address is {currentOrigin}. Installation will fail if the target node cannot resolve or reach PUBLIC_URL. Fix PUBLIC_URL in .env and restart the service before installing.",
+    "dismiss": "Dismiss"
+  },
   "help": {
     "title": "User Guide",
     "description": "Platform operation guide",

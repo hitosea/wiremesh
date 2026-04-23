@@ -578,6 +578,13 @@
     "zh-CN": "简体中文",
     "en": "English"
   },
+  "publicUrlCheck": {
+    "bannerTitle": "PUBLIC_URL 与当前访问地址不一致",
+    "bannerBody": "PUBLIC_URL 配置为 {publicUrl}，但您正在通过 {currentOrigin} 访问后台。安装脚本将使用 PUBLIC_URL，若节点无法通过该地址回连平台，请修改 .env 的 PUBLIC_URL 后重启服务。",
+    "inlineTitle": "此安装脚本将使用 PUBLIC_URL，与您的访问地址不同",
+    "inlineBody": "PUBLIC_URL 为 {publicUrl}，当前访问地址为 {currentOrigin}。若节点无法解析或访问 PUBLIC_URL，安装会失败。请先确认 .env 中的 PUBLIC_URL 正确后重启服务。",
+    "dismiss": "关闭提示"
+  },
   "help": {
     "title": "使用指南",
     "description": "平台操作指南",
