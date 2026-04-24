@@ -15,10 +15,13 @@ export function HelpToc({
   const [activeId, setActiveId] = useState<string>("");
   const [isOpen, setIsOpen] = useState(false);
   const tocRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const suppressObserverUntilRef = useRef(0);
+  const suppressTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
+        if (Date.now() < suppressObserverUntilRef.current) return;
         for (const entry of entries) {
           if (entry.isIntersecting) {
             setActiveId(entry.target.id);
@@ -36,8 +39,15 @@ export function HelpToc({
     return () => observer.disconnect();
   }, [headings]);
 
+  useEffect(() => () => {
+    if (suppressTimeoutRef.current) clearTimeout(suppressTimeoutRef.current);
+  }, []);
+
   useEffect(() => {
     if (!activeId) return;
+    // Skip during click-triggered smooth scroll — the document is animating
+    // and another smooth scroll call can cancel it.
+    if (Date.now() < suppressObserverUntilRef.current) return;
     const btn = tocRefs.current.get(activeId);
     if (btn) {
       btn.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -46,10 +56,18 @@ export function HelpToc({
 
   function handleClick(id: string) {
     const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth" });
-      setIsOpen(false);
-    }
+    if (!el) return;
+    // Suppress the IntersectionObserver during the smooth scroll so passing
+    // headings don't fire setActiveId, which would trigger another
+    // scrollIntoView and cancel the ongoing document scroll.
+    suppressObserverUntilRef.current = Date.now() + 1200;
+    if (suppressTimeoutRef.current) clearTimeout(suppressTimeoutRef.current);
+    suppressTimeoutRef.current = setTimeout(() => {
+      suppressTimeoutRef.current = null;
+    }, 1200);
+    setActiveId(id);
+    el.scrollIntoView({ behavior: "smooth" });
+    setIsOpen(false);
   }
 
   const tocList = (
