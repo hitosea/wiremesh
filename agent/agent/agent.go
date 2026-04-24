@@ -32,12 +32,13 @@ type Agent struct {
 
 func New(cfg *config.Config, version string) *Agent {
 	ctx, cancel := context.WithCancel(context.Background())
+	client := api.NewClient(cfg.ServerURL, cfg.Token)
 	return &Agent{
 		cfg:            cfg,
-		client:         api.NewClient(cfg.ServerURL, cfg.Token),
+		client:         client,
 		activeTunnels:  make(map[string]wg.ActiveTunnel),
 		socks5Manager:  socks5.NewManager(),
-		routingManager: routing.NewManager(),
+		routingManager: routing.NewManager(client),
 		version:        version,
 		ctx:            ctx,
 		cancel:         cancel,

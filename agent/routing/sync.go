@@ -78,19 +78,25 @@ func (s *SourceSyncer) fetchAndApply(branchID int, source api.RuleSource) {
 
 	resp, err := s.client.Get(source.URL)
 	if err != nil {
-		log.Printf("[sync] Fetch failed for filter=%d: %v", source.FilterID, err)
+		msg := fmt.Sprintf("fetch failed: %v", err)
+		log.Printf("[sync] filter=%d %s", source.FilterID, msg)
+		s.report(source.FilterID, false, 0, 0, msg)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		log.Printf("[sync] Fetch failed for filter=%d: status %d", source.FilterID, resp.StatusCode)
+		msg := fmt.Sprintf("HTTP status %d", resp.StatusCode)
+		log.Printf("[sync] filter=%d %s", source.FilterID, msg)
+		s.report(source.FilterID, false, 0, 0, msg)
 		return
 	}
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024)) // 10MB limit
 	if err != nil {
-		log.Printf("[sync] Read failed for filter=%d: %v", source.FilterID, err)
+		msg := fmt.Sprintf("read body failed: %v", err)
+		log.Printf("[sync] filter=%d %s", source.FilterID, msg)
+		s.report(source.FilterID, false, 0, 0, msg)
 		return
 	}
 
@@ -126,6 +132,23 @@ func (s *SourceSyncer) fetchAndApply(branchID int, source api.RuleSource) {
 		}
 		// Merge with existing rules (additive)
 		s.manager.dnsProxy.MergeRules(newRules)
+	}
+
+	s.report(source.FilterID, true, len(ipRules), len(domainRules), "")
+}
+
+func (s *SourceSyncer) report(filterID int, ok bool, ipCount, domainCount int, errMsg string) {
+	if s.manager.client == nil {
+		return
+	}
+	err := s.manager.client.ReportSourceSync(filterID, &api.SourceSyncReport{
+		Success:     ok,
+		IPCount:     ipCount,
+		DomainCount: domainCount,
+		Error:       errMsg,
+	})
+	if err != nil {
+		log.Printf("[sync] report filter=%d failed: %v", filterID, err)
 	}
 }
 

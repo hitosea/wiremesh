@@ -149,6 +149,27 @@ func (c *Client) DownloadBinary(endpoint string) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
+type SourceSyncReport struct {
+	Success     bool   `json:"success"`
+	IPCount     int    `json:"ip_count,omitempty"`
+	DomainCount int    `json:"domain_count,omitempty"`
+	Error       string `json:"error,omitempty"`
+}
+
+func (c *Client) ReportSourceSync(filterID int, report *SourceSyncReport) error {
+	path := fmt.Sprintf("/api/agent/filters/%d/sync-report", filterID)
+	resp, err := c.doRequest("POST", path, report)
+	if err != nil {
+		return fmt.Errorf("report source sync: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("report source sync: status %d: %s", resp.StatusCode, string(body))
+	}
+	return nil
+}
+
 func (c *Client) UploadCert(domain, cert, key string) error {
 	body := map[string]string{
 		"domain": domain,

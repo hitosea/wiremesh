@@ -153,6 +153,10 @@ export const filters = sqliteTable("filters", {
   domainRules: text("domain_rules"),
   sourceUrl: text("source_url"),
   sourceUpdatedAt: text("source_updated_at"),
+  sourceSyncStatus: text("source_sync_status"),
+  sourceLastError: text("source_last_error"),
+  sourceLastIpCount: integer("source_last_ip_count"),
+  sourceLastDomainCount: integer("source_last_domain_count"),
   ...timestamps,
 });
 

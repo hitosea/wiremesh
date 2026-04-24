@@ -27,6 +27,10 @@ export async function POST(request: NextRequest, { params }: Params) {
     .where(eq(branchFilters.filterId, filterId))
     .all();
 
+  if (branches.length === 0) {
+    return error("VALIDATION_ERROR", "validation.filterNotBound");
+  }
+
   const notifiedNodes = new Set<number>();
   for (const b of branches) {
     const branch = db
@@ -50,5 +54,9 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
   }
 
-  return success({ message: "同步通知已发送", notifiedNodes: notifiedNodes.size });
+  if (notifiedNodes.size === 0) {
+    return error("VALIDATION_ERROR", "validation.filterNoEntryNode");
+  }
+
+  return success({ notifiedNodes: notifiedNodes.size });
 }

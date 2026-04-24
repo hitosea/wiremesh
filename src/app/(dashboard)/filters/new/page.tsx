@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { FilterFormatHelp } from "@/components/filter-format-help";
 
 type Branch = {
   id: number;
@@ -146,10 +147,10 @@ export default function NewFilterPage() {
             </Select>
           </div>
 
+          <FilterFormatHelp />
+
           <div className="space-y-2">
-            <Label htmlFor="rules">
-              {t("ipRules")}
-            </Label>
+            <Label htmlFor="rules">{t("ipRules")}</Label>
             <Textarea
               id="rules"
               value={rules}

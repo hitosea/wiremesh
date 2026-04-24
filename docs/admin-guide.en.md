@@ -185,6 +185,17 @@ WireMesh automatically allocates /30 subnets from the tunnel subnet (10.211.0.0/
 
 Filter rules control traffic routing by matching domain names or IP addresses. Each rule operates in **whitelist** or **blacklist** mode and is linked to specific line branches.
 
+### Rule Format
+
+All rule fields are plain text with one entry per line. Lines starting with `#` are treated as comments and blank lines are ignored:
+
+- **IP Rules** — one single IP (e.g. `8.8.8.8`) or CIDR range (e.g. `10.0.0.0/8`) per line, matched exactly.
+- **Domain Rules** — one domain per line, **suffix-matched** against all subdomains. `openai.com` also matches `chat.openai.com` and `api.openai.com`. Prefixes, keywords, and regular expressions are not supported.
+- **Source URL** — a plain-text file with one CIDR or domain per line; each line is auto-classified as IP or domain. **Not supported**: dnsmasq format (`server=/...`), Clash/Shadowrocket tag syntax (`DOMAIN-SUFFIX,xxx`), v2ray `geoip.dat` / `geosite.dat` binaries.
+- **Mode** — Whitelist: matching traffic goes through this branch. Blacklist: matching traffic is blocked from this branch.
+
+The **📘 Rule format help** panel at the top of the rule editor page also lists the full conventions for quick reference.
+
 ### Creating a Rule
 
 1. Go to **Filter Rules → Add Rule**.
@@ -192,16 +203,23 @@ Filter rules control traffic routing by matching domain names or IP addresses. E
    - **Rule Name** (required).
    - **Mode** (required) — **Whitelist** or **Blacklist**.
    - **IP Rules** (optional) — one IP/CIDR per line.
-   - **Domain Rules** (optional) — one domain pattern per line.
+   - **Domain Rules** (optional) — one domain per line.
    - **Source URL** (optional) — a URL to fetch rules from automatically.
-   - **Linked Branches** — select which line branches this rule applies to.
-   - **Tags** and **Notes** (optional).
+   - **Linked Branches** — select which line branches this rule applies to. **At least one branch must be linked** for the rule to take effect, and external source URLs require the entry node of the linked branch's line to trigger a sync.
+   - **Notes** (optional).
 3. At least one of IP rules, domain rules, or source URL must be provided.
 4. Click **Save**.
 
-### Managing Rules
+### Managing Rules and Sync Feedback
 
-From the detail page you can edit all fields. If a source URL is configured, the page shows the last sync time and a **Sync Now** button to manually fetch updated rules.
+From the detail page you can edit all fields. When a source URL is configured, the page shows sync-state feedback:
+
+- **Last sync time** — recorded after the first successful sync; shows "Never synced" before then.
+- **Sync status badge** — `✓ Sync succeeded` displays the number of IP and domain entries parsed; `✗ Sync failed` is followed by the error cause (HTTP status, connection failure, etc.).
+- **Sync Now button** — click and the button is disabled showing "Syncing…" with a spinner. Once the agent finishes fetching, the result is pushed back over SSE and the UI updates **without a page refresh**.
+  - Rule not yet linked to any branch → immediate error "This rule is not linked to any line branch, cannot sync".
+  - Linked branch's line has no entry node → error "The linked branch's line has no entry node, cannot trigger sync".
+  - No agent callback within 45 seconds (typically means the entry node agent is offline) → auto timeout with a prompt to check the agent.
 
 ---
 

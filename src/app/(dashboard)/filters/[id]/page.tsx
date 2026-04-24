@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { toast } from "sonner";
 import { translateError } from "@/lib/translate-error";
@@ -23,6 +23,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { FilterFormatHelp } from "@/components/filter-format-help";
+import { useAdminSSE } from "@/components/admin-sse-provider";
 
 type Branch = {
   id: number;
@@ -43,6 +45,10 @@ type FilterDetail = {
   domainRules: string | null;
   sourceUrl: string | null;
   sourceUpdatedAt: string | null;
+  sourceSyncStatus: "ok" | "error" | null;
+  sourceLastError: string | null;
+  sourceLastIpCount: number | null;
+  sourceLastDomainCount: number | null;
   mode: string;
   isEnabled: boolean;
   remark: string | null;
@@ -61,7 +67,22 @@ export default function EditFilterPage() {
   const [filter, setFilter] = useState<FilterDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncingNodeCount, setSyncingNodeCount] = useState(0);
+  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [linesWithBranches, setLinesWithBranches] = useState<LineWithBranches[]>([]);
+
+  const stopSyncing = () => {
+    setSyncing(false);
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
+      syncTimeoutRef.current = null;
+    }
+  };
+
+  useEffect(() => () => {
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+  }, []);
 
   const [name, setName] = useState("");
   const [rules, setRules] = useState("");
@@ -96,6 +117,26 @@ export default function EditFilterPage() {
       .catch(() => toast.error(t("loadFailed")))
       .finally(() => setLoading(false));
   }, [filterId, router]);
+
+  useAdminSSE("filter_sync", (update) => {
+    if (Number(update.filterId) !== Number(filterId)) return;
+    setFilter((prev) =>
+      prev
+        ? {
+            ...prev,
+            sourceUpdatedAt: update.syncedAt as string,
+            sourceSyncStatus: update.success ? "ok" : "error",
+            sourceLastError: (update.error as string | null) ?? null,
+            sourceLastIpCount: (update.ipCount as number | null) ?? null,
+            sourceLastDomainCount: (update.domainCount as number | null) ?? null,
+          }
+        : prev
+    );
+    stopSyncing();
+    if (!update.success) {
+      toast.error(`${t("syncStatusError")}: ${update.error ?? ""}`);
+    }
+  });
 
   const toggleBranch = (branchId: number) => {
     setSelectedBranchIds((prev) =>
@@ -189,15 +230,16 @@ export default function EditFilterPage() {
             </Select>
           </div>
 
+          <FilterFormatHelp />
+
           <div className="space-y-2">
-            <Label htmlFor="rules">
-              {tf("ipRules")}
-            </Label>
+            <Label htmlFor="rules">{tf("ipRules")}</Label>
             <Textarea
               id="rules"
               value={rules}
               onChange={(e) => setRules(e.target.value)}
               rows={8}
+              placeholder={tf("ipRulesPlaceholder")}
               className="font-mono text-sm"
             />
             <p className="text-xs text-muted-foreground">{tf("ipRulesHint")}</p>
@@ -226,22 +268,73 @@ export default function EditFilterPage() {
             />
             <p className="text-xs text-muted-foreground">{tf("sourceUrlHint")}</p>
             {filter.sourceUrl && (
-              <div className="flex items-center gap-2 mt-1">
-                <p className="text-xs text-muted-foreground">
-                  {t("lastSync")}{filter.sourceUpdatedAt ?? t("neverSynced")}
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    const res = await fetch(`/api/filters/${filterId}/sync`, { method: "POST" });
-                    if (res.ok) toast.success(t("syncNow"));
-                    else toast.error(tc("operationFailed"));
-                  }}
-                >
-                  {t("syncNow")}
-                </Button>
+              <div className="mt-1 space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-xs text-muted-foreground">
+                    {t("lastSync")}{filter.sourceUpdatedAt ?? t("neverSynced")}
+                  </p>
+                  {syncing ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-r-transparent" />
+                      {t("syncPending", { count: syncingNodeCount })}
+                    </span>
+                  ) : (
+                    <>
+                      {filter.sourceSyncStatus === "ok" && (
+                        <span className="text-xs text-emerald-600 dark:text-emerald-400">
+                          ✓ {t("syncStatusOk")}
+                          {filter.sourceLastIpCount != null && (
+                            <span className="ml-1 text-muted-foreground">
+                              ({t("syncStats", { ipCount: filter.sourceLastIpCount, domainCount: filter.sourceLastDomainCount ?? 0 })})
+                            </span>
+                          )}
+                        </span>
+                      )}
+                      {filter.sourceSyncStatus === "error" && (
+                        <span className="text-xs text-destructive">
+                          ✗ {t("syncStatusError")}
+                        </span>
+                      )}
+                    </>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={syncing}
+                    onClick={async () => {
+                      setSyncing(true);
+                      setSyncingNodeCount(0);
+                      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+                      try {
+                        const res = await fetch(`/api/filters/${filterId}/sync`, { method: "POST" });
+                        const json = await res.json();
+                        if (res.ok) {
+                          const nodeCount = json.data?.notifiedNodes ?? 0;
+                          setSyncingNodeCount(nodeCount);
+                          syncTimeoutRef.current = setTimeout(() => {
+                            setSyncing(false);
+                            syncTimeoutRef.current = null;
+                            toast.error(t("syncTimeout"));
+                          }, 45000);
+                        } else {
+                          stopSyncing();
+                          toast.error(translateError(json.error, te, tc("operationFailed")));
+                        }
+                      } catch {
+                        stopSyncing();
+                        toast.error(tc("networkError"));
+                      }
+                    }}
+                  >
+                    {syncing ? t("syncingLabel") : t("syncNow")}
+                  </Button>
+                </div>
+                {!syncing && filter.sourceSyncStatus === "error" && filter.sourceLastError && (
+                  <p className="text-xs text-destructive break-all">
+                    {filter.sourceLastError}
+                  </p>
+                )}
               </div>
             )}
           </div>

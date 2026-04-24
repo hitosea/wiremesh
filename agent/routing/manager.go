@@ -15,11 +15,12 @@ import (
 type Manager struct {
 	dnsProxy   *dns.Proxy
 	syncer     *SourceSyncer
+	client     *api.Client
 	lastConfig *api.RoutingConfig
 }
 
-func NewManager() *Manager {
-	return &Manager{}
+func NewManager(client *api.Client) *Manager {
+	return &Manager{client: client}
 }
 
 // Sync applies the routing configuration from the management platform.
