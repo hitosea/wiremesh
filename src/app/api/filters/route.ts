@@ -27,10 +27,18 @@ export async function GET(request: NextRequest) {
     .all();
 
   const enriched = rows.map((row) => {
-    const ipCount = row.rules ? row.rules.split("\n").filter((l) => l.trim() && !l.startsWith("#")).length : 0;
-    const domainCount = row.domainRules ? row.domainRules.split("\n").filter((l) => l.trim() && !l.startsWith("#")).length : 0;
+    const staticIpCount = row.rules ? row.rules.split("\n").filter((l) => l.trim() && !l.startsWith("#")).length : 0;
+    const staticDomainCount = row.domainRules ? row.domainRules.split("\n").filter((l) => l.trim() && !l.startsWith("#")).length : 0;
+    // Include rules fetched from sourceUrl — counts are written back by the
+    // agent after each sync (source_last_ip_count / source_last_domain_count).
+    const syncedIpCount = row.sourceLastIpCount ?? 0;
+    const syncedDomainCount = row.sourceLastDomainCount ?? 0;
     const branchCount = db.select({ count: count() }).from(branchFilters).where(eq(branchFilters.filterId, row.id)).get()?.count ?? 0;
-    return { ...row, rulesCount: ipCount + domainCount, branchCount };
+    return {
+      ...row,
+      rulesCount: staticIpCount + staticDomainCount + syncedIpCount + syncedDomainCount,
+      branchCount,
+    };
   });
 
   return paginated(enriched, {
