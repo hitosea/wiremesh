@@ -105,6 +105,11 @@ export async function POST(request: NextRequest) {
     if (!branch.nodeIds || !Array.isArray(branch.nodeIds)) {
       return error("VALIDATION_ERROR", "validation.branchNeedsNode", { name: branch.name });
     }
+    // Forbid self-loop tunnels: entry node cannot appear in branch nodes.
+    // Users who want the entry to be the exit should use direct-exit (nodeIds = []) instead.
+    if (branch.nodeIds.includes(entryNodeId)) {
+      return error("VALIDATION_ERROR", "validation.branchContainsEntryNode", { name: branch.name });
+    }
   }
 
   // Verify entry node exists
@@ -284,8 +289,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 3d. Insert branchFilters associations
-    if (branch.filterIds && branch.filterIds.length > 0) {
+    // 3d. Insert branchFilters associations.
+    // Skip for default branches (catch-all, ignored by config builder) and
+    // direct-exit branches (no downstream tunnel, cannot route by rule).
+    const canBindFilters = !branch.isDefault && branch.nodeIds.length > 0;
+    if (canBindFilters && branch.filterIds && branch.filterIds.length > 0) {
       for (const filterId of branch.filterIds) {
         db.insert(branchFilters)
           .values({

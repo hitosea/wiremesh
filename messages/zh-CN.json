@@ -387,6 +387,9 @@
     "addTransit": "+ 添加中转",
     "directExit": "入口节点直出（不经过其他节点）",
     "filterRules": "分流规则",
+    "filterHiddenDefault": "默认分支不支持绑定分流规则，未命中其他分支的流量自动走此分支",
+    "filterHiddenDirectExit": "直出分支没有下游隧道，不支持按规则分流；若需 CN/AI 分流请取消直出并指定出口节点",
+    "entryNodeClearedFromBranches": "入口节点已更改，{count} 个分支中对应的节点位置已被清空，请重新选择",
     "chainLabel": "链路：",
     "addBranch": "添加分支",
     "createLine": "创建线路"
@@ -635,6 +638,7 @@
       "exactlyOneDefaultBranch": "必须恰好有一个默认分支 (isDefault: true)",
       "branchNameRequired": "分支 {index} 的 name 为必填项",
       "branchNeedsNode": "分支 \"{name}\" 至少需要 1 个节点 (出口)",
+      "branchContainsEntryNode": "分支「{name}」不能包含入口节点，如需入口节点直接出口请勾选「直出」",
       "entryNodeNotFound": "入口节点 ID {id} 不存在",
       "nodeNotFound": "节点 ID {id} 不存在",
       "filterNotFound": "分流规则 ID {id} 不存在",

@@ -62,6 +62,23 @@ export default function NewLinePage() {
   const [availableFilters, setAvailableFilters] = useState<FilterOption[]>([]);
   const [loadingNodes, setLoadingNodes] = useState(true);
 
+  const handleEntryChange = (newEntryId: string) => {
+    setEntryNodeId(newEntryId);
+    // Clearing slots where the new entry appears prevents self-loop tunnels
+    // (entry == exit/relay) and keeps the UI consistent with the now-disabled
+    // select option for that node.
+    const affected = branches.filter((b) => b.nodeIds.includes(newEntryId)).length;
+    if (affected === 0) return;
+    setBranches((prev) =>
+      prev.map((b) =>
+        b.nodeIds.includes(newEntryId)
+          ? { ...b, nodeIds: b.nodeIds.map((id) => (id === newEntryId ? "" : id)) }
+          : b
+      )
+    );
+    toast.warning(t("entryNodeClearedFromBranches", { count: affected }));
+  };
+
   useEffect(() => {
     Promise.all([
       fetch("/api/nodes?pageSize=100").then((r) => r.json()),
@@ -88,7 +105,12 @@ export default function NewLinePage() {
 
   const setDefaultBranch = (idx: number) => {
     setBranches((prev) =>
-      prev.map((b, i) => ({ ...b, isDefault: i === idx }))
+      prev.map((b, i) => ({
+        ...b,
+        isDefault: i === idx,
+        // Clear filters when a branch becomes default — bindings are ignored server-side.
+        filterIds: i === idx ? [] : b.filterIds,
+      }))
     );
   };
 
@@ -96,7 +118,7 @@ export default function NewLinePage() {
     setBranches((prev) => {
       const next = prev.filter((_, i) => i !== idx);
       if (next.length > 0 && !next.some((b) => b.isDefault)) {
-        next[0].isDefault = true;
+        next[0] = { ...next[0], isDefault: true, filterIds: [] };
       }
       return next;
     });
@@ -301,7 +323,7 @@ export default function NewLinePage() {
                 <Label>
                   {t("entryNode")} <span className="text-destructive">*</span>
                 </Label>
-                <Select value={entryNodeId} onValueChange={setEntryNodeId}>
+                <Select value={entryNodeId} onValueChange={handleEntryChange}>
                   <SelectTrigger>
                     <SelectValue placeholder={t("selectEntry")} />
                   </SelectTrigger>
@@ -369,7 +391,8 @@ export default function NewLinePage() {
                       checked={isSingleNodeBranch(branch)}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          updateBranch(branchIdx, { nodeIds: [] });
+                          // Direct-exit branches can't route by filter — clear any filter bindings.
+                          updateBranch(branchIdx, { nodeIds: [], filterIds: [] });
                         } else {
                           updateBranch(branchIdx, { nodeIds: [""] });
                         }
@@ -399,9 +422,16 @@ export default function NewLinePage() {
                               <SelectContent>
                                 {nodeOptions.map((n) => {
                                   const isPrivate = isPrivateIp(n.ip);
+                                  const isEntry = String(n.id) === entryNodeId;
                                   return (
-                                    <SelectItem key={n.id} value={String(n.id)} disabled={isPrivate}>
-                                      {n.name} ({n.ip}){isPrivate ? ` (${t("privateIpTag")})` : ""}
+                                    <SelectItem
+                                      key={n.id}
+                                      value={String(n.id)}
+                                      disabled={isPrivate || isEntry}
+                                    >
+                                      {n.name} ({n.ip})
+                                      {isPrivate ? ` (${t("privateIpTag")})` : ""}
+                                      {isEntry && !isPrivate ? ` (${t("entryNode")})` : ""}
                                     </SelectItem>
                                   );
                                 })}
@@ -435,26 +465,37 @@ export default function NewLinePage() {
                   )}
                 </div>
 
-                {/* Filter multi-select */}
+                {/* Filter multi-select — hidden for default branches (catch-all, ignored by
+                    config builder) and direct-exit branches (no downstream tunnel to route to) */}
                 {availableFilters.length > 0 && (
                   <div className="space-y-3">
                     <Label>{t("filterRules")}</Label>
-                    <div className="flex flex-wrap gap-x-5 gap-y-2.5">
-                      {availableFilters.map((f) => (
-                        <label
-                          key={f.id}
-                          className="flex items-center gap-2 cursor-pointer"
-                        >
-                          <Checkbox
-                            checked={branch.filterIds.includes(f.id)}
-                            onCheckedChange={() =>
-                              toggleBranchFilter(branchIdx, f.id)
-                            }
-                          />
-                          <span className="text-sm">{f.name}</span>
-                        </label>
-                      ))}
-                    </div>
+                    {branch.isDefault ? (
+                      <p className="text-xs text-muted-foreground">
+                        {t("filterHiddenDefault")}
+                      </p>
+                    ) : isSingleNodeBranch(branch) ? (
+                      <p className="text-xs text-muted-foreground">
+                        {t("filterHiddenDirectExit")}
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap gap-x-5 gap-y-2.5">
+                        {availableFilters.map((f) => (
+                          <label
+                            key={f.id}
+                            className="flex items-center gap-2 cursor-pointer"
+                          >
+                            <Checkbox
+                              checked={branch.filterIds.includes(f.id)}
+                              onCheckedChange={() =>
+                                toggleBranchFilter(branchIdx, f.id)
+                              }
+                            />
+                            <span className="text-sm">{f.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 
