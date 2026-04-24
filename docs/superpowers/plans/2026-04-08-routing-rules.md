@@ -985,8 +985,8 @@ Render as grouped checkboxes:
     <div className="space-y-3 border rounded-md p-3">
       {linesWithBranches.map((line) => (
         <div key={line.id}>
-          <p className="text-sm font-medium mb-1">{line.name}</p>
-          <div className="ml-4 space-y-1">
+          <p className="text-sm font-medium mb-2">{line.name}</p>
+          <div className="ml-4 space-y-2">
             {line.branches?.map((branch) => (
               <div key={branch.id} className="flex items-center gap-2">
                 <Checkbox
