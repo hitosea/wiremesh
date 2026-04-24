@@ -105,7 +105,11 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes []api.XrayLineRoute) e
 	}
 
 	// 3. Set up each branch
-	domainRules := make(map[string]string) // domain -> ipset name (the -dns ipset)
+	// A domain may map to multiple branches when the same filter is bound to
+	// more than one branch (e.g. the "ip.me" filter on both a split-routing
+	// branch and a split-direct branch). Each resolved IP must land in every
+	// bound branch's -dns ipset, so the value is a slice.
+	domainRules := make(map[string][]string) // domain -> ipset names (the -dns ipsets)
 
 	for _, branch := range cfg.Branches {
 		table := fmt.Sprintf("%d", branch.Mark)
@@ -169,7 +173,7 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes []api.XrayLineRoute) e
 		}
 
 		for _, domain := range branch.DomainRules {
-			domainRules[domain] = dnsSet
+			domainRules[domain] = append(domainRules[domain], dnsSet)
 		}
 	}
 

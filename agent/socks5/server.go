@@ -9,8 +9,37 @@ import (
 	"syscall"
 
 	gosocks5 "github.com/armon/go-socks5"
+	"golang.org/x/sys/unix"
+
 	"github.com/wiremesh/agent/api"
 )
+
+// listenTCPReuse creates a TCP listener with SO_REUSEADDR + SO_REUSEPORT set.
+// Without these, immediate re-listen after Close() on the same port fails with
+// EADDRINUSE because the kernel hasn't yet released the old socket. That path
+// is hit on every config Sync, since the manager unconditionally closes and
+// re-binds to pick up credential changes.
+func listenTCPReuse(addr string) (net.Listener, error) {
+	lc := net.ListenConfig{
+		Control: func(network, address string, c syscall.RawConn) error {
+			var opErr error
+			err := c.Control(func(fd uintptr) {
+				if e := syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1); e != nil {
+					opErr = e
+					return
+				}
+				if e := syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, unix.SO_REUSEPORT, 1); e != nil {
+					opErr = e
+				}
+			})
+			if err != nil {
+				return err
+			}
+			return opErr
+		},
+	}
+	return lc.Listen(context.Background(), "tcp", addr)
+}
 
 // Manager manages per-line SOCKS5 servers.
 type Manager struct {
@@ -80,7 +109,7 @@ func (m *Manager) startServer(lineId int, route api.Socks5Route) {
 		return
 	}
 
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", route.Port))
+	listener, err := listenTCPReuse(fmt.Sprintf(":%d", route.Port))
 	if err != nil {
 		log.Printf("[socks5] Failed to listen on port %d for line %d: %v", route.Port, lineId, err)
 		return

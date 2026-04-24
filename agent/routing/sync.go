@@ -173,9 +173,9 @@ func (s *SourceSyncer) fetchAndApply(branchID int, source api.RuleSource) {
 	// Apply domain rules to DNS proxy — they land in the -dns ipset.
 	if len(domainRules) > 0 && s.manager.dnsProxy != nil {
 		dnsSet := fmt.Sprintf("wm-branch-%d-dns", branchID)
-		newRules := make(map[string]string, len(domainRules))
+		newRules := make(map[string][]string, len(domainRules))
 		for _, d := range domainRules {
-			newRules[d] = dnsSet
+			newRules[d] = []string{dnsSet}
 		}
 		// Merge with existing rules (additive). Per-filter domain churn is rare
 		// enough that tracking removals isn't worth the complexity here.

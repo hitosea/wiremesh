@@ -116,12 +116,13 @@ func NewProxyWithBind(listenAddr string, upstream []string, bindDevice string) *
 }
 
 // UpdateRules replaces the domain matching rules.
-func (p *Proxy) UpdateRules(rules map[string]string) {
+// Each domain may map to multiple ipsets (same filter bound to multiple branches).
+func (p *Proxy) UpdateRules(rules map[string][]string) {
 	p.matcher.SetRules(rules)
 	log.Printf("[dns] Updated domain rules: %d entries", len(rules))
 }
 
-func (p *Proxy) MergeRules(rules map[string]string) {
+func (p *Proxy) MergeRules(rules map[string][]string) {
 	p.matcher.MergeRules(rules)
 	log.Printf("[dns] Merged domain rules: %d new entries", len(rules))
 }
@@ -190,7 +191,7 @@ func (p *Proxy) handleQuery(w mdns.ResponseWriter, r *mdns.Msg) {
 		if q.Qtype != mdns.TypeA && q.Qtype != mdns.TypeAAAA {
 			continue
 		}
-		ipsetName, matched := p.matcher.Match(q.Name)
+		ipsetNames, matched := p.matcher.Match(q.Name)
 		if !matched {
 			continue
 		}
@@ -213,8 +214,10 @@ func (p *Proxy) handleQuery(w mdns.ResponseWriter, r *mdns.Msg) {
 				ttl = 60
 			}
 
-			if err := ipset.Add(ipsetName, ip, int(ttl)); err != nil {
-				log.Printf("[dns] Failed to add %s to ipset %s: %v", ip, ipsetName, err)
+			for _, ipsetName := range ipsetNames {
+				if err := ipset.Add(ipsetName, ip, int(ttl)); err != nil {
+					log.Printf("[dns] Failed to add %s to ipset %s: %v", ip, ipsetName, err)
+				}
 			}
 		}
 	}
