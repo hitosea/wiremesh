@@ -474,7 +474,7 @@
     "sourceUrl": "External Source (optional)",
     "sourceUrlPlaceholder": "https://raw.githubusercontent.com/.../china.txt",
     "sourceUrlHint": "Periodically fetches plain-text rules (one CIDR or domain per line, # comments supported). dnsmasq / clash / v2ray dat formats are not supported",
-    "formatHelpTitle": "📘 Rule format help",
+    "formatHelpTitle": "Rule format help",
     "formatHelpBody": "All three fields accept plain text, one rule per line. Lines starting with # are treated as comments, blank lines are ignored.",
     "formatHelpIpRule": "IP rules: one single IP or CIDR per line (e.g. 8.8.8.8, 10.0.0.0/8), exact match.",
     "formatHelpDomainRule": "Domain rules: one domain per line (e.g. openai.com), auto suffix-matches all subdomains. No prefix, keyword, or regex support.",
@@ -484,6 +484,7 @@
     "linkedBranches": "Linked Branches",
     "noLines": "No lines",
     "noBranches": "No branches",
+    "defaultBranchHint": "Default branch does not support rule binding; all traffic not matching other branches falls through here automatically",
     "notes": "Notes",
     "defaultLabel": "Default",
     "createRule": "Create Rule"

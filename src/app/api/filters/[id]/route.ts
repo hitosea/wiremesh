@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { filters, branchFilters, lineBranches, lines } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
 import { notifyFilterChange } from "@/lib/filter-notify";
 
@@ -74,11 +74,21 @@ export async function PUT(request: NextRequest, { params }: Params) {
     .returning()
     .get();
 
-  // Update branch associations if provided
+  // Update branch associations if provided, silently dropping default
+  // branches — the config builder ignores those bindings anyway.
   if (branchIds !== undefined) {
     db.delete(branchFilters).where(eq(branchFilters.filterId, filterId)).run();
-    if (Array.isArray(branchIds)) {
+    if (Array.isArray(branchIds) && branchIds.length > 0) {
+      const defaultIds = new Set(
+        db
+          .select({ id: lineBranches.id })
+          .from(lineBranches)
+          .where(and(inArray(lineBranches.id, branchIds), eq(lineBranches.isDefault, true)))
+          .all()
+          .map((r) => r.id)
+      );
       for (const branchId of branchIds) {
+        if (defaultIds.has(branchId)) continue;
         db.insert(branchFilters)
           .values({ branchId, filterId })
           .run();

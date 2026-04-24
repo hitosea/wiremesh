@@ -104,15 +104,26 @@ export default function EditFilterPage() {
           router.push("/filters");
           return;
         }
+        const lines: LineWithBranches[] = linesJson.data ?? [];
+        const defaultBranchIds = new Set<number>();
+        for (const line of lines) {
+          for (const b of line.branches ?? []) {
+            if (b.isDefault) defaultBranchIds.add(b.id);
+          }
+        }
         setFilter(f);
         setName(f.name ?? "");
         setRules(f.rules ?? "");
         setDomainRules(f.domainRules ?? "");
         setSourceUrl(f.sourceUrl ?? "");
         setMode(f.mode ?? "whitelist");
-        setSelectedBranchIds(f.branches?.map((b: { branchId: number }) => b.branchId) ?? []);
+        setSelectedBranchIds(
+          (f.branches ?? [])
+            .map((b: { branchId: number }) => b.branchId)
+            .filter((id: number) => !defaultBranchIds.has(id))
+        );
         setRemark(f.remark ?? "");
-        setLinesWithBranches(linesJson.data ?? []);
+        setLinesWithBranches(lines);
       })
       .catch(() => toast.error(t("loadFailed")))
       .finally(() => setLoading(false));
@@ -351,17 +362,31 @@ export default function EditFilterPage() {
                     <div className="ml-4 space-y-1">
                       {line.branches?.length ? (
                         line.branches.map((branch) => (
-                          <div key={branch.id} className="flex items-center gap-2">
+                          <div
+                            key={branch.id}
+                            className="flex items-center gap-2"
+                            title={branch.isDefault ? tf("defaultBranchHint") : undefined}
+                          >
                             <Checkbox
                               id={`branch-${branch.id}`}
-                              checked={selectedBranchIds.includes(branch.id)}
-                              onCheckedChange={() => toggleBranch(branch.id)}
+                              checked={!branch.isDefault && selectedBranchIds.includes(branch.id)}
+                              onCheckedChange={() => !branch.isDefault && toggleBranch(branch.id)}
+                              disabled={branch.isDefault}
                             />
                             <label
                               htmlFor={`branch-${branch.id}`}
-                              className="text-sm cursor-pointer"
+                              className={
+                                branch.isDefault
+                                  ? "text-sm text-muted-foreground/70 cursor-not-allowed"
+                                  : "text-sm cursor-pointer"
+                              }
                             >
                               {branch.name}{branch.isDefault ? ` (${tf("defaultLabel")})` : ""}
+                              {branch.isDefault && (
+                                <span className="ml-2 text-xs text-muted-foreground">
+                                  · {tf("defaultBranchHint")}
+                                </span>
+                              )}
                             </label>
                           </div>
                         ))

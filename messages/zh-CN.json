@@ -474,7 +474,7 @@
     "sourceUrl": "外部规则源（可选）",
     "sourceUrlPlaceholder": "https://raw.githubusercontent.com/.../china.txt",
     "sourceUrlHint": "定期拉取纯文本规则（每行一条 CIDR 或域名，支持 # 注释）。不支持 dnsmasq / clash / v2ray dat 格式",
-    "formatHelpTitle": "📘 规则格式说明",
+    "formatHelpTitle": "规则格式说明",
     "formatHelpBody": "三个字段都接受纯文本、每行一条。以 # 开头的行视为注释、空行自动忽略。",
     "formatHelpIpRule": "IP 规则：每行一条单 IP 或 CIDR（如 8.8.8.8、10.0.0.0/8），精确匹配。",
     "formatHelpDomainRule": "域名规则：每行一个域名（如 openai.com），自动按后缀匹配所有子域名。不支持前缀、关键词或正则。",
@@ -484,6 +484,7 @@
     "linkedBranches": "关联分支",
     "noLines": "暂无线路",
     "noBranches": "暂无分支",
+    "defaultBranchHint": "默认分支不支持绑定规则，所有未命中其他分支的流量自动走此分支",
     "notes": "备注",
     "defaultLabel": "默认",
     "createRule": "创建规则"

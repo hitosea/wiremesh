@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { filters, branchFilters } from "@/lib/db/schema";
+import { filters, branchFilters, lineBranches } from "@/lib/db/schema";
 import { success, created, error, paginated } from "@/lib/api-response";
 import { parsePaginationParams, paginationOffset } from "@/lib/pagination";
-import { eq, like, count, and } from "drizzle-orm";
+import { eq, like, count, and, inArray } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
 import { notifyFilterChange } from "@/lib/filter-notify";
 
@@ -64,9 +64,20 @@ export async function POST(request: NextRequest) {
     .returning()
     .get();
 
-  // Insert branch associations
-  if (branchIds && Array.isArray(branchIds)) {
+  // Insert branch associations, silently dropping default branches —
+  // the config builder ignores filter bindings on default branches, so
+  // storing them would be dead data.
+  if (branchIds && Array.isArray(branchIds) && branchIds.length > 0) {
+    const defaultIds = new Set(
+      db
+        .select({ id: lineBranches.id })
+        .from(lineBranches)
+        .where(and(inArray(lineBranches.id, branchIds), eq(lineBranches.isDefault, true)))
+        .all()
+        .map((r) => r.id)
+    );
     for (const branchId of branchIds) {
+      if (defaultIds.has(branchId)) continue;
       db.insert(branchFilters)
         .values({ branchId, filterId: filter.id })
         .run();

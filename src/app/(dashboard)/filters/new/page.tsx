@@ -198,17 +198,31 @@ export default function NewFilterPage() {
                     <div className="ml-4 space-y-1">
                       {line.branches?.length ? (
                         line.branches.map((branch) => (
-                          <div key={branch.id} className="flex items-center gap-2">
+                          <div
+                            key={branch.id}
+                            className="flex items-center gap-2"
+                            title={branch.isDefault ? t("defaultBranchHint") : undefined}
+                          >
                             <Checkbox
                               id={`branch-${branch.id}`}
-                              checked={selectedBranchIds.includes(branch.id)}
-                              onCheckedChange={() => toggleBranch(branch.id)}
+                              checked={!branch.isDefault && selectedBranchIds.includes(branch.id)}
+                              onCheckedChange={() => !branch.isDefault && toggleBranch(branch.id)}
+                              disabled={branch.isDefault}
                             />
                             <label
                               htmlFor={`branch-${branch.id}`}
-                              className="text-sm cursor-pointer"
+                              className={
+                                branch.isDefault
+                                  ? "text-sm text-muted-foreground/70 cursor-not-allowed"
+                                  : "text-sm cursor-pointer"
+                              }
                             >
                               {branch.name}{branch.isDefault ? ` (${t("defaultLabel")})` : ""}
+                              {branch.isDefault && (
+                                <span className="ml-2 text-xs text-muted-foreground">
+                                  · {t("defaultBranchHint")}
+                                </span>
+                              )}
                             </label>
                           </div>
                         ))

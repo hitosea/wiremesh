@@ -194,7 +194,7 @@ All rule fields are plain text with one entry per line. Lines starting with `#` 
 - **Source URL** — a plain-text file with one CIDR or domain per line; each line is auto-classified as IP or domain. **Not supported**: dnsmasq format (`server=/...`), Clash/Shadowrocket tag syntax (`DOMAIN-SUFFIX,xxx`), v2ray `geoip.dat` / `geosite.dat` binaries.
 - **Mode** — Whitelist: matching traffic goes through this branch. Blacklist: matching traffic is blocked from this branch.
 
-The **📘 Rule format help** panel at the top of the rule editor page also lists the full conventions for quick reference.
+The **Rule format help** panel at the top of the rule editor page also lists the full conventions for quick reference.
 
 ### Creating a Rule
 
