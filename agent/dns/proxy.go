@@ -115,16 +115,30 @@ func NewProxyWithBind(listenAddr string, upstream []string, bindDevice string) *
 	}
 }
 
-// UpdateRules replaces the domain matching rules.
-// Each domain may map to multiple ipsets (same filter bound to multiple branches).
-func (p *Proxy) UpdateRules(rules map[string][]string) {
-	p.matcher.SetRules(rules)
-	log.Printf("[dns] Updated domain rules: %d entries", len(rules))
+// SetStaticRules replaces the static (Manager-owned) domain matching rules.
+// External (sourceUrl) rules are not touched — they're owned by SourceSyncer
+// and live in their own per-filter namespace in the matcher.
+func (p *Proxy) SetStaticRules(rules map[string][]string) {
+	p.matcher.SetStatic(rules)
+	log.Printf("[dns] Updated static domain rules: %d entries", len(rules))
 }
 
-func (p *Proxy) MergeRules(rules map[string][]string) {
-	p.matcher.MergeRules(rules)
-	log.Printf("[dns] Merged domain rules: %d new entries", len(rules))
+// SetFilterRules replaces the domain rules contributed by one sourceUrl
+// filter. Other filters' rules are unaffected.
+func (p *Proxy) SetFilterRules(filterID int, rules map[string][]string) {
+	p.matcher.SetFilter(filterID, rules)
+	log.Printf("[dns] Updated filter=%d domain rules: %d entries", filterID, len(rules))
+}
+
+// DeleteFilterRules drops rules from one filter (filter removed from config).
+func (p *Proxy) DeleteFilterRules(filterID int) {
+	p.matcher.DeleteFilter(filterID)
+	log.Printf("[dns] Dropped filter=%d domain rules", filterID)
+}
+
+// RetainFilterRules drops rules of filters whose IDs are not in keep.
+func (p *Proxy) RetainFilterRules(keep map[int]struct{}) {
+	p.matcher.RetainFilters(keep)
 }
 
 // Start begins listening for DNS queries.

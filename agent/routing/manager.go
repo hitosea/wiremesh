@@ -61,7 +61,7 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes []api.XrayLineRoute) e
 		m.cleanIPRules()
 		m.cleanMangleRules()
 		if m.dnsProxy != nil {
-			m.dnsProxy.UpdateRules(nil)
+			m.dnsProxy.SetStaticRules(nil)
 		}
 		m.lastConfig = cfg
 		return nil
@@ -232,10 +232,14 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes []api.XrayLineRoute) e
 	// MASQUERADE for SOCKS5 traffic going through tunnels (independent of Xray)
 	addNatRule("-A POSTROUTING -o wm-tun+ -j MASQUERADE -m comment --comment wm-socks5-masq")
 
-	// 3. Update DNS proxy domain rules (proxy lifecycle is already managed above
-	// based on cfg.DNS.Listen, independent of domain rules)
+	// 3. Update DNS proxy static domain rules. External (sourceUrl) rules
+	// live in their own namespace in the matcher — they're owned by
+	// SourceSyncer and must not be clobbered here. Before the split, this
+	// call wiped the external rules, leaving a window (until the next fetch
+	// returned) where sourceUrl domains silently fell through to the
+	// default branch.
 	if m.dnsProxy != nil {
-		m.dnsProxy.UpdateRules(domainRules)
+		m.dnsProxy.SetStaticRules(domainRules)
 	}
 
 	// 4. Start/update external rule source syncer

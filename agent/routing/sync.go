@@ -22,14 +22,23 @@ import (
 // the same branch). It never touches iptables — the mangle rules emitted by
 // the Manager reference the ipset by name and remain stable.
 type SourceSyncer struct {
-	manager       *Manager
-	timers        map[int]*time.Timer // filter_id -> timer
-	filterBranch  map[int]int         // filter_id -> branch_id (for rebuild scope)
-	filterIPs     map[int][]string    // filter_id -> last fetched IPs
-	mu            sync.Mutex
-	client        *http.Client
-	stopCh        chan struct{}
-	stopped       bool
+	manager      *Manager
+	timers       map[int]*time.Timer  // filter_id -> timer
+	filterBranch map[int]int          // filter_id -> branch_id (for rebuild scope)
+	filterIPs    map[int][]string     // filter_id -> last fetched IPs
+	mu           sync.Mutex
+	client       *http.Client
+	stopCh       chan struct{}
+	stopped      bool
+
+	// rebuildMu serialises rebuildBranchCidrSet per branch. Without it,
+	// two concurrent rebuilders for the same branch (e.g. the eager
+	// rebuild in UpdateSources racing with a fetchAndApply goroutine)
+	// share the same fixed ".tmp" ipset name and step on each other —
+	// one destroys the tmp set mid-build, the other's Add/Swap then
+	// fails with "set does not exist".
+	rebuildMuMap   map[int]*sync.Mutex
+	rebuildMuGuard sync.Mutex
 }
 
 func NewSourceSyncer(manager *Manager) *SourceSyncer {
@@ -40,6 +49,7 @@ func NewSourceSyncer(manager *Manager) *SourceSyncer {
 		filterIPs:    make(map[int][]string),
 		client:       &http.Client{Timeout: 30 * time.Second},
 		stopCh:       make(chan struct{}),
+		rebuildMuMap: make(map[int]*sync.Mutex),
 	}
 }
 
@@ -73,6 +83,17 @@ func (s *SourceSyncer) UpdateSources(branches []api.RoutingBranch) {
 	}
 	s.filterBranch = newFilterBranch
 	s.mu.Unlock()
+
+	// Prune per-filter DNS rules for filters that disappeared from config.
+	// The matcher holds these independently of the IP cache, so we must
+	// tell it which filter IDs are still live.
+	if s.manager.dnsProxy != nil {
+		keep := make(map[int]struct{}, len(newFilterBranch))
+		for fid := range newFilterBranch {
+			keep[fid] = struct{}{}
+		}
+		s.manager.dnsProxy.RetainFilterRules(keep)
+	}
 
 	// Rebuild each affected branch's -cidr ipset from cached external IPs
 	// immediately. Without this, the window between Sync (which flushes the
@@ -170,16 +191,17 @@ func (s *SourceSyncer) fetchAndApply(branchID int, source api.RuleSource) {
 		log.Printf("[sync] filter=%d rebuild ipset failed: %v", source.FilterID, err)
 	}
 
-	// Apply domain rules to DNS proxy — they land in the -dns ipset.
-	if len(domainRules) > 0 && s.manager.dnsProxy != nil {
+	// Apply domain rules to DNS proxy under this filter's namespace. The
+	// matcher keeps external rules keyed by filter ID, so this replaces any
+	// previous rules for the same filter without clobbering others — and
+	// without being clobbered when Manager.Sync pushes fresh static rules.
+	if s.manager.dnsProxy != nil {
 		dnsSet := fmt.Sprintf("wm-branch-%d-dns", branchID)
 		newRules := make(map[string][]string, len(domainRules))
 		for _, d := range domainRules {
 			newRules[d] = []string{dnsSet}
 		}
-		// Merge with existing rules (additive). Per-filter domain churn is rare
-		// enough that tracking removals isn't worth the complexity here.
-		s.manager.dnsProxy.MergeRules(newRules)
+		s.manager.dnsProxy.SetFilterRules(source.FilterID, newRules)
 	}
 
 	s.report(source.FilterID, true, len(ipRules), len(domainRules), "")
@@ -189,7 +211,27 @@ func (s *SourceSyncer) fetchAndApply(branchID int, source api.RuleSource) {
 // the union of static IPs (from routing config) and all cached external-source
 // IPs of filters bound to the same branch. Uses ipset swap so the replacement
 // is observably atomic — no packet sees a half-populated set.
+// branchRebuildMutex returns the lock for a given branch, creating it on
+// first use. The guard mutex only protects map access — it is released
+// before the branch lock is taken so unrelated branches can still rebuild
+// in parallel.
+func (s *SourceSyncer) branchRebuildMutex(branchID int) *sync.Mutex {
+	s.rebuildMuGuard.Lock()
+	defer s.rebuildMuGuard.Unlock()
+	mu, ok := s.rebuildMuMap[branchID]
+	if !ok {
+		mu = &sync.Mutex{}
+		s.rebuildMuMap[branchID] = mu
+	}
+	return mu
+}
+
 func (s *SourceSyncer) rebuildBranchCidrSet(branchID int) error {
+	// Serialise rebuilds for this branch — see rebuildMuMap comment.
+	brMu := s.branchRebuildMutex(branchID)
+	brMu.Lock()
+	defer brMu.Unlock()
+
 	s.mu.Lock()
 	// Collect external IPs from all filters pointing at this branch.
 	external := make(map[string]struct{})
