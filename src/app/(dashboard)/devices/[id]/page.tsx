@@ -137,7 +137,11 @@ function DeviceDetailContent() {
       }
 
       toast.success(t("saved"));
-      setDevice({ ...json.data, lineId: parsedLineId });
+      setDevice((prev) =>
+        prev
+          ? { ...prev, name: name.trim(), remark: remark.trim() || null, lineId: parsedLineId }
+          : prev,
+      );
     } catch {
       toast.error(tc("saveFailedRetry"));
     } finally {
