@@ -39,10 +39,12 @@ func getDefaultGateway() string {
 	return defaultGateway
 }
 
-// addDefaultRoute adds a default route in the given table.
+// AddDefaultRoute adds a default route in the given table.
 // For wm-* tunnel interfaces: "ip route replace default dev <iface> table <table>"
-// For external interfaces (eth0 etc.): adds "via <gateway>" to ensure proper routing.
-func addDefaultRoute(iface, table string) error {
+// For external interfaces (eth0 etc.): adds "via <gateway>" to ensure proper
+// routing on nodes behind NAT (e.g. cloud VMs where eth0 is a private IP and
+// non-LAN destinations require the gateway).
+func AddDefaultRoute(iface, table string) error {
 	if strings.HasPrefix(iface, "wm-") {
 		_, err := Run("ip", "route", "replace", "default", "dev", iface, "table", table)
 		return err
@@ -92,7 +94,7 @@ func SyncRouting(deviceRoutes []api.DeviceRoute) error {
 			tableNum := routeTableStart + entryIdx // 20001, 20002, ...
 			table := fmt.Sprintf("%d", tableNum)
 
-			if err := addDefaultRoute(route.Tunnel, table); err != nil {
+			if err := AddDefaultRoute(route.Tunnel, table); err != nil {
 				log.Printf("[routing] Error adding route table %s: %v", table, err)
 				continue
 			}
@@ -131,7 +133,7 @@ func SyncRouting(deviceRoutes []api.DeviceRoute) error {
 
 // addIifRoute sets up a policy route: packets arriving on inIface are routed to outIface via the given table.
 func addIifRoute(inIface, outIface, table, label string) error {
-	if err := addDefaultRoute(outIface, table); err != nil {
+	if err := AddDefaultRoute(outIface, table); err != nil {
 		log.Printf("[routing] Error adding %s route table %s: %v", label, table, err)
 		return err
 	}
@@ -161,7 +163,7 @@ func SyncXrayRouting(routes []api.XrayLineRoute) error {
 		priority := table // unified: priority == table number
 
 		// Add route: default via tunnel in this table
-		if err := addDefaultRoute(route.Tunnel, table); err != nil {
+		if err := AddDefaultRoute(route.Tunnel, table); err != nil {
 			log.Printf("[routing] Error adding xray route table %s: %v", table, err)
 			continue
 		}
@@ -195,7 +197,7 @@ func SyncSocks5Routing(routes []api.Socks5Route) error {
 		markHex := fmt.Sprintf("0x%x", route.Mark)
 		priority := table
 
-		if err := addDefaultRoute(route.Tunnel, table); err != nil {
+		if err := AddDefaultRoute(route.Tunnel, table); err != nil {
 			log.Printf("[routing] Error adding socks5 route table %s: %v", table, err)
 			continue
 		}

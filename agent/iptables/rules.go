@@ -63,8 +63,11 @@ func RemoveAllWireMeshRules() error {
 }
 
 // listWireMeshRules returns all wm- tagged rules in normalized format.
-// NAT rules include the "-t nat" prefix so they can be correctly compared
-// with desired rules from the management platform.
+// Scope is limited to filter/FORWARD and nat/POSTROUTING — the chains that
+// the management platform's iptablesRules list actually drives. Mangle
+// PREROUTING (branch fwmark rules) is managed by routing.Manager, including
+// source-synced CIDRs from external filter URLs, so SyncRules must not touch
+// it or it would wipe those rules every config sync.
 func listWireMeshRules() ([]string, error) {
 	var allRules []string
 
@@ -84,16 +87,6 @@ func listWireMeshRules() ([]string, error) {
 			line = strings.TrimSpace(line)
 			if strings.Contains(line, "wm-") && strings.HasPrefix(line, "-A ") {
 				allRules = append(allRules, "-t nat "+line)
-			}
-		}
-	}
-
-	// mangle table PREROUTING chain — prefix with "-t mangle" for correct matching
-	if output, err := exec.Command("iptables", "-t", "mangle", "-S", "PREROUTING").CombinedOutput(); err == nil {
-		for _, line := range strings.Split(string(output), "\n") {
-			line = strings.TrimSpace(line)
-			if strings.Contains(line, "wm-") && strings.HasPrefix(line, "-A ") {
-				allRules = append(allRules, "-t mangle "+line)
 			}
 		}
 	}

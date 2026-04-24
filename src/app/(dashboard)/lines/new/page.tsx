@@ -391,8 +391,7 @@ export default function NewLinePage() {
                       checked={isSingleNodeBranch(branch)}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          // Direct-exit branches can't route by filter — clear any filter bindings.
-                          updateBranch(branchIdx, { nodeIds: [], filterIds: [] });
+                          updateBranch(branchIdx, { nodeIds: [] });
                         } else {
                           updateBranch(branchIdx, { nodeIds: [""] });
                         }
@@ -465,18 +464,15 @@ export default function NewLinePage() {
                   )}
                 </div>
 
-                {/* Filter multi-select — hidden for default branches (catch-all, ignored by
-                    config builder) and direct-exit branches (no downstream tunnel to route to) */}
+                {/* Filter multi-select — hidden for default branches only (catch-all,
+                    ignored by config builder). Direct-exit branches are allowed and
+                    route matching traffic out the entry node's external interface. */}
                 {availableFilters.length > 0 && (
                   <div className="space-y-3">
                     <Label>{t("filterRules")}</Label>
                     {branch.isDefault ? (
                       <p className="text-xs text-muted-foreground">
                         {t("filterHiddenDefault")}
-                      </p>
-                    ) : isSingleNodeBranch(branch) ? (
-                      <p className="text-xs text-muted-foreground">
-                        {t("filterHiddenDirectExit")}
                       </p>
                     ) : (
                       <div className="flex flex-wrap gap-x-5 gap-y-2.5">

@@ -53,6 +53,24 @@ func Add(name, ip string, timeout int) error {
 	return nil
 }
 
+// Swap atomically swaps the contents of two ipsets of the same type.
+func Swap(nameA, nameB string) error {
+	out, err := exec.Command("ipset", "swap", nameA, nameB).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("ipset swap %s %s: %w: %s", nameA, nameB, err, string(out))
+	}
+	return nil
+}
+
+// Exists reports whether the named ipset exists.
+func Exists(name string) bool {
+	out, err := exec.Command("ipset", "list", name, "-terse").CombinedOutput()
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(out), "Name: "+name)
+}
+
 // Destroy removes the named ipset entirely.
 func Destroy(name string) error {
 	out, err := exec.Command("ipset", "destroy", name).CombinedOutput()

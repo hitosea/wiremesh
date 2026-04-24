@@ -290,9 +290,10 @@ export async function POST(request: NextRequest) {
     }
 
     // 3d. Insert branchFilters associations.
-    // Skip for default branches (catch-all, ignored by config builder) and
-    // direct-exit branches (no downstream tunnel, cannot route by rule).
-    const canBindFilters = !branch.isDefault && branch.nodeIds.length > 0;
+    // Skip for default branches (catch-all, ignored by config builder).
+    // Direct-exit branches are allowed — they route matching traffic out the
+    // entry node's external interface via fwmark → branch table → extIface.
+    const canBindFilters = !branch.isDefault;
     if (canBindFilters && branch.filterIds && branch.filterIds.length > 0) {
       for (const filterId of branch.filterIds) {
         db.insert(branchFilters)

@@ -9,9 +9,18 @@ import (
 	"github.com/wiremesh/agent/api"
 	"github.com/wiremesh/agent/dns"
 	"github.com/wiremesh/agent/ipset"
+	"github.com/wiremesh/agent/wg"
 )
 
 // Manager orchestrates branch-based routing: ip rules, iptables mangle, ipset, DNS proxy.
+//
+// Per-branch ipset model (for non-default branches):
+//   - wm-line-src-{id}  hash:net   source scoping: device IPs on this line
+//   - wm-branch-{id}-cidr  hash:net   static + external-source IPs (bulk swapped)
+//   - wm-branch-{id}-dns   hash:ip   DNS-resolved IPs (TTL-based, incrementally added)
+//
+// Mangle rules are generated once at Sync() and never modified by the SourceSyncer.
+// Filter updates only mutate ipset membership, not iptables rules.
 type Manager struct {
 	dnsProxy   *dns.Proxy
 	syncer     *SourceSyncer
@@ -96,15 +105,19 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes []api.XrayLineRoute) e
 	}
 
 	// 3. Set up each branch
-	domainRules := make(map[string]string) // domain -> ipset name
+	domainRules := make(map[string]string) // domain -> ipset name (the -dns ipset)
 
 	for _, branch := range cfg.Branches {
 		table := fmt.Sprintf("%d", branch.Mark)
 		markHex := markHex(branch.Mark)
-		ipsetName := fmt.Sprintf("wm-branch-%d", branch.ID)
 		srcMatch := srcMatchFor(branch)
 
-		run("ip", "route", "replace", "default", "dev", branch.Tunnel, "table", table)
+		// Use wg.AddDefaultRoute so external interfaces (eth0) pick up the
+		// system's default gateway — essential for nodes behind NAT where
+		// "dev eth0 scope link" alone can't reach off-subnet destinations.
+		if err := wg.AddDefaultRoute(branch.Tunnel, table); err != nil {
+			log.Printf("[routing] Failed to add default route for branch %d via %s: %v", branch.ID, branch.Tunnel, err)
+		}
 
 		if branch.IsDefault {
 			run("ip", "rule", "add", "fwmark", markHex, "lookup", table, "priority", "32000")
@@ -119,42 +132,60 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes []api.XrayLineRoute) e
 					markHex,
 				))
 			}
+			continue
+		}
+
+		// Non-default branch: dual-ipset model.
+		//   *-cidr  carries static IPs (from branch.IPRules) and external-source
+		//           IPs (populated later by SourceSyncer via atomic swap).
+		//   *-dns   carries DNS-resolved IPs, populated incrementally by DNS proxy
+		//           with TTL-based expiry.
+		cidrSet := fmt.Sprintf("wm-branch-%d-cidr", branch.ID)
+		dnsSet := fmt.Sprintf("wm-branch-%d-dns", branch.ID)
+
+		run("ip", "rule", "add", "fwmark", markHex, "lookup", table, "priority", table)
+
+		if err := ipset.CreateHash(cidrSet, "net"); err != nil {
+			log.Printf("[routing] Failed to create ipset %s: %v", cidrSet, err)
 		} else {
-			run("ip", "rule", "add", "fwmark", markHex, "lookup", table, "priority", table)
-
 			for _, cidr := range branch.IPRules {
-				addMangleRule(fmt.Sprintf(
-					"-A PREROUTING -i wm-wg0 %s-d %s -j MARK --set-mark %s -m comment --comment wm-branch-%d",
-					srcMatch, cidr, markHex, branch.ID,
-				))
+				if err := ipset.Add(cidrSet, cidr, 0); err != nil {
+					log.Printf("[routing] Failed to add static rule %s to %s: %v", cidr, cidrSet, err)
+				}
 			}
+			addMangleRule(fmt.Sprintf(
+				"-A PREROUTING -i wm-wg0 %s-m set --match-set %s dst -j MARK --set-mark %s -m comment --comment wm-branch-%d-cidr",
+				srcMatch, cidrSet, markHex, branch.ID,
+			))
+		}
 
-			if len(branch.DomainRules) > 0 {
-				if err := ipset.Create(ipsetName); err != nil {
-					log.Printf("[routing] Failed to create ipset %s: %v (skipping ipset-based rules for branch %d)", ipsetName, err, branch.ID)
-				} else {
-					addMangleRule(fmt.Sprintf(
-						"-A PREROUTING -i wm-wg0 %s-m set --match-set %s dst -j MARK --set-mark %s -m comment --comment wm-branch-%d-dns",
-						srcMatch, ipsetName, markHex, branch.ID,
-					))
-				}
-				for _, domain := range branch.DomainRules {
-					domainRules[domain] = ipsetName
-				}
-			}
+		if err := ipset.Create(dnsSet); err != nil {
+			log.Printf("[routing] Failed to create ipset %s: %v", dnsSet, err)
+		} else {
+			addMangleRule(fmt.Sprintf(
+				"-A PREROUTING -i wm-wg0 %s-m set --match-set %s dst -j MARK --set-mark %s -m comment --comment wm-branch-%d-dns",
+				srcMatch, dnsSet, markHex, branch.ID,
+			))
+		}
+
+		for _, domain := range branch.DomainRules {
+			domainRules[domain] = dnsSet
 		}
 	}
 
 	// 2b. OUTPUT chain rules for Xray split tunneling
 	// Each Xray line has its own default mark. For lines with branch routing,
 	// OUTPUT rules remark the default mark to branch marks based on ipset matching.
-	// This works because Xray uses UseIP + DNS proxy, so ipsets are populated.
+	// Each branch contributes one rule per ipset (cidr + dns), mirroring the
+	// PREROUTING model — so both static/external IPs and DNS-resolved IPs trigger
+	// the branch remark for Xray traffic.
 	if len(xrayRoutes) > 0 {
-		// Build mark → ipset name mapping from routing config branches
-		markToIpset := make(map[int]string)
+		// Determine which branch IDs exist in the routing config so we only
+		// emit rules for branches whose ipsets were created above.
+		branchExists := make(map[int]bool)
 		for _, b := range cfg.Branches {
-			if !b.IsDefault && len(b.DomainRules) > 0 {
-				markToIpset[b.Mark] = fmt.Sprintf("wm-branch-%d", b.ID)
+			if !b.IsDefault {
+				branchExists[b.ID] = true
 			}
 		}
 
@@ -170,12 +201,21 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes []api.XrayLineRoute) e
 				if branch.IsDefault {
 					continue
 				}
-				if ipsetName, ok := markToIpset[branch.Mark]; ok {
-					addMangleRule(fmt.Sprintf(
-						"-A OUTPUT -m mark --mark %s -m set --match-set %s dst -j MARK --set-mark %s -m comment --comment wm-xray-line-%d",
-						perLineMarkHex, ipsetName, markHex(branch.Mark), route.LineID,
-					))
+				branchID := findBranchIDByMark(cfg.Branches, branch.Mark)
+				if branchID == 0 || !branchExists[branchID] {
+					continue
 				}
+				cidrSet := fmt.Sprintf("wm-branch-%d-cidr", branchID)
+				dnsSet := fmt.Sprintf("wm-branch-%d-dns", branchID)
+				branchMarkHex := markHex(branch.Mark)
+				addMangleRule(fmt.Sprintf(
+					"-A OUTPUT -m mark --mark %s -m set --match-set %s dst -j MARK --set-mark %s -m comment --comment wm-xray-line-%d-cidr",
+					perLineMarkHex, cidrSet, branchMarkHex, route.LineID,
+				))
+				addMangleRule(fmt.Sprintf(
+					"-A OUTPUT -m mark --mark %s -m set --match-set %s dst -j MARK --set-mark %s -m comment --comment wm-xray-line-%d-dns",
+					perLineMarkHex, dnsSet, branchMarkHex, route.LineID,
+				))
 			}
 		}
 
@@ -240,26 +280,32 @@ func (m *Manager) cleanMangleRules() {
 	cleanIptablesRules("mangle", []string{"PREROUTING", "OUTPUT"}, "wm-branch", "wm-xray")
 }
 
-// ReapplyIPRules re-applies IP rules for a branch after external source sync.
-func (m *Manager) ReapplyIPRules(branchID int, ipRules []string) {
-	if m.lastConfig == nil {
-		return
-	}
-	for _, branch := range m.lastConfig.Branches {
-		if branch.ID == branchID && !branch.IsDefault {
-			markHex := markHex(branch.Mark)
-			// Remove old rules for this branch
-			removeMangleRulesByComment(fmt.Sprintf("wm-branch-%d", branchID))
-			// Re-add with new IP list
-			for _, cidr := range ipRules {
-				addMangleRule(fmt.Sprintf(
-					"-A PREROUTING -i wm-wg0 -d %s -j MARK --set-mark %s -m comment --comment wm-branch-%d",
-					cidr, markHex, branchID,
-				))
-			}
-			break
+// findBranchIDByMark returns the branch ID in cfg.Branches matching the given
+// fwmark, or 0 if none found. Used to correlate Xray branch marks (per-line
+// view) with routing-config branch IDs (per-node view).
+func findBranchIDByMark(branches []api.RoutingBranch, mark int) int {
+	for _, b := range branches {
+		if b.Mark == mark {
+			return b.ID
 		}
 	}
+	return 0
+}
+
+// StaticIPsForBranch returns the static IP rules declared in the routing
+// config for a given branch. These come from manually-entered filter.rules
+// (not external sourceUrl lists). Used by SourceSyncer when rebuilding the
+// branch's -cidr ipset.
+func (m *Manager) StaticIPsForBranch(branchID int) []string {
+	if m.lastConfig == nil {
+		return nil
+	}
+	for _, b := range m.lastConfig.Branches {
+		if b.ID == branchID {
+			return append([]string(nil), b.IPRules...)
+		}
+	}
+	return nil
 }
 
 func markHex(mark int) string { return fmt.Sprintf("0x%x", mark) }
@@ -300,21 +346,6 @@ func cleanIptablesRules(table string, chains []string, commentPrefixes ...string
 					break
 				}
 			}
-		}
-	}
-}
-
-func removeMangleRulesByComment(comment string) {
-	out, err := exec.Command("iptables", "-t", "mangle", "-S", "PREROUTING").CombinedOutput()
-	if err != nil {
-		return
-	}
-	for _, line := range strings.Split(string(out), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.Contains(line, comment) && strings.HasPrefix(line, "-A ") {
-			deleteRule := strings.Replace(line, "-A ", "-D ", 1)
-			args := strings.Fields("-t mangle " + deleteRule)
-			exec.Command("iptables", args...).CombinedOutput()
 		}
 	}
 }

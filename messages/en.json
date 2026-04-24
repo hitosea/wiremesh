@@ -388,7 +388,6 @@
     "directExit": "Direct exit from entry node (no other nodes)",
     "filterRules": "Filter Rules",
     "filterHiddenDefault": "Default branch does not support filter binding; all traffic not matching other branches falls through here",
-    "filterHiddenDirectExit": "Direct-exit branch has no downstream tunnel and cannot route by rule; uncheck Direct Exit and pick an exit node to enable filters",
     "entryNodeClearedFromBranches": "Entry node changed. The matching slot in {count} branch(es) was cleared; please re-select",
     "chainLabel": "Chain:",
     "addBranch": "Add Branch",

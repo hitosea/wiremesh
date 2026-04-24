@@ -349,7 +349,14 @@ export async function GET(request: NextRequest) {
       let defaultMark = 0;
 
       for (const branch of lineBranchCache.get(lineId) ?? []) {
-        const tunnelIfaceName = isSingleNode ? extIface : (branchToDownstreamIface.get(branch.id) ?? "");
+        // Direct-exit branches (no exit nodes) have no tunnel interface — they
+        // route locally via extIface on the entry node. Treat them like
+        // single-node lines for Xray's purposes so the branch still gets an
+        // OUTPUT remap rule.
+        const branchHasTunnel = branchToDownstreamIface.has(branch.id);
+        const tunnelIfaceName = isSingleNode
+          ? extIface
+          : (branchHasTunnel ? branchToDownstreamIface.get(branch.id)! : extIface);
         if (!tunnelIfaceName) continue;
 
         const branchMark = branchMarkMap.get(branch.id) ?? 0;
@@ -529,10 +536,27 @@ export async function GET(request: NextRequest) {
           )
           .get();
 
+        // Direct-exit branch: no nodes configured, entry node serves as exit
+        // and traffic leaves locally via the external interface.
+        const branchHasNodes = (db
+          .select({ cnt: count() })
+          .from(lineNodes)
+          .where(eq(lineNodes.branchId, branch.id))
+          .get()?.cnt ?? 0) > 0;
+
         // Match to interface name via fromWgPort
         let tunnelIfaceName = "";
         if (singleNodeLineIds.has(lineId)) {
           tunnelIfaceName = extIface;
+        } else if (!branchHasNodes) {
+          tunnelIfaceName = extIface;
+          // Direct-exit branches in mixed lines need FORWARD + MASQUERADE for traffic
+          // to actually leave via extIface (single-node lines add these at the line
+          // level; mixed lines need them per-branch).
+          const branchTag = `wm-branch-${branch.id}-direct`;
+          iptablesRules.push(`-A FORWARD -i wm-wg0 -o ${extIface} -m comment --comment ${branchTag} -j ACCEPT`);
+          iptablesRules.push(`-A FORWARD -i ${extIface} -o wm-wg0 -m state --state RELATED,ESTABLISHED -m comment --comment ${branchTag} -j ACCEPT`);
+          iptablesRules.push(`-t nat -A POSTROUTING -s 10.0.0.0/8 -o ${extIface} -m comment --comment ${branchTag} -j MASQUERADE`);
         } else if (branchTunnel) {
           const matchedIface = interfaces.find((iface) => iface.listenPort === branchTunnel.fromWgPort && iface.role === "from");
           if (matchedIface) {
