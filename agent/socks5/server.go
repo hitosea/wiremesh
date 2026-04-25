@@ -3,9 +3,11 @@ package socks5
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"sync"
+	"sync/atomic"
 	"syscall"
 
 	gosocks5 "github.com/armon/go-socks5"
@@ -13,6 +15,116 @@ import (
 
 	"github.com/wiremesh/agent/api"
 )
+
+// Package-level so the collector can poll deltas without holding a Manager reference.
+type lineStats struct {
+	upload       atomic.Int64 // bytes client→destination, hot-path writes
+	download     atomic.Int64 // bytes destination→client, hot-path writes
+	prevUpload   int64        // accessed only under statsMu
+	prevDownload int64        // accessed only under statsMu
+}
+
+var (
+	statsMu sync.Mutex
+	stats   = make(map[int]*lineStats)
+)
+
+func getOrCreateStats(lineId int) *lineStats {
+	statsMu.Lock()
+	defer statsMu.Unlock()
+	s, ok := stats[lineId]
+	if !ok {
+		s = &lineStats{}
+		stats[lineId] = s
+	}
+	return s
+}
+
+// countingConn counts proxied bytes. gosocks5 io.Copy's the client conn against
+// this destination conn, so Write is client-upload and Read is client-download.
+// ReadFrom/WriteTo preserve the splice/sendfile fast path that the unwrapped
+// *net.TCPConn provides — without them, io.Copy falls back to userspace buffer
+// copying and SOCKS5 throughput drops.
+type countingConn struct {
+	net.Conn
+	s *lineStats
+}
+
+func (c *countingConn) Read(p []byte) (int, error) {
+	n, err := c.Conn.Read(p)
+	if n > 0 {
+		c.s.download.Add(int64(n))
+	}
+	return n, err
+}
+
+func (c *countingConn) Write(p []byte) (int, error) {
+	n, err := c.Conn.Write(p)
+	if n > 0 {
+		c.s.upload.Add(int64(n))
+	}
+	return n, err
+}
+
+func (c *countingConn) ReadFrom(r io.Reader) (int64, error) {
+	if rf, ok := c.Conn.(io.ReaderFrom); ok {
+		n, err := rf.ReadFrom(r)
+		if n > 0 {
+			c.s.upload.Add(n)
+		}
+		return n, err
+	}
+	// writeOnly hides ReadFrom on countingConn so io.Copy doesn't recurse here;
+	// it'll run its generic Read/Write loop and the bytes still pass through
+	// countingConn.Write so the counter stays correct.
+	return io.Copy(writeOnly{c}, r)
+}
+
+func (c *countingConn) WriteTo(w io.Writer) (int64, error) {
+	if wt, ok := c.Conn.(io.WriterTo); ok {
+		n, err := wt.WriteTo(w)
+		if n > 0 {
+			c.s.download.Add(n)
+		}
+		return n, err
+	}
+	return io.Copy(w, readOnly{c})
+}
+
+type writeOnly struct{ io.Writer }
+type readOnly struct{ io.Reader }
+
+// CollectTransfers returns per-line traffic deltas since the last call.
+// Lines with zero delta are omitted. The deltaUp/Down < 0 branches defend
+// against counter wraparound, matching collectTransfers/collectXrayTransfers.
+func CollectTransfers() []api.Socks5TransferReport {
+	statsMu.Lock()
+	defer statsMu.Unlock()
+
+	var reports []api.Socks5TransferReport
+	for lineId, s := range stats {
+		curUp := s.upload.Load()
+		curDown := s.download.Load()
+		deltaUp := curUp - s.prevUpload
+		deltaDown := curDown - s.prevDownload
+		if deltaUp < 0 {
+			deltaUp = curUp
+		}
+		if deltaDown < 0 {
+			deltaDown = curDown
+		}
+		s.prevUpload = curUp
+		s.prevDownload = curDown
+		if deltaUp > 0 || deltaDown > 0 {
+			reports = append(reports, api.Socks5TransferReport{
+				LineID:        lineId,
+				UploadBytes:   deltaUp,
+				DownloadBytes: deltaDown,
+			})
+		}
+	}
+	return reports
+}
 
 // listenTCPReuse creates a TCP listener with SO_REUSEADDR + SO_REUSEPORT set.
 // Without these, immediate re-listen after Close() on the same port fails with
@@ -100,7 +212,7 @@ func (m *Manager) startServer(lineId int, route api.Socks5Route) {
 
 	conf := &gosocks5.Config{
 		AuthMethods: []gosocks5.Authenticator{gosocks5.UserPassAuthenticator{Credentials: creds}},
-		Dial:        makeDialer(route.Mark),
+		Dial:        makeDialer(lineId, route.Mark),
 	}
 
 	server, err := gosocks5.New(conf)
@@ -148,8 +260,10 @@ func (m *Manager) Stop() {
 	log.Println("[socks5] All servers stopped")
 }
 
-// makeDialer returns a dial function that sets SO_MARK on outgoing connections.
-func makeDialer(mark int) func(ctx context.Context, network, addr string) (net.Conn, error) {
+// makeDialer returns a dial function that sets SO_MARK on outgoing connections
+// and wraps the result so per-line byte counters update on every Read/Write.
+func makeDialer(lineId int, mark int) func(ctx context.Context, network, addr string) (net.Conn, error) {
+	s := getOrCreateStats(lineId)
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
 		dialer := &net.Dialer{
 			Control: func(network, address string, c syscall.RawConn) error {
@@ -158,6 +272,10 @@ func makeDialer(mark int) func(ctx context.Context, network, addr string) (net.C
 				})
 			},
 		}
-		return dialer.DialContext(ctx, network, addr)
+		conn, err := dialer.DialContext(ctx, network, addr)
+		if err != nil {
+			return nil, err
+		}
+		return &countingConn{Conn: conn, s: s}, nil
 	}
 }

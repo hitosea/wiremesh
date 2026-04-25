@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/wiremesh/agent/api"
+	"github.com/wiremesh/agent/socks5"
 	"github.com/wiremesh/agent/wg"
 	"github.com/wiremesh/agent/xray"
 )
@@ -59,6 +60,7 @@ func Collect(serverURL string, agentVersion string) *api.StatusReport {
 	report.XrayOnlineUsers = collectXrayOnlineUsers()
 	report.XrayTransfers = collectXrayTransfers()
 	report.XrayConnections = collectXrayConnections(report.XrayOnlineUsers)
+	report.Socks5Transfers = socks5.CollectTransfers()
 	fwUp, fwDown := collectForwardTransfers()
 	report.ForwardUpload = fwUp
 	report.ForwardDownload = fwDown

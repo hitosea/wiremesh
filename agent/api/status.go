@@ -8,6 +8,7 @@ type StatusReport struct {
 	XrayOnlineUsers  []string               `json:"xray_online_users,omitempty"`
 	XrayTransfers    []XrayTransferReport   `json:"xray_transfers,omitempty"`
 	XrayConnections  []XrayConnectionReport `json:"xray_connections,omitempty"`
+	Socks5Transfers  []Socks5TransferReport `json:"socks5_transfers,omitempty"`
 	ForwardUpload    int64                  `json:"forward_upload,omitempty"`
 	ForwardDownload  int64                  `json:"forward_download,omitempty"`
 	AgentVersion     string                 `json:"agent_version,omitempty"`
@@ -34,6 +35,16 @@ type XrayTransferReport struct {
 	Uuid          string `json:"uuid"`
 	UploadBytes   int64  `json:"upload_bytes"`
 	DownloadBytes int64  `json:"download_bytes"`
+}
+
+// Socks5TransferReport: per-line SOCKS5 traffic delta since last report.
+// UploadBytes is bytes sent client→destination (egress through the SOCKS5
+// server), DownloadBytes is bytes received destination→client. Matches
+// the convention used by TransferReport / XrayTransferReport.
+type Socks5TransferReport struct {
+	LineID        int   `json:"line_id"`
+	UploadBytes   int64 `json:"upload_bytes"`
+	DownloadBytes int64 `json:"download_bytes"`
 }
 
 // XrayConnectionReport: active source IPs for a user, with last_seen unix ts.

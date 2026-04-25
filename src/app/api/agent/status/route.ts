@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
     xray_online_users?: string[];
     xray_transfers?: { uuid: string; upload_bytes: number; download_bytes: number }[];
     xray_connections?: { uuid: string; ips: { ip: string; last_seen: number }[] }[];
+    socks5_transfers?: { line_id: number; upload_bytes: number; download_bytes: number }[];
     forward_upload?: number;
     forward_download?: number;
     agent_version?: string;
@@ -39,17 +40,28 @@ export async function POST(request: NextRequest) {
     xray_online_users = [],
     xray_transfers = [],
     xray_connections = [],
+    socks5_transfers = [],
     forward_upload = 0,
     forward_download = 0,
     agent_version,
     xray_version,
   } = body;
 
+  // Entry traffic spans three disjoint protocols (WG / Xray / SOCKS5);
+  // missing any of them under-counts the dashboard "节点流量" entry column.
   let totalUpload = 0;
   let totalDownload = 0;
   for (const t of transfers) {
     totalUpload += t.upload_bytes ?? 0;
     totalDownload += t.download_bytes ?? 0;
+  }
+  for (const xt of xray_transfers) {
+    totalUpload += xt.upload_bytes ?? 0;
+    totalDownload += xt.download_bytes ?? 0;
+  }
+  for (const st of socks5_transfers) {
+    totalUpload += st.upload_bytes ?? 0;
+    totalDownload += st.download_bytes ?? 0;
   }
 
   db.insert(nodeStatus)
