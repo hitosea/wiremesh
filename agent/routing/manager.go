@@ -242,7 +242,15 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes []api.XrayLineRoute) e
 		m.dnsProxy.SetStaticRules(domainRules)
 	}
 
-	// 4. Start/update external rule source syncer
+	// 4. Prune orphan wm-* ipsets from previous agent versions or removed
+	// branches. Must run after mangle rules have been rebuilt (so new sets
+	// are referenced and old ones are not) and before UpdateSources spawns
+	// fetch goroutines that would re-touch the live sets. A kernel-busy set
+	// will refuse destroy ("Set cannot be destroyed: it is in use"), which
+	// is fine — we only try to destroy sets that are not in the desired set.
+	m.pruneOrphanIpsets(cfg.Branches)
+
+	// 5. Start/update external rule source syncer
 	if m.syncer == nil {
 		m.syncer = NewSourceSyncer(m)
 	}
@@ -251,6 +259,43 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes []api.XrayLineRoute) e
 	m.lastConfig = cfg
 	log.Printf("[routing] Routing configured: %d branches", len(cfg.Branches))
 	return nil
+}
+
+// pruneOrphanIpsets destroys wm-* ipsets that are not part of the current
+// desired configuration. This catches two cases:
+//  1. Stale sets from a previous agent version with a different naming
+//     scheme (e.g. 1.1.8's single-set "wm-branch-{id}" before the dual-ipset
+//     refactor). The new agent never references them, so they leak kernel
+//     memory without affecting routing.
+//  2. Sets for branches that existed in a previous config but have since
+//     been removed (line deletion, branch removal).
+//
+// ".tmp" suffixed sets are skipped — SourceSyncer owns them transiently and
+// cleans them up in its own rebuild path.
+func (m *Manager) pruneOrphanIpsets(branches []api.RoutingBranch) {
+	desired := make(map[string]bool)
+	for _, branch := range branches {
+		if len(branch.DeviceIPs) > 0 {
+			desired[fmt.Sprintf("wm-line-src-%d", branch.ID)] = true
+		}
+		if !branch.IsDefault {
+			desired[fmt.Sprintf("wm-branch-%d-cidr", branch.ID)] = true
+			desired[fmt.Sprintf("wm-branch-%d-dns", branch.ID)] = true
+		}
+	}
+
+	for _, name := range ipset.ListWireMesh() {
+		if desired[name] || strings.HasSuffix(name, ".tmp") {
+			continue
+		}
+		if err := ipset.Destroy(name); err != nil {
+			// In-use sets will fail; that's expected for sets still
+			// referenced elsewhere (shouldn't happen after cleanMangleRules,
+			// but log at info level rather than error in case a future
+			// chain we don't clean still references one).
+			log.Printf("[routing] Skipped orphan ipset %s (still in use): %v", name, err)
+		}
+	}
 }
 
 // Cleanup removes all routing rules and stops DNS proxy.

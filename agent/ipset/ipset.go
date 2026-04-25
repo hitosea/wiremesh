@@ -86,14 +86,23 @@ func Destroy(name string) error {
 
 // DestroyAllWireMesh destroys all ipsets with "wm-" prefix.
 func DestroyAllWireMesh() {
+	for _, name := range ListWireMesh() {
+		Destroy(name)
+	}
+}
+
+// ListWireMesh returns all ipset names with "wm-" prefix currently present.
+func ListWireMesh() []string {
 	out, err := exec.Command("ipset", "list", "-name").CombinedOutput()
 	if err != nil {
-		return
+		return nil
 	}
+	var names []string
 	for _, name := range strings.Split(string(out), "\n") {
 		name = strings.TrimSpace(name)
 		if strings.HasPrefix(name, "wm-") {
-			Destroy(name)
+			names = append(names, name)
 		}
 	}
+	return names
 }
