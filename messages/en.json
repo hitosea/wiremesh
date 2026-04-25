@@ -424,7 +424,11 @@
     "status": "Status",
     "active": "Active",
     "disabled": "Disabled",
-    "directExit": "Direct exit"
+    "directExit": "Direct exit",
+    "renameBranch": "Rename branch",
+    "branchNameLabel": "Branch name",
+    "branchRenamed": "Branch name updated",
+    "branchNameEmpty": "Branch name is required"
   },
   "filters": {
     "mode": {
@@ -627,6 +631,8 @@
       "invalidLineId": "Invalid line ID",
       "invalidFilterId": "Invalid filter rule ID",
       "invalidRuleId": "Invalid rule ID",
+      "invalidBranchId": "Invalid branch ID",
+      "branchNameRequiredSimple": "Branch name is required",
       "bodyMustBeObject": "Request body must be an object",
       "selectAtLeastOne": "Please select at least one",
       "selectAtLeastOneNode": "Please select at least one node",
@@ -680,7 +686,8 @@
       "line": "Line not found",
       "filter": "Filter rule not found",
       "rule": "Rule not found",
-      "entryNode": "Entry node not found"
+      "entryNode": "Entry node not found",
+      "branch": "Branch not found"
     },
     "conflict": {
       "ipExists": "IP address already exists"

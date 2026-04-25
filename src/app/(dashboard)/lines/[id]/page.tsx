@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { StatusDot } from "@/components/status-dot";
+import { Pencil, Check, X } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -98,6 +99,61 @@ export default function LineDetailPage() {
   const [name, setName] = useState("");
   const [status, setStatus] = useState("active");
   const [remark, setRemark] = useState("");
+
+  const [editingBranchId, setEditingBranchId] = useState<number | null>(null);
+  const [branchNameDraft, setBranchNameDraft] = useState("");
+  const [branchSaving, setBranchSaving] = useState(false);
+
+  const startEditBranch = (branch: Branch) => {
+    setEditingBranchId(branch.id);
+    setBranchNameDraft(branch.name);
+  };
+
+  const cancelEditBranch = () => {
+    setEditingBranchId(null);
+    setBranchNameDraft("");
+  };
+
+  const saveBranchName = async (branchId: number) => {
+    const trimmed = branchNameDraft.trim();
+    if (!trimmed) {
+      toast.error(t("branchNameEmpty"));
+      return;
+    }
+    setBranchSaving(true);
+    try {
+      const res = await fetch(
+        `/api/lines/${lineId}/branches/${branchId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: trimmed }),
+        }
+      );
+      const json = await res.json();
+      if (res.ok) {
+        toast.success(t("branchRenamed"));
+        setLine((prev) =>
+          prev
+            ? {
+                ...prev,
+                branches: prev.branches.map((b) =>
+                  b.id === branchId ? { ...b, name: trimmed } : b
+                ),
+              }
+            : prev
+        );
+        setEditingBranchId(null);
+        setBranchNameDraft("");
+      } else {
+        toast.error(translateError(json.error, te, tc("saveFailed")));
+      }
+    } catch {
+      toast.error(tc("saveFailedRetry"));
+    } finally {
+      setBranchSaving(false);
+    }
+  };
 
   useEffect(() => {
     fetch(`/api/lines/${lineId}`)
@@ -233,9 +289,63 @@ export default function LineDetailPage() {
                     className="border rounded-lg p-4 space-y-2"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="font-medium">{branch.name}</span>
-                      {branch.isDefault && (
-                        <Badge variant="outline">{t("default")}</Badge>
+                      {editingBranchId === branch.id ? (
+                        <>
+                          <Input
+                            value={branchNameDraft}
+                            onChange={(e) => setBranchNameDraft(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                saveBranchName(branch.id);
+                              } else if (e.key === "Escape") {
+                                e.preventDefault();
+                                cancelEditBranch();
+                              }
+                            }}
+                            disabled={branchSaving}
+                            autoFocus
+                            className="h-8 max-w-xs"
+                          />
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8"
+                            onClick={() => saveBranchName(branch.id)}
+                            disabled={branchSaving}
+                            aria-label={tc("save")}
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8"
+                            onClick={cancelEditBranch}
+                            disabled={branchSaving}
+                            aria-label={tc("cancel")}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex items-center h-8">
+                            <span className="font-medium">{branch.name}</span>
+                          </div>
+                          {branch.isDefault && (
+                            <Badge variant="outline">{t("default")}</Badge>
+                          )}
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            onClick={() => startEditBranch(branch)}
+                            aria-label={t("renameBranch")}
+                          >
+                            <Pencil className="h-4 w-4 scale-90" />
+                          </Button>
+                        </>
                       )}
                     </div>
                     <div className="text-sm font-mono text-muted-foreground">
