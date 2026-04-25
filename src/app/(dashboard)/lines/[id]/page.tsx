@@ -20,13 +20,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -90,6 +83,7 @@ export default function LineDetailPage() {
   const tc = useTranslations("common");
   const te = useTranslations("errors");
   const tn = useTranslations("nodes");
+  const tl = useTranslations("lines");
   const tNew = useTranslations("lineNew");
 
   const [line, setLine] = useState<LineDetail | null>(null);
@@ -97,7 +91,6 @@ export default function LineDetailPage() {
   const [saving, setSaving] = useState(false);
 
   const [name, setName] = useState("");
-  const [status, setStatus] = useState("active");
   const [remark, setRemark] = useState("");
 
   const [editingBranchId, setEditingBranchId] = useState<number | null>(null);
@@ -167,7 +160,6 @@ export default function LineDetailPage() {
         }
         setLine(l);
         setName(l.name ?? "");
-        setStatus(l.status ?? "active");
         setRemark(l.remark ?? "");
       })
       .catch(() => toast.error(t("loadFailed")))
@@ -186,7 +178,6 @@ export default function LineDetailPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
-          status,
           remark: remark.trim() || null,
         }),
       });
@@ -219,7 +210,7 @@ export default function LineDetailPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold">{line.name}</h1>
-          <StatusDot status={line.status} label={line.status === "active" ? t("active") : line.status === "inactive" ? t("disabled") : line.status} />
+          <StatusDot status={line.status} label={tl(`status.${line.status}` as "status.active" | "status.inactive") ?? line.status} />
         </div>
         <Button variant="outline" onClick={() => router.push("/lines")}>
           {tc("back")}
@@ -449,18 +440,6 @@ export default function LineDetailPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="status">{t("status")}</Label>
-            <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger id="status">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">{t("active")}</SelectItem>
-                <SelectItem value="inactive">{t("disabled")}</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="remark">{tNew("notes")}</Label>

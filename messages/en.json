@@ -339,7 +339,7 @@
   "lines": {
     "status": {
       "active": "Active",
-      "disabled": "Disabled"
+      "inactive": "Inactive"
     },
     "role": {
       "entry": "Entry",
@@ -420,9 +420,6 @@
     "deviceUnit": "devices",
     "editLine": "Edit Line",
     "lineName": "Line Name",
-    "status": "Status",
-    "active": "Active",
-    "disabled": "Disabled",
     "directExit": "Direct exit",
     "renameBranch": "Rename branch",
     "branchNameLabel": "Branch name",

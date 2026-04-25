@@ -132,7 +132,7 @@ export default function LinesPage() {
       key: "status",
       label: t("statusCol"),
       render: (row) => (
-        <StatusDot status={row.status} label={t(`status.${row.status}` as "status.active" | "status.disabled") ?? row.status} />
+        <StatusDot status={row.status} label={t(`status.${row.status}` as "status.active" | "status.inactive") ?? row.status} />
       ),
     },
     {
