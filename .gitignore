@@ -49,6 +49,7 @@ public/xray/
 
 # claude skills (project-local, contains credentials)
 .claude/settings.json
+.claude/scheduled_tasks.lock
 agent/.next/
 
 # playwright-mcp

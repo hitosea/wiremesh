@@ -268,7 +268,7 @@ function DeviceDetailContent() {
                   </thead>
                   <tbody>
                     {ips.map((entry) => (
-                      <tr key={entry.ip} className="border-t">
+                      <tr key={entry.ip} className={ips.length > 1 ? "border-t" : ""}>
                         <td className="py-1 font-mono">{entry.ip}</td>
                         <td className="py-1">{new Date(entry.last_seen * 1000).toLocaleString()}</td>
                       </tr>
