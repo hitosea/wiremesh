@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { lines, lineNodes, lineTunnels, lineBranches, branchFilters, nodes, settings, filters } from "@/lib/db/schema";
-import { success, created, error, paginated } from "@/lib/api-response";
+import { created, error, paginated } from "@/lib/api-response";
 import { parsePaginationParams, paginationOffset } from "@/lib/pagination";
 import { eq, like, count, and, sql, SQL, inArray } from "drizzle-orm";
 import { encrypt } from "@/lib/crypto";
@@ -109,6 +109,17 @@ export async function POST(request: NextRequest) {
     // Users who want the entry to be the exit should use direct-exit (nodeIds = []) instead.
     if (branch.nodeIds.includes(entryNodeId)) {
       return error("VALIDATION_ERROR", "validation.branchContainsEntryNode", { name: branch.name });
+    }
+    // Forbid duplicate nodes within a single branch chain (e.g. A → B → A or A → A).
+    // Why: agent config keys downstream/upstream tunnels by lineId, so a node
+    // appearing twice in the same chain would have its Map entries overwritten —
+    // the redundant hops silently drop traffic instead of forming a loop.
+    const seenInBranch = new Set<number>();
+    for (const nodeId of branch.nodeIds) {
+      if (seenInBranch.has(nodeId)) {
+        return error("VALIDATION_ERROR", "validation.duplicateNodeInBranch", { name: branch.name });
+      }
+      seenInBranch.add(nodeId);
     }
   }
 

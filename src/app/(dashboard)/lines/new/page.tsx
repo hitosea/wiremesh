@@ -93,7 +93,7 @@ export default function NewLinePage() {
         toast.error(t("loadFailed"));
         setLoadingNodes(false);
       });
-  }, []);
+  }, [t]);
 
   // --- Helper functions ---
 
@@ -232,6 +232,15 @@ export default function NewLinePage() {
       if (branch.nodeIds.length > 0 && branch.nodeIds.some((id) => !id)) {
         toast.error(t("branchNodeMissing", { name: branch.name }));
         return;
+      }
+      const seenInBranch = new Set<string>();
+      for (const id of branch.nodeIds) {
+        if (!id) continue;
+        if (seenInBranch.has(id)) {
+          toast.error(t("duplicateNodeInBranch", { name: branch.name }));
+          return;
+        }
+        seenInBranch.add(id);
       }
     }
     if (!branches.some((b) => b.isDefault)) {
