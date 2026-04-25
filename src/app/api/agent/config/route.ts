@@ -74,10 +74,25 @@ export async function GET(request: NextRequest) {
     role: "from" | "to";
   }[] = [];
 
-  // Internal tracking: lineId -> interface name, by node role
-  const lineToDownstreamIface = new Map<number, string>(); // entry/relay: line -> default branch "from" tunnel
-  const branchToDownstreamIface = new Map<number, string>(); // branchId -> "from" tunnel (for multi-branch lines)
-  const lineToUpstreamIface = new Map<number, string>();   // exit/relay: line -> "to" tunnel
+  // Internal tracking. Branch-keyed (not line-keyed) because a node can play
+  // different roles in different branches of the same line — e.g. relay in
+  // branch A, exit in branch B — and each branch needs its own forwarding
+  // rules. Line-keyed maps would collapse these onto a single iface and
+  // silently drop traffic for the redundant branches.
+  const lineToDownstreamIface = new Map<number, string>(); // lineId -> default-branch "from" tunnel (used as Xray/SOCKS5 default route fallback)
+  const branchToDownstreamIface = new Map<number, string>(); // branchId -> "from" tunnel
+  const branchToUpstreamIface = new Map<number, string>(); // branchId -> "to" tunnel
+
+  // Per-branch role lookup. Entry-role rows have branchId=null and are not
+  // tracked here; use entryLineIds for the entry check.
+  type LineNodeRole = "entry" | "relay" | "exit";
+  const myBranchRoles = new Map<number, LineNodeRole>();
+  for (const ln of myLineNodes) {
+    if (ln.branchId !== null) {
+      myBranchRoles.set(ln.branchId, ln.role as LineNodeRole);
+    }
+  }
+  const entryLineIdSet = new Set(entryLineIds);
 
   const iptablesRules: string[] = [];
 
@@ -98,10 +113,10 @@ export async function GET(request: NextRequest) {
         .all()
         .filter((t) => t.lineId === lineId);
 
-      const myRole = myLineNodes.find((ln) => ln.lineId === lineId)?.role;
+      const isEntryOnThisLine = entryLineIdSet.has(lineId);
 
       // Single-node line: this node is entry and there are no tunnels
-      if (myRole === "entry" && tunnels.length === 0) {
+      if (isEntryOnThisLine && tunnels.length === 0) {
         singleNodeLineIds.add(lineId);
         const lineTag = `wm-line-${lineId}`;
         // Direct forwarding: wm-wg0 → eth0 (no tunnel needed)
@@ -144,34 +159,44 @@ export async function GET(request: NextRequest) {
 
         interfaces.push({ name: ifaceName, privateKey, address, listenPort, peerPublicKey, peerAddress, peerPort, role });
 
-        // Track tunnel-to-interface mappings
+        // Resolve role for THIS tunnel by its branch (not by lineId), so a
+        // node that's relay in one branch and exit in another gets the right
+        // rules per tunnel. Entry tunnels have branchId set but the entry
+        // node's lineNodes row has branchId=null, so myBranchRoles won't
+        // contain it — fall back via entryLineIdSet.
+        const tunnelRole: LineNodeRole | undefined =
+          (tunnel.branchId !== null ? myBranchRoles.get(tunnel.branchId) : undefined) ??
+          (isEntryOnThisLine ? "entry" : undefined);
+
         if (role === "from") {
-          if (tunnel.branchId) {
+          if (tunnel.branchId !== null) {
             branchToDownstreamIface.set(tunnel.branchId, ifaceName);
           }
-          // Fallback: first "from" tunnel for this line (overwritten below for default branch)
+          // Fallback: first "from" tunnel for this line; the default-branch
+          // resolution loop below may overwrite this for multi-branch lines.
           if (!lineToDownstreamIface.has(lineId)) {
             lineToDownstreamIface.set(lineId, ifaceName);
           }
         }
         if (role === "to") {
-          lineToUpstreamIface.set(lineId, ifaceName); // exit or relay upstream
+          if (tunnel.branchId !== null) {
+            branchToUpstreamIface.set(tunnel.branchId, ifaceName);
+          }
         }
 
-        // Generate iptables rules based on role in this line
         const lineTag = `wm-line-${lineId}`;
 
-        if (myRole === "entry") {
+        if (tunnelRole === "entry") {
           iptablesRules.push(`-A FORWARD -i wm-wg0 -o ${ifaceName} -m comment --comment ${lineTag} -j ACCEPT`);
           iptablesRules.push(`-A FORWARD -i ${ifaceName} -o wm-wg0 -m comment --comment ${lineTag} -j ACCEPT`);
-        } else if (myRole === "relay") {
+        } else if (tunnelRole === "relay") {
           iptablesRules.push(`-A FORWARD -i ${ifaceName} -m comment --comment ${lineTag} -j ACCEPT`);
           iptablesRules.push(`-A FORWARD -o ${ifaceName} -m comment --comment ${lineTag} -j ACCEPT`);
           // MASQUERADE on the downstream tunnel so the exit node can route responses back
           if (role === "from") {
             iptablesRules.push(`-t nat -A POSTROUTING -o ${ifaceName} -s 10.0.0.0/8 -m comment --comment ${lineTag} -j MASQUERADE`);
           }
-        } else if (myRole === "exit") {
+        } else if (tunnelRole === "exit") {
           iptablesRules.push(`-A FORWARD -i ${ifaceName} -o ${extIface} -m comment --comment ${lineTag} -j ACCEPT`);
           iptablesRules.push(`-A FORWARD -i ${extIface} -o ${ifaceName} -m state --state RELATED,ESTABLISHED -m comment --comment ${lineTag} -j ACCEPT`);
           iptablesRules.push(`-t nat -A POSTROUTING -s 10.0.0.0/8 -o ${extIface} -m comment --comment ${lineTag} -j MASQUERADE`);
@@ -214,8 +239,7 @@ export async function GET(request: NextRequest) {
   for (const [lineId, ifaceName] of lineToDownstreamIface) {
     if (linesWithBranchRouting.has(lineId)) continue;
     if (singleNodeLineIds.has(lineId)) continue;
-    const myRole = myLineNodes.find((ln) => ln.lineId === lineId)?.role;
-    if (myRole !== "entry") continue; // only entry nodes use source-based routing
+    if (!entryLineIdSet.has(lineId)) continue; // only entry nodes use source-based routing
     const lineDevices = db
       .select({ wgAddress: devices.wgAddress })
       .from(devices)
@@ -228,28 +252,43 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Exit node routes (destination-based: return traffic TO this IP)
-  for (const [lineId, ifaceName] of lineToUpstreamIface) {
-    const myRole = myLineNodes.find((ln) => ln.lineId === lineId)?.role;
-    if (myRole !== "exit") continue; // only exit nodes use destination-based routing
-    const lineDevices = db
-      .select({ wgAddress: devices.wgAddress })
+  // Exit node routes (destination-based: return traffic TO this IP).
+  // Iterate per-branch so a node that's exit on multiple branches emits a
+  // route per branch. Agent uses `ip route replace` so kernel keeps the last
+  // installed; asymmetric routing handles the rest.
+  const exitBranches = myLineNodes.filter((ln) => ln.role === "exit" && ln.branchId !== null);
+  if (exitBranches.length > 0) {
+    const exitLineIds = [...new Set(exitBranches.map((ln) => ln.lineId))];
+    const exitDevicesByLine = new Map<number, string[]>();
+    const rows = db
+      .select({ lineId: devices.lineId, wgAddress: devices.wgAddress })
       .from(devices)
-      .where(eq(devices.lineId, lineId))
+      .where(inArray(devices.lineId, exitLineIds))
       .all();
-    for (const d of lineDevices) {
-      if (d.wgAddress) {
-        deviceRoutes.push({ destination: d.wgAddress.split("/")[0] + "/32", tunnel: ifaceName, type: "exit" });
+    for (const r of rows) {
+      if (!r.wgAddress || r.lineId === null) continue;
+      const dest = r.wgAddress.split("/")[0] + "/32";
+      const arr = exitDevicesByLine.get(r.lineId) ?? [];
+      arr.push(dest);
+      exitDevicesByLine.set(r.lineId, arr);
+    }
+    for (const ln of exitBranches) {
+      const upstreamIface = branchToUpstreamIface.get(ln.branchId!);
+      if (!upstreamIface) continue;
+      for (const dest of exitDevicesByLine.get(ln.lineId) ?? []) {
+        deviceRoutes.push({ destination: dest, tunnel: upstreamIface, type: "exit" });
       }
     }
   }
 
-  // Relay node routes (iif-based: forward traffic from upstream tunnel to downstream tunnel)
-  for (const lineId of lineIds) {
-    const myRole = myLineNodes.find((ln) => ln.lineId === lineId)?.role;
-    if (myRole !== "relay") continue;
-    const upstreamIface = lineToUpstreamIface.get(lineId);
-    const downstreamIface = lineToDownstreamIface.get(lineId);
+  // Relay node routes (iif-based: forward traffic from upstream tunnel to
+  // downstream tunnel). Per-branch: a node that's relay on multiple branches
+  // of one line gets a separate iif rule per branch.
+  for (const ln of myLineNodes) {
+    if (ln.role !== "relay") continue;
+    if (ln.branchId === null) continue;
+    const upstreamIface = branchToUpstreamIface.get(ln.branchId);
+    const downstreamIface = branchToDownstreamIface.get(ln.branchId);
     if (upstreamIface && downstreamIface) {
       deviceRoutes.push({ destination: upstreamIface, tunnel: downstreamIface, type: "relay" });
     }
@@ -346,7 +385,6 @@ export async function GET(request: NextRequest) {
 
       // Build branch info for this line's Xray routing
       const xrayBranches: { mark: number; tunnel: string; is_default: boolean; domain_rules: string[] }[] = [];
-      let defaultMark = 0;
 
       for (const branch of lineBranchCache.get(lineId) ?? []) {
         // Direct-exit branches (no exit nodes) have no tunnel interface — they
@@ -361,7 +399,7 @@ export async function GET(request: NextRequest) {
 
         const branchMark = branchMarkMap.get(branch.id) ?? 0;
 
-        let domainRules: string[] = [];
+        const domainRules: string[] = [];
         if (!branch.isDefault) {
           const bfRows = db.select({ filterId: branchFilters.filterId }).from(branchFilters).where(eq(branchFilters.branchId, branch.id)).all();
           for (const bf of bfRows) {
@@ -373,7 +411,6 @@ export async function GET(request: NextRequest) {
         }
 
         xrayBranches.push({ mark: branchMark, tunnel: tunnelIfaceName, is_default: branch.isDefault, domain_rules: domainRules });
-        if (branch.isDefault) defaultMark = branchMark;
       }
 
       xrayRoutes.push({
@@ -565,9 +602,9 @@ export async function GET(request: NextRequest) {
         }
 
         // For default branch, rules are empty
-        let ipRules: string[] = [];
-        let domainRules: string[] = [];
-        let ruleSources: { filter_id: number; url: string; sync_interval: number }[] = [];
+        const ipRules: string[] = [];
+        const domainRules: string[] = [];
+        const ruleSources: { filter_id: number; url: string; sync_interval: number }[] = [];
 
         if (!branch.isDefault) {
           // Fetch associated enabled filters
