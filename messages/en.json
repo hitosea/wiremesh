@@ -332,7 +332,6 @@
     "shortId": "Short ID",
     "clashHint": "Compatible with Clash Meta / Clash Verge. Copy and add to proxies section.",
     "copyConfig": "Copy Config",
-    "proxyUrl": "Proxy URL",
     "username": "Username",
     "password": "Password",
     "socks5Hint": "Configure SOCKS5 proxy in your browser or system proxy settings"

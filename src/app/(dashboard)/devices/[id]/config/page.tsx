@@ -284,22 +284,6 @@ export default function DeviceConfigPage() {
               <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">{t("socks5Hint")}</p>
                 <div className="code-block rounded-lg p-4 text-xs space-y-1">
-                  {configData.proxyUrl && (
-                    <div className="flex items-center gap-2">
-                      <div className="flex flex-1">
-                        <span className="text-muted-foreground w-24 shrink-0">{t("proxyUrl")}</span>
-                        <span className="font-mono break-all">{configData.proxyUrl}</span>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="shrink-0 h-6 px-2 text-xs"
-                        onClick={() => handleCopy(configData.proxyUrl)}
-                      >
-                        {tc("copy")}
-                      </Button>
-                    </div>
-                  )}
                   {configData.server && (
                     <ConfigRow label={t("address")} value={configData.server} />
                   )}

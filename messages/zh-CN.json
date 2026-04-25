@@ -332,7 +332,6 @@
     "shortId": "Short ID",
     "clashHint": "适用于 Clash Meta / Clash Verge，复制后添加到 proxies 配置段",
     "copyConfig": "复制配置",
-    "proxyUrl": "代理地址",
     "username": "用户名",
     "password": "密码",
     "socks5Hint": "在浏览器或系统代理设置中配置 SOCKS5 代理"
