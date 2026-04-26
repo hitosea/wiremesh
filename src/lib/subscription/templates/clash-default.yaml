@@ -1,0 +1,38 @@
+# WireMesh subscription — Clash / Mihomo profile template
+# proxies / proxy-groups[Select].proxies / rules will be populated at render time.
+mode: rule
+log-level: info
+allow-lan: false
+mixed-port: 7890
+ipv6: false
+
+dns:
+  enable: true
+  listen: 0.0.0.0:1053
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  default-nameserver:
+    - 114.114.114.114
+    - 223.5.5.5
+  nameserver:
+    - https://dns.alidns.com/dns-query
+    - https://doh.pub/dns-query
+  fallback:
+    - https://1.1.1.1/dns-query
+    - https://dns.google/dns-query
+
+proxies: []
+
+proxy-groups:
+  - name: Select
+    type: select
+    proxies:
+      - __ALL_PROXIES__
+      - DIRECT
+
+rules:
+  - DOMAIN-SUFFIX,cn,DIRECT
+  - DOMAIN-KEYWORD,-cn,DIRECT
+  - GEOIP,LAN,DIRECT,no-resolve
+  - GEOIP,CN,DIRECT
+  - MATCH,Select

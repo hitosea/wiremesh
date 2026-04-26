@@ -3,7 +3,7 @@ import { auditLogs } from "@/lib/db/schema";
 
 export function writeAuditLog(entry: {
   action: "create" | "update" | "delete";
-  targetType: "node" | "device" | "line" | "filter" | "settings";
+  targetType: "node" | "device" | "line" | "filter" | "settings" | "subscription";
   targetId?: number;
   targetName?: string;
   detail?: string;

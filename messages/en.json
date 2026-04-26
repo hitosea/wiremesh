@@ -43,6 +43,7 @@
     "devices": "Devices",
     "lines": "Lines",
     "filters": "Filter Rules",
+    "subscriptions": "Subscriptions",
     "settings": "Settings",
     "auditLogs": "Audit Logs",
     "help": "Help"
@@ -633,6 +634,61 @@
     "description": "Platform operation guide",
     "toc": "Table of Contents"
   },
+  "subscriptions": {
+    "title": "Subscription Groups",
+    "description": "Bundle multiple devices into one subscription URL; clients pull the latest config on a schedule.",
+    "create": "New Subscription",
+    "name": "Name",
+    "namePlaceholder": "e.g. All my devices",
+    "remark": "Remark",
+    "remarkPlaceholder": "Optional, purpose / context",
+    "deviceCount": "Devices",
+    "createdAt": "Created",
+    "actions": "Actions",
+    "searchPlaceholder": "Search by name",
+    "loadFailed": "Failed to load subscription groups",
+    "createFailed": "Failed to create subscription group",
+    "deleteConfirm": "Delete this subscription group? Issued URLs stop working immediately, but devices themselves are unaffected.",
+    "deleted": "Subscription group deleted",
+    "saved": "Saved",
+    "saveFailed": "Save failed",
+    "back": "Back to subscription list",
+    "tabBasic": "Basic",
+    "tabDevices": "Devices",
+    "tabUrls": "Subscription URLs",
+    "deviceSelectTitle": "Choose devices to include",
+    "deviceSelectEmpty": "No devices yet — create one in Devices first.",
+    "deviceTotal": "{count} selected",
+    "saveDevices": "Save device list",
+    "savedDevices": "Device list updated",
+    "saveDevicesFailed": "Failed to save device list",
+    "urlClash": "Clash / Mihomo subscription",
+    "urlShadowrocket": "Shadowrocket subscription",
+    "copyUrl": "Copy link",
+    "copied": "Copied to clipboard",
+    "copyFailed": "Copy failed",
+    "rotateToken": "Rotate Token",
+    "rotateConfirmTitle": "Rotate subscription token?",
+    "rotateConfirmDesc": "The old subscription URL stops working immediately. All clients must re-import the new link.",
+    "rotateConfirm": "Rotate",
+    "rotated": "Token rotated",
+    "rotateFailed": "Rotate failed",
+    "tokenLabel": "Token",
+    "showQr": "Show QR",
+    "hideQr": "Hide QR",
+    "noDevices": "No devices yet",
+    "deviceTableName": "Name",
+    "deviceTableProtocol": "Protocol",
+    "deviceTableLine": "Line",
+    "deviceTableStatus": "Status",
+    "noLine": "Unbound",
+    "publicUrlMissing": "No public URL configured for the platform — subscription links will use relative paths.",
+    "errors": {
+      "nameTaken": "Name already in use",
+      "deviceIdsRequired": "deviceIds must be an array"
+    },
+    "rulesNote": "Default client rules: traffic to the subscription host itself, .cn domains, and CN GeoIP go DIRECT; everything else goes through Select. Server-side filters handle the rest."
+  },
   "errors": {
     "system": {
       "alreadyInitialized": "System already initialized"
@@ -694,7 +750,8 @@
       "syncInterval": "Sync interval must be an integer >= 60",
       "dnsUpstream": "DNS upstream must be comma-separated valid IP addresses",
       "privateIpNotAllowedAsRelayOrExit": "Node \"{name}\" uses a private IP and cannot be used as relay or exit",
-      "wsTlsDomainRequired": "Domain is required for WebSocket + TLS mode"
+      "wsTlsDomainRequired": "Domain is required for WebSocket + TLS mode",
+      "deviceIdsRequired": "deviceIds must be an array"
     },
     "auth": {
       "unauthorized": "Invalid username or password",
@@ -710,7 +767,8 @@
       "filter": "Filter rule not found",
       "rule": "Rule not found",
       "entryNode": "Entry node not found",
-      "branch": "Branch not found"
+      "branch": "Branch not found",
+      "subscription": "Subscription group not found"
     },
     "conflict": {
       "ipExists": "IP address already exists"

@@ -168,6 +168,25 @@ export const branchFilters = sqliteTable("branch_filters", {
   filterId: integer("filter_id").notNull().references(() => filters.id, { onDelete: "cascade" }),
 });
 
+// ===== subscription_groups =====
+export const subscriptionGroups = sqliteTable("subscription_groups", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  token: text("token").notNull().unique(),
+  remark: text("remark"),
+  ...timestamps,
+});
+
+// ===== subscription_group_devices =====
+export const subscriptionGroupDevices = sqliteTable("subscription_group_devices", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  groupId: integer("group_id").notNull().references(() => subscriptionGroups.id, { onDelete: "cascade" }),
+  deviceId: integer("device_id").notNull().references(() => devices.id, { onDelete: "cascade" }),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
 // ===== audit_logs =====
 export const auditLogs = sqliteTable("audit_logs", {
   id: integer("id").primaryKey({ autoIncrement: true }),

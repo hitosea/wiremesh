@@ -4,6 +4,7 @@ import {
   Smartphone,
   Cable,
   Split,
+  Rss,
   Settings,
   CircleHelp,
 } from "lucide-react";
@@ -33,6 +34,7 @@ export const NAV_GROUPS: NavGroup[] = [
     titleKey: "nav.config",
     items: [
       { href: "/filters", labelKey: "nav.filters", icon: Split },
+      { href: "/subscriptions", labelKey: "nav.subscriptions", icon: Rss },
       { href: "/settings", labelKey: "nav.settings", icon: Settings },
       { href: "/help", labelKey: "nav.help", icon: CircleHelp },
     ],

@@ -85,6 +85,13 @@
       "when": 1777248000000,
       "tag": "0011_node_port_blacklist",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1777680000000,
+      "tag": "0012_add_subscription_groups",
+      "breakpoints": true
     }
   ]
 }

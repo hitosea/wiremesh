@@ -43,6 +43,7 @@
     "devices": "设备管理",
     "lines": "线路管理",
     "filters": "分流规则",
+    "subscriptions": "订阅组",
     "settings": "系统设置",
     "auditLogs": "审计日志",
     "help": "帮助"
@@ -633,6 +634,61 @@
     "description": "平台操作指南",
     "toc": "目录"
   },
+  "subscriptions": {
+    "title": "订阅组",
+    "description": "把多个设备打包成一条订阅 URL，客户端定时拉取最新配置",
+    "create": "新建订阅组",
+    "name": "名称",
+    "namePlaceholder": "如：我的全部设备",
+    "remark": "备注",
+    "remarkPlaceholder": "可选，用途说明",
+    "deviceCount": "设备数",
+    "createdAt": "创建时间",
+    "actions": "操作",
+    "searchPlaceholder": "搜索订阅组名称",
+    "loadFailed": "加载订阅组失败",
+    "createFailed": "创建订阅组失败",
+    "deleteConfirm": "删除该订阅组？已发出的订阅 URL 将立即失效，但不会影响设备本身。",
+    "deleted": "已删除订阅组",
+    "saved": "已保存",
+    "saveFailed": "保存失败",
+    "back": "返回订阅组列表",
+    "tabBasic": "基本信息",
+    "tabDevices": "设备",
+    "tabUrls": "订阅 URL",
+    "deviceSelectTitle": "选择要包含的设备",
+    "deviceSelectEmpty": "尚无设备可选，请先在「设备管理」创建设备",
+    "deviceTotal": "已选 {count} 台",
+    "saveDevices": "保存设备列表",
+    "savedDevices": "设备列表已更新",
+    "saveDevicesFailed": "保存设备列表失败",
+    "urlClash": "Clash / Mihomo 订阅",
+    "urlShadowrocket": "Shadowrocket 订阅",
+    "copyUrl": "复制订阅链接",
+    "copied": "已复制到剪贴板",
+    "copyFailed": "复制失败",
+    "rotateToken": "轮换 Token",
+    "rotateConfirmTitle": "轮换订阅 Token？",
+    "rotateConfirmDesc": "旧的订阅 URL 将立刻失效，所有客户端必须使用新链接重新订阅。",
+    "rotateConfirm": "确认轮换",
+    "rotated": "Token 已更新",
+    "rotateFailed": "轮换失败",
+    "tokenLabel": "Token",
+    "showQr": "显示二维码",
+    "hideQr": "隐藏二维码",
+    "noDevices": "尚未添加设备",
+    "deviceTableName": "名称",
+    "deviceTableProtocol": "协议",
+    "deviceTableLine": "线路",
+    "deviceTableStatus": "状态",
+    "noLine": "未绑定",
+    "publicUrlMissing": "未配置平台公开访问域名，订阅 URL 将使用相对路径",
+    "errors": {
+      "nameTaken": "该名称已被使用",
+      "deviceIdsRequired": "deviceIds 必须为数组"
+    },
+    "rulesNote": "客户端订阅默认包含：本订阅 URL 域名直连、cn 域名直连、CN GeoIP 直连，其他流量走 Select。其余分流由服务端 filter 决定。"
+  },
   "errors": {
     "system": {
       "alreadyInitialized": "系统已初始化"
@@ -694,7 +750,8 @@
       "syncInterval": "同步间隔必须是不小于 60 的整数",
       "dnsUpstream": "DNS 上游服务器必须是逗号分隔的合法 IP 地址",
       "privateIpNotAllowedAsRelayOrExit": "节点 \"{name}\" 使用内网 IP，不能作为中继或出口节点",
-      "wsTlsDomainRequired": "WebSocket + TLS 模式必须设置域名"
+      "wsTlsDomainRequired": "WebSocket + TLS 模式必须设置域名",
+      "deviceIdsRequired": "deviceIds 必须为数组"
     },
     "auth": {
       "unauthorized": "用户名或密码错误",
@@ -710,7 +767,8 @@
       "filter": "过滤规则不存在",
       "rule": "规则不存在",
       "entryNode": "未找到线路入口节点",
-      "branch": "分支不存在"
+      "branch": "分支不存在",
+      "subscription": "订阅组不存在"
     },
     "conflict": {
       "ipExists": "该 IP 地址已存在"

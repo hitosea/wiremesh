@@ -22,6 +22,12 @@ function isUninstallScriptPath(pathname: string): boolean {
   return pathname === "/api/uninstall-script";
 }
 
+function isSubscriptionFetchPath(pathname: string): boolean {
+  // Public subscription URLs are token-authed in their own handler;
+  // the JWT cookie check is bypassed here.
+  return pathname.startsWith("/api/sub/");
+}
+
 function isStaticPath(pathname: string): boolean {
   return pathname.startsWith("/_next") || pathname === "/favicon.ico";
 }
@@ -38,7 +44,13 @@ async function checkInitialized(_request: NextRequest): Promise<boolean> {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (isStaticPath(pathname) || isAgentPath(pathname) || isNodeScriptPath(pathname) || isUninstallScriptPath(pathname)) {
+  if (
+    isStaticPath(pathname) ||
+    isAgentPath(pathname) ||
+    isNodeScriptPath(pathname) ||
+    isUninstallScriptPath(pathname) ||
+    isSubscriptionFetchPath(pathname)
+  ) {
     return NextResponse.next();
   }
 
