@@ -223,6 +223,49 @@ From the detail page you can edit all fields. When a source URL is configured, t
 
 ---
 
+## Subscription Groups
+
+Subscription groups bundle multiple devices into a single URL that clients poll on a schedule. When you change a node's IP, swap an exit, or rotate keys on the platform, every client behind a subscription picks up the new config on its next refresh — no need to redistribute `.conf` files or share links by hand.
+
+### Creating a Group
+
+1. Go to **Subscription Groups → New Subscription**.
+2. Fill in:
+   - **Name** (required) — e.g. "All my devices".
+   - **Remark** (optional) — purpose or context.
+3. Click **Save**. A unique token is generated automatically.
+4. Open the group's detail page and switch to the **Devices** tab to add existing devices to this group. A device may belong to multiple groups simultaneously.
+
+### Subscription URLs
+
+The **Subscription URLs** tab exposes the same group as eight client-specific URLs. Each URL serves the same set of devices, but in the format that client expects:
+
+| Client | Platforms | Notes |
+|--------|-----------|-------|
+| Generic | Multi-platform fallback | Works with most V2Ray-family clients; WireGuard not supported. |
+| Clash Verge | Android / iOS / macOS / Windows / Linux | Clash / Mihomo core — all protocols supported. |
+| Shadowrocket | iOS | Supports WireGuard, VLESS, and SOCKS5. |
+| Hiddify-Next | Android / iOS / macOS / Windows / Linux | Supports WireGuard, VLESS, and SOCKS5. |
+| sing-box v1.12 | Android / iOS / macOS / Windows / Linux | Official sing-box v1.12+; ships with a clash-api controller (127.0.0.1:9090) for yacd / metacubexd dashboards. |
+| V2RayN | Windows / macOS / Linux | V2Ray core — WireGuard not supported. |
+| V2RayNG | Android | V2Ray core — WireGuard not supported. |
+| Passwall | OpenWRT / Router | V2Ray family — WireGuard not supported. |
+
+Each row has a **Copy link** button and a **Show QR** toggle. Choose the row that matches the client app the user is installing.
+
+### Rotating the Token
+
+If a subscription URL leaks, click **Rotate Token** in the detail page. The old URL stops working immediately and a fresh one is issued. All clients using the group must re-import the new link.
+
+### Notes & Limitations
+
+- **WireGuard devices on V2Ray-family subscriptions are silently skipped.** V2Ray core has no WireGuard outbound, so V2RayN / V2RayNG / Passwall / Generic subscriptions only carry the device's Xray and SOCKS5 entries. The detail page shows a warning when this applies.
+- **Routing decisions stay on the server.** The subscription only delivers the device's *connection* config — which entry node, which key, which port. Domain / IP routing is enforced by filter rules on the entry node, not in the client. Keep the client side dumb so a config change here doesn't require touching every device.
+- **Tokens are path-based** (`/api/sub/<token>/<client>`), not query strings. This makes them resilient to URL-trimming clients and easy to audit.
+- **Deleting a group** invalidates its URLs immediately but does not delete the underlying devices — they remain available for direct config download or other groups.
+
+---
+
 ## System Settings
 
 Go to **Settings** to adjust global parameters. Settings are organized into groups:
