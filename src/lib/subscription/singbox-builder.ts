@@ -43,6 +43,7 @@ export function buildSingboxOutbound(ctx: DeviceContext): SingboxOutbound | null
         server_port: port,
         uuid: ctx.xray.uuid,
         flow: "",
+        packet_encoding: "packetaddr",
         tls: {
           enabled: true,
           server_name: sni,
@@ -59,6 +60,7 @@ export function buildSingboxOutbound(ctx: DeviceContext): SingboxOutbound | null
       server_port: port,
       uuid: ctx.xray.uuid,
       flow: "xtls-rprx-vision",
+      packet_encoding: "packetaddr",
       tls: {
         enabled: true,
         server_name: ctx.entry.realityServerName ?? "www.microsoft.com",

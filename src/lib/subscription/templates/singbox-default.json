@@ -42,9 +42,9 @@
   ],
   "route": {
     "rules": [
-      { "protocol": "dns", "outbound": "direct" },
-      { "geoip": ["cn", "private"], "outbound": "direct" },
-      { "domain_suffix": ["cn"], "outbound": "direct" }
+      { "protocol": "dns", "action": "route", "outbound": "direct" },
+      { "geoip": ["cn", "private"], "action": "route", "outbound": "direct" },
+      { "domain_suffix": ["cn"], "action": "route", "outbound": "direct" }
     ],
     "auto_detect_interface": true,
     "final": "Select"

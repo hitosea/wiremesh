@@ -111,7 +111,11 @@ function renderV2Ray(group: SubscriptionGroupRow): RenderResult {
   };
 }
 
-function renderSingbox(group: SubscriptionGroupRow, subHost: string | null): RenderResult {
+function renderSingbox(
+  group: SubscriptionGroupRow,
+  subHost: string | null,
+  clientId: string | null
+): RenderResult {
   const deviceIds = loadGroupDeviceIds(group.id);
   const ctxs = loadDeviceContexts(deviceIds);
   const { outbounds, skipped } = buildSingboxOutbounds(ctxs);
@@ -143,12 +147,21 @@ function renderSingbox(group: SubscriptionGroupRow, subHost: string | null): Ren
 
   // Anti-loop: traffic to the subscription host itself must go DIRECT,
   // otherwise polling for updates would be tunnelled and break when the
-  // wm hop is unhealthy.
+  // wm hop is unhealthy. action:"route" makes this 1.12-strict-friendly.
   if (subHost) {
     const route = (template.route as Record<string, unknown>) ?? {};
     const rules = (route.rules as Array<Record<string, unknown>>) ?? [];
-    route.rules = [{ domain: [subHost], outbound: "direct" }, ...rules];
+    route.rules = [{ domain: [subHost], action: "route", outbound: "direct" }, ...rules];
     template.route = route;
+  }
+
+  // The official sing-box CLI has no GUI, so users running it directly often
+  // pair it with an external dashboard (yacd / metacubexd). Hiddify ships
+  // its own GUI and doesn't need this block.
+  if (clientId === "singbox-1.12") {
+    template.experimental = {
+      clash_api: { external_controller: "127.0.0.1:9090" },
+    };
   }
 
   return {
@@ -164,12 +177,13 @@ function renderSingbox(group: SubscriptionGroupRow, subHost: string | null): Ren
 export function renderSubscription(
   group: SubscriptionGroupRow,
   format: FormatKind,
-  subHost: string | null
+  subHost: string | null,
+  clientId: string | null
 ): RenderResult {
   switch (format) {
     case "clash": return renderClash(group, subHost);
     case "shadowrocket": return renderShadowrocket(group);
     case "v2ray": return renderV2Ray(group);
-    case "singbox": return renderSingbox(group, subHost);
+    case "singbox": return renderSingbox(group, subHost, clientId);
   }
 }

@@ -26,7 +26,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { usePublicUrlCheck } from "@/components/public-url-check-provider";
-import { ALL_CLIENT_IDS, CLIENT_TO_FORMAT, FORMAT_PROTOCOL_SUPPORT, type ClientId } from "@/lib/subscription/formats";
+import { ALL_CLIENT_IDS, CLIENT_TO_FORMAT, FORMAT_PROTOCOL_SUPPORT, clientI18nKey, type ClientId } from "@/lib/subscription/formats";
 
 type DeviceRow = {
   id: number;
@@ -267,19 +267,20 @@ export default function SubscriptionDetailPage() {
             // rules; URI-list formats (SR, V2Ray-family) carry no rules
             // and the client decides routing entirely on its own.
             const carriesRoutingRules = format === "clash" || format === "singbox";
+            const i18nId = clientI18nKey(clientId);
             return (
               <Card key={clientId}>
                 <CardHeader className="pb-3">
                   <div className="flex items-baseline justify-between gap-3">
                     <CardTitle className="text-base">
-                      {t(`clients.${clientId}.name`)}
+                      {t(`clients.${i18nId}.name`)}
                     </CardTitle>
                     <span className="text-xs text-muted-foreground">
-                      {t(`clients.${clientId}.platforms`)}
+                      {t(`clients.${i18nId}.platforms`)}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {t(`clients.${clientId}.note`)}
+                    {t(`clients.${i18nId}.note`)}
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-3">

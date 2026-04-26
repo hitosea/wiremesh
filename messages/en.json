@@ -683,7 +683,12 @@
       "hiddify": {
         "name": "Hiddify-Next",
         "platforms": "Android / iOS / macOS / Windows / Linux",
-        "note": "sing-box core — all protocols supported"
+        "note": "Supports WireGuard, VLESS, and SOCKS5"
+      },
+      "singbox-1_12": {
+        "name": "sing-box v1.12.0",
+        "platforms": "Android / iOS / macOS / Windows / Linux",
+        "note": "Official sing-box core v1.12+, all protocols supported. Subscription ships with a clash-api controller (127.0.0.1:9090) for yacd / metacubexd dashboards."
       },
       "v2rayn": {
         "name": "V2RayN",

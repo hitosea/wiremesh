@@ -43,20 +43,22 @@ describe("buildSingboxOutbound", () => {
     expect(ob.local_address).toEqual(["10.210.0.100/32"]);
   });
 
-  it("Xray reality → vless outbound with reality block", () => {
+  it("Xray reality → vless outbound with reality block + packet_encoding", () => {
     const ob = buildSingboxOutbound(xrayReality)!;
     expect(ob.type).toBe("vless");
     expect(ob.flow).toBe("xtls-rprx-vision");
+    expect(ob.packet_encoding).toBe("packetaddr");
     const tls = ob.tls as Record<string, unknown>;
     expect(tls.enabled).toBe(true);
     expect(tls.server_name).toBe("www.microsoft.com");
     expect((tls.reality as Record<string, unknown>).public_key).toBe("REALPUB");
   });
 
-  it("Xray ws-tls → vless outbound with ws transport", () => {
+  it("Xray ws-tls → vless outbound with ws transport + packet_encoding", () => {
     const ob = buildSingboxOutbound(xrayWs)!;
     expect(ob.type).toBe("vless");
     expect(ob.flow).toBe("");
+    expect(ob.packet_encoding).toBe("packetaddr");
     expect(ob.transport).toEqual({ type: "ws", path: "/ws", headers: { Host: "edge.example.com" } });
     expect(ob.server).toBe("edge.example.com");
   });

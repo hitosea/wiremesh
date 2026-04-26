@@ -13,7 +13,8 @@ export type ClientId =
   | "v2rayng"
   | "passwall"
   | "clashverge"
-  | "hiddify";
+  | "hiddify"
+  | "singbox-1.12";
 
 export type FormatKind = "v2ray" | "shadowrocket" | "clash" | "singbox";
 
@@ -25,6 +26,7 @@ export const CLIENT_TO_FORMAT: Record<ClientId, FormatKind> = {
   passwall: "v2ray",
   clashverge: "clash",
   hiddify: "singbox",
+  "singbox-1.12": "singbox",
 };
 
 // Path aliases admins may type. Order matters only for documentation.
@@ -33,10 +35,20 @@ export const ALL_CLIENT_IDS: ClientId[] = [
   "clashverge",
   "shadowrocket",
   "hiddify",
+  "singbox-1.12",
   "v2rayn",
   "v2rayng",
   "passwall",
 ];
+
+/**
+ * next-intl uses dots as path separators in lookup keys, so a client ID
+ * like "singbox-1.12" can't be used directly. Sanitise it for i18n only;
+ * the URL slug stays as-is.
+ */
+export function clientI18nKey(id: ClientId): string {
+  return id.replace(/\./g, "_");
+}
 
 // Canonical format names also accepted on the URL path.
 const CANONICAL_FORMATS: Record<string, FormatKind> = {

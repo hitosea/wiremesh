@@ -32,7 +32,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   }
 
   const subHost = request.headers.get("host");
-  const result = renderSubscription(group, format, subHost);
+  const result = renderSubscription(group, format, subHost, fmt.toLowerCase());
 
   const headers: Record<string, string> = {
     "Content-Type": result.contentType,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveFormat, ALL_CLIENT_IDS, FORMAT_PROTOCOL_SUPPORT } from "@/lib/subscription/formats";
+import { resolveFormat, ALL_CLIENT_IDS, FORMAT_PROTOCOL_SUPPORT, clientI18nKey } from "@/lib/subscription/formats";
 
 describe("resolveFormat", () => {
   it("maps every advertised client to a known format", () => {
@@ -20,6 +20,13 @@ describe("resolveFormat", () => {
   it("rejects unknown clients", () => {
     expect(resolveFormat("nekobox")).toBeNull();
     expect(resolveFormat("")).toBeNull();
+  });
+  it("singbox-1.12 (with dot in URL slug) resolves to singbox format", () => {
+    expect(resolveFormat("singbox-1.12")).toBe("singbox");
+  });
+  it("clientI18nKey replaces dots so next-intl can index it", () => {
+    expect(clientI18nKey("singbox-1.12")).toBe("singbox-1_12");
+    expect(clientI18nKey("hiddify")).toBe("hiddify");
   });
   it("v2ray is the only family that drops WG (V2Ray core has no WG outbound)", () => {
     expect(FORMAT_PROTOCOL_SUPPORT.v2ray.wireguard).toBe(false);
