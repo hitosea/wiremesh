@@ -11,7 +11,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -314,12 +314,14 @@ export default function SubscriptionDetailPage() {
                       <QRCodeSVG value={url} size={200} />
                     </div>
                   )}
-                  {carriesRoutingRules && (
-                    <p className="text-xs text-muted-foreground pt-1 border-t">
+                </CardContent>
+                {carriesRoutingRules && (
+                  <CardFooter className="border-t">
+                    <p className="text-xs text-muted-foreground">
                       {t(`routingNote.${format}` as "routingNote.clash" | "routingNote.singbox")}
                     </p>
-                  )}
-                </CardContent>
+                  </CardFooter>
+                )}
               </Card>
             );
           })}
