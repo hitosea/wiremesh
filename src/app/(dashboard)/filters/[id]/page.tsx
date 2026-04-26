@@ -383,7 +383,7 @@ export default function EditFilterPage() {
                                   : "text-sm cursor-pointer"
                               }
                             >
-                              {branch.name}{branch.isDefault ? ` (${tf("defaultLabel")})` : ""}
+                              {branch.name}
                               <span className="ml-2 text-xs text-muted-foreground">
                                 · {buildBranchChain(line.nodes, branch.id, tf("directExit"))}
                               </span>

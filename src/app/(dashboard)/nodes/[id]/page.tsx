@@ -28,6 +28,7 @@ import { xrayPortHintParams } from "@/lib/port-hint";
 import { parseTunnelPortBlacklist } from "@/lib/ip-allocator";
 import { NodePortsDetail } from "@/components/node-ports-detail";
 import { useAdminSSE } from "@/components/admin-sse-provider";
+import { Loader2 } from "lucide-react";
 
 type NodeDetail = {
   id: number;
@@ -94,11 +95,14 @@ export default function NodeDetailPage() {
   const [tlsKey, setTlsKey] = useState("");
   const [wsPath, setWsPath] = useState("");
   const [blacklistInput, setBlacklistInput] = useState("");
+  const [addingPort, setAddingPort] = useState(false);
+  const [removingPort, setRemovingPort] = useState<number | null>(null);
+  const blacklistBusy = addingPort || removingPort !== null;
 
   const blacklistPorts: number[] = node ? parseTunnelPortBlacklist(node.tunnelPortBlacklist) : [];
 
-  const saveBlacklist = async (newPorts: number[]) => {
-    if (!node) return;
+  const saveBlacklist = async (newPorts: number[]): Promise<boolean> => {
+    if (!node) return false;
     const csv = [...new Set(newPorts)].sort((a, b) => a - b).join(",");
     const r = await fetch(`/api/nodes/${node.id}`, {
       method: "PATCH",
@@ -108,24 +112,36 @@ export default function NodeDetailPage() {
     if (r.ok) {
       toast.success(tc("save"));
       setNode({ ...node, tunnelPortBlacklist: csv });
-    } else {
-      const json = await r.json();
-      toast.error(translateError(json.error, te, tc("saveFailed")));
+      return true;
     }
+    const json = await r.json();
+    toast.error(translateError(json.error, te, tc("saveFailed")));
+    return false;
   };
 
-  const handleAddPort = () => {
+  const handleAddPort = async () => {
     const n = parseInt(blacklistInput.trim(), 10);
     if (!Number.isFinite(n) || n < 1 || n > 65535) {
       toast.error(t("invalidPort"));
       return;
     }
-    saveBlacklist([...blacklistPorts, n]);
-    setBlacklistInput("");
+    setAddingPort(true);
+    try {
+      if (await saveBlacklist([...blacklistPorts, n])) {
+        setBlacklistInput("");
+      }
+    } finally {
+      setAddingPort(false);
+    }
   };
 
-  const handleRemovePort = (port: number) => {
-    saveBlacklist(blacklistPorts.filter((p) => p !== port));
+  const handleRemovePort = async (port: number) => {
+    setRemovingPort(port);
+    try {
+      await saveBlacklist(blacklistPorts.filter((p) => p !== port));
+    } finally {
+      setRemovingPort(null);
+    }
   };
 
   useEffect(() => {
@@ -299,23 +315,28 @@ export default function NodeDetailPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-xs text-muted-foreground">{t("tunnelPortBlacklistHint")}</p>
-          <div className="flex flex-wrap gap-2">
-            {blacklistPorts.length === 0 ? (
-              <span className="text-sm text-muted-foreground">—</span>
-            ) : blacklistPorts.map((p) => (
-              <span key={p} className="inline-flex items-center gap-1 rounded bg-secondary px-2 py-1 text-xs">
-                {p}
-                <button
-                  onClick={() => handleRemovePort(p)}
-                  className="hover:text-destructive"
-                  aria-label="remove"
-                >
-                  ✕
-                </button>
-              </span>
-            ))}
-          </div>
-          <div className="flex gap-2">
+          {blacklistPorts.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {blacklistPorts.map((p) => (
+                <span key={p} className="inline-flex items-center gap-1 rounded bg-secondary px-2 py-1 text-xs">
+                  {p}
+                  <button
+                    onClick={() => handleRemovePort(p)}
+                    disabled={blacklistBusy}
+                    className="hover:text-destructive disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center"
+                    aria-label="remove"
+                  >
+                    {removingPort === p ? (
+                      <Loader2 className="size-3 animate-spin" />
+                    ) : (
+                      "✕"
+                    )}
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center gap-2">
             <Input
               type="number"
               min={1}
@@ -323,10 +344,14 @@ export default function NodeDetailPage() {
               placeholder="41834"
               value={blacklistInput}
               onChange={(e) => setBlacklistInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAddPort()}
+              onKeyDown={(e) => e.key === "Enter" && !blacklistBusy && handleAddPort()}
+              disabled={blacklistBusy}
               className="w-32"
             />
-            <Button size="sm" onClick={handleAddPort}>{t("addPort")}</Button>
+            <Button onClick={handleAddPort} disabled={blacklistBusy}>
+              {addingPort && <Loader2 className="size-4 animate-spin" />}
+              {t("addPort")}
+            </Button>
           </div>
         </CardContent>
       </Card>

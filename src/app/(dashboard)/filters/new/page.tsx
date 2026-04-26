@@ -219,7 +219,7 @@ export default function NewFilterPage() {
                                   : "text-sm cursor-pointer"
                               }
                             >
-                              {branch.name}{branch.isDefault ? ` (${t("defaultLabel")})` : ""}
+                              {branch.name}
                               <span className="ml-2 text-xs text-muted-foreground">
                                 · {buildBranchChain(line.nodes, branch.id, t("directExit"))}
                               </span>

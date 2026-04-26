@@ -501,7 +501,7 @@ export default function LineDetailPage() {
                   <TableHead>{t("targetPort")}</TableHead>
                   <TableHead>{t("lastHandshake")}</TableHead>
                   <TableHead>{t("transfer")}</TableHead>
-                  <TableHead>{t("actions")}</TableHead>
+                  <TableHead className="text-right">{t("actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -536,7 +536,7 @@ export default function LineDetailPage() {
                           <span className="inline-block h-3 w-20 rounded bg-muted animate-pulse align-middle" />
                         ) : offline ? "—" : `↓${formatBytes(rx)} ↑${formatBytes(tx)}`}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-right">
                         <Button
                           size="sm"
                           variant="outline"
