@@ -6,7 +6,7 @@ import { parsePaginationParams, paginationOffset } from "@/lib/pagination";
 import { eq, like, count, and, sql, SQL, inArray } from "drizzle-orm";
 import { encrypt } from "@/lib/crypto";
 import { generateKeyPair } from "@/lib/wireguard";
-import { allocateTunnelSubnet, allocateTunnelPort } from "@/lib/ip-allocator";
+import { allocateTunnelSubnet, allocateTunnelPort, parseTunnelPortBlacklist } from "@/lib/ip-allocator";
 import { writeAuditLog } from "@/lib/audit-log";
 import { sseManager } from "@/lib/sse-manager";
 import { isPrivateIp } from "@/lib/ip-utils";
@@ -221,6 +221,15 @@ export async function POST(request: NextRequest) {
   // Track all affected node IDs for SSE notification
   const affectedNodeIds = new Set<number>([entryNodeId]);
 
+  // Bulk-fetch port blacklists for every node that may participate in a tunnel
+  // (entry + every branch hop). One query instead of two-per-hop inside the loop.
+  const blacklistTargetIds = [entryNodeId, ...allBranchNodeIds];
+  const blacklistRows = db.select({ id: nodes.id, blacklist: nodes.tunnelPortBlacklist })
+    .from(nodes)
+    .where(inArray(nodes.id, blacklistTargetIds))
+    .all();
+  const nodeBlacklistById = new Map(blacklistRows.map((r) => [r.id, r.blacklist]));
+
   // 3. For each branch
   let globalHopIndex = 0; // tunnel hop index across all branches
 
@@ -270,9 +279,20 @@ export async function POST(request: NextRequest) {
         );
         usedAddresses.push(fromAddress, toAddress);
 
-        const fromPort = allocateTunnelPort(usedPorts, tunnelPortStart);
+        // Allocator skips ports blacklisted on either end (union of from + to).
+        const fromBlacklist = nodeBlacklistById.get(fromNodeId);
+        const toBlacklist = nodeBlacklistById.get(toNodeId);
+        if (fromBlacklist === undefined || toBlacklist === undefined) {
+          throw new Error(`Node disappeared during line creation: ${fromBlacklist === undefined ? fromNodeId : toNodeId}`);
+        }
+        const portBlacklist = new Set([
+          ...parseTunnelPortBlacklist(fromBlacklist),
+          ...parseTunnelPortBlacklist(toBlacklist),
+        ]);
+
+        const fromPort = allocateTunnelPort(usedPorts, tunnelPortStart, portBlacklist);
         usedPorts.push(fromPort);
-        const toPort = allocateTunnelPort(usedPorts, tunnelPortStart);
+        const toPort = allocateTunnelPort(usedPorts, tunnelPortStart, portBlacklist);
         usedPorts.push(toPort);
 
         const fromKeyPair = generateKeyPair();

@@ -198,6 +198,71 @@ func ipSet(list []api.XrayActiveIp) map[string]bool {
 	return out
 }
 
+func TestParseTunnelStatuses(t *testing.T) {
+	// Sample wg show all dump output (tab-separated).
+	// First line for each iface is the interface line (5 fields).
+	// Subsequent lines for that iface are peer lines (9 fields).
+	input := "wm-wg0\tabcPRIV=\tabcPUB=\t41820\toff\n" +
+		"wm-wg0\tdevicePeer=\t(none)\t(none)\t10.210.0.100/32\t1777111630\t1024\t2048\t0\n" +
+		"wm-tun11\titun11PRIV=\titun11PUB=\t41834\toff\n" +
+		"wm-tun11\tpeerTun11=\t(none)\t47.84.141.78:41835\t0.0.0.0/0\t0\t0\t354100\t25\n" +
+		"wm-tun6\titun6PRIV=\titun6PUB=\t41832\toff\n" +
+		"wm-tun6\tpeerTun6=\t(none)\t47.84.141.78:41833\t0.0.0.0/0\t1777111600\t128000000\t226000000\t25\n"
+
+	got := parseTunnelStatuses(input)
+
+	if len(got) != 2 {
+		t.Fatalf("parseTunnelStatuses returned %d entries, want 2 (only wm-tun*)", len(got))
+	}
+
+	// Find by iface name (order may vary)
+	byIface := map[string]api.TunnelStatusReport{}
+	for _, r := range got {
+		byIface[r.Iface] = r
+	}
+
+	tun11, ok := byIface["wm-tun11"]
+	if !ok {
+		t.Fatal("wm-tun11 missing")
+	}
+	if tun11.PeerPublicKey != "peerTun11=" {
+		t.Errorf("wm-tun11 PeerPublicKey = %q, want %q", tun11.PeerPublicKey, "peerTun11=")
+	}
+	if tun11.LastHandshake != 0 {
+		t.Errorf("wm-tun11 LastHandshake = %d, want 0", tun11.LastHandshake)
+	}
+	if tun11.RxBytes != 0 {
+		t.Errorf("wm-tun11 RxBytes = %d, want 0", tun11.RxBytes)
+	}
+	if tun11.TxBytes != 354100 {
+		t.Errorf("wm-tun11 TxBytes = %d, want 354100", tun11.TxBytes)
+	}
+
+	tun6, ok := byIface["wm-tun6"]
+	if !ok {
+		t.Fatal("wm-tun6 missing")
+	}
+	if tun6.LastHandshake != 1777111600 {
+		t.Errorf("wm-tun6 LastHandshake = %d, want 1777111600", tun6.LastHandshake)
+	}
+}
+
+func TestParseTunnelStatuses_skipsNonTunInterfaces(t *testing.T) {
+	// Only wm-wg0 (device interface) — should yield 0 results.
+	input := "wm-wg0\tprivkey\tpubkey\t41820\toff\n" +
+		"wm-wg0\tpeer1=\t(none)\t(none)\t10.210.0.100/32\t1777111630\t1024\t2048\t0\n"
+	got := parseTunnelStatuses(input)
+	if len(got) != 0 {
+		t.Errorf("parseTunnelStatuses returned %d entries for non-tun input, want 0", len(got))
+	}
+}
+
+func TestParseTunnelStatuses_emptyInput(t *testing.T) {
+	if got := parseTunnelStatuses(""); len(got) != 0 {
+		t.Errorf("parseTunnelStatuses(\"\") returned %d, want 0", len(got))
+	}
+}
+
 func TestFormatBytes(t *testing.T) {
 	tests := []struct {
 		input int64

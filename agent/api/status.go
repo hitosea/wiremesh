@@ -14,6 +14,7 @@ type StatusReport struct {
 	AgentVersion     string                 `json:"agent_version,omitempty"`
 	XrayVersion      string                 `json:"xray_version,omitempty"`
 	XrayRunning      bool                   `json:"xray_running"`
+	TunnelStatuses   []TunnelStatusReport   `json:"tunnel_statuses,omitempty"`
 }
 
 // TransferReport: per-peer traffic delta since last report, from the peer's
@@ -60,4 +61,14 @@ type XrayActiveIp struct {
 
 type ErrorReport struct {
 	Message string `json:"message"`
+}
+
+// TunnelStatusReport: snapshot of one wm-tun* peer's wg state at report time.
+// LastHandshake is unix seconds (0 = never handshaked).
+type TunnelStatusReport struct {
+	Iface         string `json:"iface"`
+	PeerPublicKey string `json:"peer_public_key"`
+	LastHandshake int64  `json:"last_handshake"`
+	RxBytes       int64  `json:"rx_bytes"`
+	TxBytes       int64  `json:"tx_bytes"`
 }

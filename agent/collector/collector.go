@@ -3,6 +3,7 @@ package collector
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os/exec"
 	"strconv"
@@ -67,6 +68,12 @@ func Collect(serverURL string, agentVersion string) *api.StatusReport {
 	report.AgentVersion = agentVersion
 	report.XrayVersion = xray.GetVersion()
 	report.XrayRunning = xray.IsRunning()
+	// Collect wm-tun* states (best-effort; failure shouldn't fail the whole report)
+	if dump, err := wg.WgShowAllDump(); err == nil {
+		report.TunnelStatuses = parseTunnelStatuses(dump)
+	} else {
+		log.Printf("[collector] WgShowAllDump failed: %v", err)
+	}
 	return report
 }
 
@@ -441,6 +448,46 @@ func collectForwardTransfers() (int64, int64) {
 		}
 	}
 	return totalUp, totalDown
+}
+
+// parseTunnelStatuses parses `wg show all dump` output and returns peer rows
+// for wm-tun* interfaces only. Each interface in the output emits:
+//   - one interface line (5 tab-separated fields): iface, privkey, pubkey, listen-port, fwmark
+//   - one peer line per peer (9 fields): iface, pubkey, preshared, endpoint, allowed-ips,
+//     latest-handshake, rx, tx, keepalive
+//
+// We identify peer lines by field count == 9.
+func parseTunnelStatuses(dump string) []api.TunnelStatusReport {
+	var out []api.TunnelStatusReport
+	for _, line := range strings.Split(dump, "\n") {
+		if line == "" {
+			continue
+		}
+		fields := strings.Split(line, "\t")
+		if len(fields) != 9 {
+			continue // skip interface lines and malformed rows
+		}
+		iface := fields[0]
+		if !strings.HasPrefix(iface, "wm-tun") {
+			continue
+		}
+		out = append(out, api.TunnelStatusReport{
+			Iface:         iface,
+			PeerPublicKey: fields[1],
+			LastHandshake: parseInt64Safe(fields[5]),
+			RxBytes:       parseInt64Safe(fields[6]),
+			TxBytes:       parseInt64Safe(fields[7]),
+		})
+	}
+	return out
+}
+
+func parseInt64Safe(s string) int64 {
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return n
 }
 
 // listTunnelInterfaces returns all `wm-tun*` interface names currently up.

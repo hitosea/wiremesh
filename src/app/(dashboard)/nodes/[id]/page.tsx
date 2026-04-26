@@ -25,6 +25,7 @@ import {
 import { StatusDot } from "@/components/status-dot";
 import { NodeStatusChart } from "@/components/node-status-chart";
 import { xrayPortHintParams } from "@/lib/port-hint";
+import { parseTunnelPortBlacklist } from "@/lib/ip-allocator";
 import { NodePortsDetail } from "@/components/node-ports-detail";
 import { useAdminSSE } from "@/components/admin-sse-provider";
 
@@ -51,6 +52,7 @@ type NodeDetail = {
   remark: string | null;
   agentVersion: string | null;
   xrayVersion: string | null;
+  tunnelPortBlacklist: string;
   ports: {
     wg: number;
     xray: number[];
@@ -91,6 +93,40 @@ export default function NodeDetailPage() {
   const [tlsCert, setTlsCert] = useState("");
   const [tlsKey, setTlsKey] = useState("");
   const [wsPath, setWsPath] = useState("");
+  const [blacklistInput, setBlacklistInput] = useState("");
+
+  const blacklistPorts: number[] = node ? parseTunnelPortBlacklist(node.tunnelPortBlacklist) : [];
+
+  const saveBlacklist = async (newPorts: number[]) => {
+    if (!node) return;
+    const csv = [...new Set(newPorts)].sort((a, b) => a - b).join(",");
+    const r = await fetch(`/api/nodes/${node.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ tunnelPortBlacklist: csv }),
+    });
+    if (r.ok) {
+      toast.success(tc("save"));
+      setNode({ ...node, tunnelPortBlacklist: csv });
+    } else {
+      const json = await r.json();
+      toast.error(translateError(json.error, te, tc("saveFailed")));
+    }
+  };
+
+  const handleAddPort = () => {
+    const n = parseInt(blacklistInput.trim(), 10);
+    if (!Number.isFinite(n) || n < 1 || n > 65535) {
+      toast.error(t("invalidPort"));
+      return;
+    }
+    saveBlacklist([...blacklistPorts, n]);
+    setBlacklistInput("");
+  };
+
+  const handleRemovePort = (port: number) => {
+    saveBlacklist(blacklistPorts.filter((p) => p !== port));
+  };
 
   useEffect(() => {
     fetch(`/api/nodes/${nodeId}`)
@@ -254,6 +290,45 @@ export default function NodeDetailPage() {
               <p className="text-sm text-destructive">{node.errorMessage}</p>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Tunnel port blacklist */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("tunnelPortBlacklist")}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">{t("tunnelPortBlacklistHint")}</p>
+          <div className="flex flex-wrap gap-2">
+            {blacklistPorts.length === 0 ? (
+              <span className="text-sm text-muted-foreground">—</span>
+            ) : blacklistPorts.map((p) => (
+              <span key={p} className="inline-flex items-center gap-1 rounded bg-secondary px-2 py-1 text-xs">
+                {p}
+                <button
+                  onClick={() => handleRemovePort(p)}
+                  className="hover:text-destructive"
+                  aria-label="remove"
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Input
+              type="number"
+              min={1}
+              max={65535}
+              placeholder="41834"
+              value={blacklistInput}
+              onChange={(e) => setBlacklistInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAddPort()}
+              className="w-32"
+            />
+            <Button size="sm" onClick={handleAddPort}>{t("addPort")}</Button>
+          </div>
         </CardContent>
       </Card>
 

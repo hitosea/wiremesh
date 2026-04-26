@@ -201,7 +201,11 @@
     "wgPublicKey": "WireGuard Public Key",
     "agentToken": "Agent Token",
     "errorMessage": "Error Message",
-    "editNode": "Edit Node"
+    "editNode": "Edit Node",
+    "tunnelPortBlacklist": "Tunnel port blacklist",
+    "tunnelPortBlacklistHint": "Ports added here will be skipped by the tunnel port allocator.",
+    "addPort": "Add port",
+    "invalidPort": "Port must be an integer between 1 and 65535"
   },
   "nodeScript": {
     "loadNodeFailed": "Failed to load node info",
@@ -425,7 +429,24 @@
     "renameBranch": "Rename branch",
     "branchNameLabel": "Branch name",
     "branchRenamed": "Branch name updated",
-    "branchNameEmpty": "Branch name is required"
+    "branchNameEmpty": "Branch name is required",
+    "lastHandshake": "Last handshake",
+    "transfer": "Transfer",
+    "never": "Never",
+    "refresh": "Refresh",
+    "refreshed": "Refreshed",
+    "refreshFailed": "Refresh failed",
+    "lastUpdated": "Last updated {time}",
+    "staleData": "Data may be stale, click refresh",
+    "actions": "Actions",
+    "reallocate": "Reallocate ports",
+    "reallocateConfirm": "Current ports {ports} will be added to node blacklist. Continue?",
+    "reallocateSuccess": "Ports reallocated to {ports}",
+    "secondsAgo": "{n} seconds ago",
+    "minutesAgo": "{n} minutes ago",
+    "hoursAgo": "{n} hours ago",
+    "daysAgo": "{n} days ago",
+    "reallocateFailed": "Reallocate failed"
   },
   "filters": {
     "mode": {

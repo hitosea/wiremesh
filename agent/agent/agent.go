@@ -108,6 +108,9 @@ func (a *Agent) handleSSEEvent(evt api.SSEEvent) {
 			log.Printf("[agent] Uninstall failed: %v", err)
 			a.client.ReportError("Uninstall failed: " + err.Error())
 		}
+	case "request_status_report":
+		log.Println("[agent] Received request_status_report, triggering immediate report")
+		a.reportStatus()
 	case "upgrade":
 		a.handleUpgrade()
 	case "xray_upgrade":

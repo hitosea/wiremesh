@@ -45,6 +45,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       xrayVersion: nodes.xrayVersion,
       upgradeTriggeredAt: nodes.upgradeTriggeredAt,
       xrayUpgradeTriggeredAt: nodes.xrayUpgradeTriggeredAt,
+      tunnelPortBlacklist: nodes.tunnelPortBlacklist,
     })
     .from(nodes)
     .where(eq(nodes.id, nodeId))
@@ -94,6 +95,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
     xrayPort,
     externalInterface,
     remark,
+    tunnelPortBlacklist,
   } = body;
 
   // Check IP uniqueness if changed (exclude soft-deleted nodes)
@@ -118,6 +120,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (xrayPort !== undefined) updateData.xrayPort = xrayPort;
   if (externalInterface !== undefined) updateData.externalInterface = externalInterface;
   if (remark !== undefined) updateData.remark = remark;
+  if (tunnelPortBlacklist !== undefined) updateData.tunnelPortBlacklist = tunnelPortBlacklist;
 
   // Auto-generate Reality keys if missing (legacy data), or update dest if provided
   {
@@ -215,6 +218,44 @@ export async function PUT(request: NextRequest, { params }: Params) {
   });
 
   sseManager.notifyNodeConfigUpdate(nodeId);
+
+  return success(updated);
+}
+
+export async function PATCH(request: NextRequest, { params }: Params) {
+  const { id } = await params;
+  const nodeId = parseInt(id);
+  if (isNaN(nodeId)) return error("VALIDATION_ERROR", "validation.invalidNodeId");
+
+  const existing = db
+    .select({ id: nodes.id, name: nodes.name })
+    .from(nodes)
+    .where(eq(nodes.id, nodeId))
+    .get();
+  if (!existing) return error("NOT_FOUND", "notFound.node");
+
+  const body = await request.json();
+  const updateData: Partial<typeof nodes.$inferInsert> = {
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (body.tunnelPortBlacklist !== undefined) {
+    updateData.tunnelPortBlacklist = String(body.tunnelPortBlacklist);
+  }
+
+  const updated = db
+    .update(nodes)
+    .set(updateData)
+    .where(eq(nodes.id, nodeId))
+    .returning({ id: nodes.id, tunnelPortBlacklist: nodes.tunnelPortBlacklist })
+    .get();
+
+  writeAuditLog({
+    action: "update",
+    targetType: "node",
+    targetId: nodeId,
+    targetName: existing.name,
+  });
 
   return success(updated);
 }

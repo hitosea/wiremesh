@@ -54,6 +54,7 @@ export const nodes = sqliteTable("nodes", {
   upgradeTriggeredAt: text("upgrade_triggered_at"),
   xrayUpgradeTriggeredAt: text("xray_upgrade_triggered_at"),
   pendingDelete: integer("pending_delete", { mode: "boolean" }).notNull().default(false),
+  tunnelPortBlacklist: text("tunnel_port_blacklist").notNull().default(""),
   remark: text("remark"),
   ...timestamps,
 });

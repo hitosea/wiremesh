@@ -64,3 +64,18 @@ func IpAddrAdd(addr, iface string) error {
 	_, err := Run("ip", "addr", "add", addr, "dev", iface)
 	return err
 }
+
+// WgShowAllDump runs `wg show all dump` and returns raw stdout.
+// Output format (tab-separated):
+//
+//	<iface>  <private-key>  <public-key>  <listen-port>  <fwmark>          (interface line, 5 fields)
+//	<iface>  <pubkey>  <preshared>  <endpoint>  <allowed-ips>  <latest-handshake>  <rx-bytes>  <tx-bytes>  <keepalive>   (peer line, 9 fields)
+//
+// Caller distinguishes interface vs peer lines by field count.
+func WgShowAllDump() (string, error) {
+	out, err := exec.Command("wg", "show", "all", "dump").Output()
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}

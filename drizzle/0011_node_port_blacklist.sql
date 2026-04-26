@@ -1,0 +1,1 @@
+ALTER TABLE `nodes` ADD `tunnel_port_blacklist` text DEFAULT '' NOT NULL;

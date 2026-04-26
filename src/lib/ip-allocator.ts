@@ -69,10 +69,21 @@ export function allocateTunnelSubnet(
   throw new Error("No available /30 subnets in tunnel range");
 }
 
-export function allocateTunnelPort(usedPorts: number[], startPort: number): number {
+export function allocateTunnelPort(
+  usedPorts: number[],
+  startPort: number,
+  blacklist: Set<number> = new Set()
+): number {
   const usedSet = new Set(usedPorts);
   for (let port = startPort; port < 65535; port++) {
-    if (!usedSet.has(port)) return port;
+    if (!usedSet.has(port) && !blacklist.has(port)) return port;
   }
   throw new Error("No available tunnel ports");
+}
+
+export function parseTunnelPortBlacklist(csv: string): number[] {
+  return csv
+    .split(",")
+    .map((s) => parseInt(s.trim(), 10))
+    .filter((n) => Number.isFinite(n) && n > 0 && n < 65536);
 }

@@ -201,7 +201,11 @@
     "wgPublicKey": "WireGuard 公钥",
     "agentToken": "Agent Token",
     "errorMessage": "错误信息",
-    "editNode": "编辑节点"
+    "editNode": "编辑节点",
+    "tunnelPortBlacklist": "隧道端口黑名单",
+    "tunnelPortBlacklistHint": "在此添加的端口将被隧道端口分配器跳过",
+    "addPort": "添加端口",
+    "invalidPort": "端口必须是 1-65535 之间的整数"
   },
   "nodeScript": {
     "loadNodeFailed": "获取节点信息失败",
@@ -425,7 +429,24 @@
     "renameBranch": "重命名分支",
     "branchNameLabel": "分支名称",
     "branchRenamed": "分支名称已更新",
-    "branchNameEmpty": "分支名称不能为空"
+    "branchNameEmpty": "分支名称不能为空",
+    "lastHandshake": "最近握手",
+    "transfer": "收发",
+    "never": "从未",
+    "refresh": "刷新",
+    "refreshed": "已刷新",
+    "refreshFailed": "刷新失败",
+    "lastUpdated": "上次更新 {time}",
+    "staleData": "数据可能不新鲜，请点刷新",
+    "actions": "操作",
+    "reallocate": "重新分配端口",
+    "reallocateConfirm": "当前端口 {ports} 将加入节点黑名单，是否继续？",
+    "reallocateSuccess": "端口已重新分配为 {ports}",
+    "secondsAgo": "{n} 秒前",
+    "minutesAgo": "{n} 分钟前",
+    "hoursAgo": "{n} 小时前",
+    "daysAgo": "{n} 天前",
+    "reallocateFailed": "重新分配端口失败"
   },
   "filters": {
     "mode": {

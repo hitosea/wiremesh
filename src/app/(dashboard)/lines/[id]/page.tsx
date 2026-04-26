@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { translateError } from "@/lib/translate-error";
+import { formatBytes } from "@/lib/format-bytes";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { StatusDot } from "@/components/status-dot";
-import { Pencil, Check, X } from "lucide-react";
+import { Pencil, Check, X, RefreshCw } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -49,6 +50,17 @@ type LineTunnel = {
   toWgPublicKey: string;
   toWgAddress: string;
   toWgPort: number;
+};
+
+type TunnelStatusView = {
+  id: number; lineId: number; hopIndex: number;
+  fromNodeId: number; fromNodeName: string;
+  toNodeId: number; toNodeName: string;
+  fromWgAddress: string; toWgAddress: string;
+  fromWgPort: number; toWgPort: number;
+  lastHandshake: number; rxBytes: number; txBytes: number;
+  dataFromToNode: boolean; stale: boolean;
+  fromNodeReachable: boolean; toNodeReachable: boolean;
 };
 
 type BranchFilter = {
@@ -92,6 +104,12 @@ export default function LineDetailPage() {
 
   const [name, setName] = useState("");
   const [remark, setRemark] = useState("");
+
+  const [tunnelStatus, setTunnelStatus] = useState<{
+    lastReportedAt: number | null;
+    tunnels: TunnelStatusView[];
+  } | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [editingBranchId, setEditingBranchId] = useState<number | null>(null);
   const [branchNameDraft, setBranchNameDraft] = useState("");
@@ -165,6 +183,54 @@ export default function LineDetailPage() {
       .catch(() => toast.error(t("loadFailed")))
       .finally(() => setLoading(false));
   }, [lineId, router]);
+
+  const loadStatus = useCallback(async () => {
+    if (!line) return;
+    const r = await fetch(`/api/lines/${line.id}/tunnels`);
+    if (r.ok) setTunnelStatus(await r.json());
+  }, [line?.id]);
+
+  useEffect(() => { loadStatus(); }, [loadStatus]);
+
+  const handleRefresh = async () => {
+    if (!line) return;
+    setRefreshing(true);
+    try {
+      const r = await fetch(`/api/lines/${line.id}/tunnels/refresh`, { method: "POST" });
+      if (r.ok) {
+        setTunnelStatus(await r.json());
+        toast.success(t("refreshed"));
+      } else {
+        toast.error(t("refreshFailed"));
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleReallocate = async (tunnelId: number, oldFrom: number, oldTo: number) => {
+    if (!confirm(t("reallocateConfirm", { ports: `${oldFrom}/${oldTo}` }))) return;
+    const r = await fetch(`/api/line-tunnels/${tunnelId}/reallocate`, { method: "POST" });
+    if (r.ok) {
+      const data = await r.json();
+      toast.success(t("reallocateSuccess", { ports: `${data.newPorts.from}/${data.newPorts.to}` }));
+      location.reload();
+    } else {
+      toast.error(t("reallocateFailed"));
+    }
+  };
+
+  const formatHandshake = (unixSec: number): string => {
+    if (unixSec === 0) return t("never");
+    const ago = Math.floor(Date.now() / 1000) - unixSec;
+    if (ago < 60) return t("secondsAgo", { n: ago });
+    if (ago < 3600) return t("minutesAgo", { n: Math.floor(ago / 60) });
+    if (ago < 86400) return t("hoursAgo", { n: Math.floor(ago / 3600) });
+    return t("daysAgo", { n: Math.floor(ago / 86400) });
+  };
+  const formatTime = (unixSec: number): string => {
+    return new Date(unixSec * 1000).toLocaleTimeString();
+  };
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -366,8 +432,24 @@ export default function LineDetailPage() {
 
       {/* Tunnel info card */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle>{t("tunnelInfo")}</CardTitle>
+          <div className="flex items-center gap-3">
+            {tunnelStatus?.lastReportedAt && (
+              <span className="text-xs text-muted-foreground">
+                {t("lastUpdated", { time: formatTime(tunnelStatus.lastReportedAt) })}
+              </span>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleRefresh}
+              disabled={refreshing}
+            >
+              <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? "animate-spin" : ""}`} />
+              {t("refresh")}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {line.tunnels.length === 0 ? (
@@ -383,24 +465,57 @@ export default function LineDetailPage() {
                   <TableHead>{t("targetAddress")}</TableHead>
                   <TableHead>{t("sourcePort")}</TableHead>
                   <TableHead>{t("targetPort")}</TableHead>
+                  <TableHead>{t("lastHandshake")}</TableHead>
+                  <TableHead>{t("transfer")}</TableHead>
+                  <TableHead>{t("actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {line.tunnels.map((tun) => (
-                  <TableRow key={tun.id}>
-                    <TableCell>{tun.hopIndex + 1}</TableCell>
-                    <TableCell>{tun.fromNodeName}</TableCell>
-                    <TableCell>{tun.toNodeName}</TableCell>
-                    <TableCell>
-                      <code className="text-xs">{tun.fromWgAddress}</code>
-                    </TableCell>
-                    <TableCell>
-                      <code className="text-xs">{tun.toWgAddress}</code>
-                    </TableCell>
-                    <TableCell>{tun.fromWgPort}</TableCell>
-                    <TableCell>{tun.toWgPort}</TableCell>
-                  </TableRow>
-                ))}
+                {line.tunnels.map((tun) => {
+                  const status = tunnelStatus?.tunnels.find((s) => s.id === tun.id);
+                  const lastHs = status?.lastHandshake ?? 0;
+                  const rx = status?.rxBytes ?? 0;
+                  const tx = status?.txBytes ?? 0;
+                  const stale = status?.stale ?? false;
+                  const offline = !!status && !status.fromNodeReachable && !status.toNodeReachable;
+                  const ageOK = lastHs > 0 && (Math.floor(Date.now() / 1000) - lastHs) < 300;
+                  // Wait until we've fetched at least one snapshot before showing
+                  // the reallocate button — otherwise every row briefly flashes it
+                  // on first paint while tunnelStatus is still null.
+                  const showReallocate = tunnelStatus !== null && !ageOK;
+
+                  return (
+                    <TableRow key={tun.id}>
+                      <TableCell>{tun.hopIndex + 1}</TableCell>
+                      <TableCell>{tun.fromNodeName}</TableCell>
+                      <TableCell>{tun.toNodeName}</TableCell>
+                      <TableCell><code className="text-xs">{tun.fromWgAddress}</code></TableCell>
+                      <TableCell><code className="text-xs">{tun.toWgAddress}</code></TableCell>
+                      <TableCell>{tun.fromWgPort}</TableCell>
+                      <TableCell>{tun.toWgPort}</TableCell>
+                      <TableCell className={stale ? "text-muted-foreground" : ""}>
+                        {offline ? "—" : formatHandshake(lastHs)}
+                        {stale && !offline && (
+                          <span title={t("staleData")} className="ml-1 opacity-50">ⓘ</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {offline ? "—" : `↓${formatBytes(rx)} ↑${formatBytes(tx)}`}
+                      </TableCell>
+                      <TableCell>
+                        {showReallocate && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleReallocate(tun.id, tun.fromWgPort, tun.toWgPort)}
+                          >
+                            {t("reallocate")}
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}

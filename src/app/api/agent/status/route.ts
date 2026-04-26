@@ -4,6 +4,7 @@ import { nodes, nodeStatus, devices } from "@/lib/db/schema";
 import { eq, sql, and, gt, lt } from "drizzle-orm";
 import { authenticateAgent } from "@/lib/agent-auth";
 import { adminSseManager } from "@/lib/admin-sse-manager";
+import { setNodeSnapshot } from "@/lib/tunnel-status-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ export async function POST(request: NextRequest) {
     agent_version?: string;
     xray_version?: string;
     xray_running?: boolean;
+    tunnel_statuses?: { iface: string; peer_public_key: string; last_handshake: number; rx_bytes: number; tx_bytes: number }[];
   };
 
   const {
@@ -190,6 +192,17 @@ export async function POST(request: NextRequest) {
       deviceId: d.id,
       connectionCount: 0,
     });
+  }
+
+  // Older agents won't send tunnel_statuses; skip the cache write in that case.
+  if (Array.isArray(body.tunnel_statuses)) {
+    setNodeSnapshot(node.id, body.tunnel_statuses.map((t) => ({
+      iface: t.iface,
+      peerPublicKey: t.peer_public_key,
+      lastHandshake: t.last_handshake,
+      rxBytes: t.rx_bytes,
+      txBytes: t.tx_bytes,
+    })));
   }
 
   return Response.json({ data: { ok: true } });

@@ -4,6 +4,7 @@ import {
   allocateDeviceIp,
   allocateTunnelSubnet,
   allocateTunnelPort,
+  parseTunnelPortBlacklist,
 } from "@/lib/ip-allocator";
 
 describe("ip-allocator", () => {
@@ -103,6 +104,39 @@ describe("ip-allocator", () => {
     it("throws when no ports available", () => {
       const used = Array.from({ length: 65534 }, (_, i) => i + 1);
       expect(() => allocateTunnelPort(used, 1)).toThrow("No available tunnel ports");
+    });
+
+    it("skips blacklisted ports", () => {
+      const blacklist = new Set([51820, 51821]);
+      expect(allocateTunnelPort([], 51820, blacklist)).toBe(51822);
+    });
+
+    it("skips both used and blacklisted ports", () => {
+      const blacklist = new Set([51822]);
+      expect(allocateTunnelPort([51820, 51821], 51820, blacklist)).toBe(51823);
+    });
+
+    it("treats empty blacklist same as no blacklist arg", () => {
+      const blacklist = new Set<number>();
+      expect(allocateTunnelPort([51820], 51820, blacklist)).toBe(51821);
+    });
+  });
+
+  describe("parseTunnelPortBlacklist", () => {
+    it("returns empty array for empty string", () => {
+      expect(parseTunnelPortBlacklist("")).toEqual([]);
+    });
+
+    it("parses comma-separated ports", () => {
+      expect(parseTunnelPortBlacklist("41834,41835,41840")).toEqual([41834, 41835, 41840]);
+    });
+
+    it("trims whitespace", () => {
+      expect(parseTunnelPortBlacklist(" 41834 , 41835 ")).toEqual([41834, 41835]);
+    });
+
+    it("filters out invalid entries (non-numeric, out of range)", () => {
+      expect(parseTunnelPortBlacklist("41834,abc,99999,0,-5,41835")).toEqual([41834, 41835]);
     });
   });
 });
