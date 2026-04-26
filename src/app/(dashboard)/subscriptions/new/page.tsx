@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { toast } from "sonner";
 import { translateError } from "@/lib/translate-error";
 import { useTranslations } from "next-intl";
@@ -49,19 +48,24 @@ export default function NewSubscriptionPage() {
   };
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <Link href="/subscriptions" className="text-sm text-muted-foreground hover:text-foreground">
-        ← {t("back")}
-      </Link>
+    <div className="space-y-6 w-full">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">{t("create")}</h1>
+        <Button variant="outline" onClick={() => router.push("/subscriptions")}>
+          {tc("back")}
+        </Button>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("create")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("tabBasic")}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">{t("name")}</Label>
+              <Label htmlFor="name">
+                {t("name")} <span className="text-destructive">*</span>
+              </Label>
               <Input
                 id="name"
                 value={name}
@@ -82,22 +86,23 @@ export default function NewSubscriptionPage() {
                 rows={3}
               />
             </div>
-            <div className="flex gap-2 justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => router.push("/subscriptions")}
-                disabled={submitting}
-              >
-                {tc("cancel")}
-              </Button>
-              <Button type="submit" disabled={submitting}>
-                {submitting ? tc("creating") : tc("create")}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+
+        <div className="flex gap-2 justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.push("/subscriptions")}
+            disabled={submitting}
+          >
+            {tc("cancel")}
+          </Button>
+          <Button type="submit" disabled={submitting}>
+            {submitting ? tc("creating") : tc("create")}
+          </Button>
+        </div>
+      </form>
     </div>
   );
 }

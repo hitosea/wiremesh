@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { translateError } from "@/lib/translate-error";
 import { useTranslations } from "next-intl";
@@ -51,6 +50,7 @@ type GroupDetail = {
 
 export default function SubscriptionDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const groupId = params.id as string;
   const t = useTranslations("subscriptions");
   const tc = useTranslations("common");
@@ -218,32 +218,38 @@ export default function SubscriptionDetailPage() {
 
   if (!group) {
     return (
-      <div className="text-muted-foreground">
-        <Link href="/subscriptions" className="text-primary hover:underline">
-          ← {t("back")}
-        </Link>
+      <div className="space-y-6 w-full">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold">{t("title")}</h1>
+          <Button variant="outline" onClick={() => router.push("/subscriptions")}>
+            {tc("back")}
+          </Button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <Link href="/subscriptions" className="text-sm text-muted-foreground hover:text-foreground">
-        ← {t("back")}
-      </Link>
-
-      <div>
-        <h1 className="text-2xl font-semibold">{group.name}</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {group.remark ?? t("description")}
-        </p>
+    <div className="space-y-6 w-full">
+      <div className="flex items-center justify-between">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-2xl font-semibold truncate">{group.name}</h1>
+          {group.remark && (
+            <p className="text-sm text-muted-foreground mt-1 truncate">{group.remark}</p>
+          )}
+        </div>
+        <Button variant="outline" onClick={() => router.push("/subscriptions")}>
+          {tc("back")}
+        </Button>
       </div>
 
       <Tabs defaultValue="urls">
         <TabsList>
-          <TabsTrigger value="urls">{t("tabUrls")}</TabsTrigger>
-          <TabsTrigger value="devices">{t("tabDevices")}</TabsTrigger>
-          <TabsTrigger value="basic">{t("tabBasic")}</TabsTrigger>
+          <TabsTrigger value="urls" className="px-4">{t("tabUrls")}</TabsTrigger>
+          <TabsTrigger value="devices" className="px-4">
+            {t("tabDevices")} ({selectedIds.size})
+          </TabsTrigger>
+          <TabsTrigger value="basic" className="px-4">{t("tabBasic")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="urls" className="space-y-4 mt-4">
