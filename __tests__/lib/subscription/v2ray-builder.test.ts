@@ -26,8 +26,11 @@ const sock: DeviceContext = {
 };
 
 describe("buildV2RayUri", () => {
-  it("returns null for WireGuard (V2Ray core has no WG outbound)", () => {
-    expect(buildV2RayUri(wg)).toBeNull();
+  it("emits wg:// for WireGuard (modern V2RayN/NG/NekoBox accept it)", () => {
+    const uri = buildV2RayUri(wg)!;
+    expect(uri.startsWith("wg://")).toBe(true);
+    expect(uri).toContain("publicKey=");
+    expect(uri).toContain("privateKey=");
   });
   it("emits vless:// for Xray devices", () => {
     const uri = buildV2RayUri(xray)!;
@@ -40,14 +43,15 @@ describe("buildV2RayUri", () => {
 });
 
 describe("buildV2RaySubscription", () => {
-  it("counts WireGuard devices as skipped", () => {
+  it("includes all three protocols (no devices skipped)", () => {
     const { body, skipped } = buildV2RaySubscription([wg, xray, sock]);
-    expect(skipped).toBe(1);
+    expect(skipped).toBe(0);
     const decoded = Buffer.from(body, "base64").toString("utf8");
     const lines = decoded.split("\r\n");
-    expect(lines).toHaveLength(2);
-    expect(lines[0].startsWith("vless://")).toBe(true);
-    expect(lines[1].startsWith("socks5://")).toBe(true);
+    expect(lines).toHaveLength(3);
+    expect(lines[0].startsWith("wg://")).toBe(true);
+    expect(lines[1].startsWith("vless://")).toBe(true);
+    expect(lines[2].startsWith("socks5://")).toBe(true);
   });
 
   it("base64-encodes the joined URI list", () => {

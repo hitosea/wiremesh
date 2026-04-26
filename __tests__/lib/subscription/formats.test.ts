@@ -28,8 +28,8 @@ describe("resolveFormat", () => {
     expect(clientI18nKey("singbox-1.12")).toBe("singbox-1_12");
     expect(clientI18nKey("hiddify")).toBe("hiddify");
   });
-  it("v2ray is the only family that drops WG (V2Ray core has no WG outbound)", () => {
-    expect(FORMAT_PROTOCOL_SUPPORT.v2ray.wireguard).toBe(false);
+  it("all four formats now claim WG support (v2ray emits wg:// since modern V2RayN/NG/NekoBox accept it)", () => {
+    expect(FORMAT_PROTOCOL_SUPPORT.v2ray.wireguard).toBe(true);
     expect(FORMAT_PROTOCOL_SUPPORT.clash.wireguard).toBe(true);
     expect(FORMAT_PROTOCOL_SUPPORT.shadowrocket.wireguard).toBe(true);
     expect(FORMAT_PROTOCOL_SUPPORT.singbox.wireguard).toBe(true);

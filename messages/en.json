@@ -670,7 +670,7 @@
       "generic": {
         "name": "Generic",
         "platforms": "Multi-platform fallback",
-        "note": "Works with most V2Ray-family clients; WireGuard not supported"
+        "note": "Works with most proxy clients; WireGuard support depends on the client version, older builds ignore wg:// entries"
       },
       "clashverge": {
         "name": "Clash Verge",
@@ -695,17 +695,17 @@
       "v2rayn": {
         "name": "V2RayN",
         "platforms": "Windows / macOS / Linux",
-        "note": "V2Ray core — WireGuard not supported"
+        "note": "V2Ray core; v6+ supports WireGuard, older builds ignore wg:// entries"
       },
       "v2rayng": {
         "name": "V2RayNG",
         "platforms": "Android",
-        "note": "V2Ray core — WireGuard not supported"
+        "note": "V2Ray core; v1.10+ supports WireGuard, older builds ignore wg:// entries"
       },
       "passwall": {
         "name": "Passwall",
         "platforms": "OpenWRT / Router",
-        "note": "V2Ray family — WireGuard not supported"
+        "note": "V2Ray family; WireGuard runs through a separate OpenWRT plugin, wg:// entries may be ignored"
       }
     },
     "wgSkippedWarning": "{count} WireGuard device(s) will be skipped in this subscription",

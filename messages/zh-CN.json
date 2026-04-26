@@ -670,7 +670,7 @@
       "generic": {
         "name": "通用链接",
         "platforms": "多平台通用",
-        "note": "适用于绝大多数 V2Ray 系客户端，不支持 WireGuard"
+        "note": "适用于绝大多数代理客户端；WireGuard 兼容性视客户端版本而定，旧版会忽略 wg:// 项"
       },
       "clashverge": {
         "name": "Clash Verge",
@@ -695,17 +695,17 @@
       "v2rayn": {
         "name": "V2RayN",
         "platforms": "Windows / macOS / Linux",
-        "note": "V2Ray 内核，不支持 WireGuard"
+        "note": "V2Ray 内核；v6+ 起支持 WireGuard，旧版本会忽略 wg:// 项"
       },
       "v2rayng": {
         "name": "V2RayNG",
         "platforms": "Android",
-        "note": "V2Ray 内核，不支持 WireGuard"
+        "note": "V2Ray 内核；v1.10+ 起支持 WireGuard，旧版本会忽略 wg:// 项"
       },
       "passwall": {
         "name": "Passwall",
         "platforms": "OpenWRT / 路由器",
-        "note": "V2Ray 系，不支持 WireGuard"
+        "note": "V2Ray 系；WireGuard 在 OpenWRT 上走独立插件，wg:// 项可能被忽略"
       }
     },
     "wgSkippedWarning": "本订阅会跳过 WireGuard 设备（{count} 台）",

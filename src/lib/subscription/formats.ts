@@ -72,6 +72,9 @@ export function resolveFormat(slug: string): FormatKind | null {
 export const FORMAT_PROTOCOL_SUPPORT: Record<FormatKind, { wireguard: boolean; xray: boolean; socks5: boolean }> = {
   clash: { wireguard: true, xray: true, socks5: true },
   shadowrocket: { wireguard: true, xray: true, socks5: true },
-  v2ray: { wireguard: false, xray: true, socks5: true },
+  // V2Ray family now ships wg:// for WG devices. Modern V2RayN/NG/NekoBox
+  // builds parse it; older or strict V2Ray builds silently ignore — either
+  // way the vless/socks5 entries still work, so we count this as supported.
+  v2ray: { wireguard: true, xray: true, socks5: true },
   singbox: { wireguard: true, xray: true, socks5: true },
 };
