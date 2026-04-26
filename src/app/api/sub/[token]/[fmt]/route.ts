@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isValidTokenShape } from "@/lib/subscription/token";
-import { findGroupByToken, renderClash, renderShadowrocket } from "@/lib/subscription/render";
+import { findGroupByToken, renderSubscription } from "@/lib/subscription/render";
+import { resolveFormat } from "@/lib/subscription/formats";
 
 type Params = { params: Promise<{ token: string; fmt: string }> };
 
 function safeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_") || "wiremesh";
+}
+
+function fileExtension(format: string): string {
+  if (format === "clash") return "yaml";
+  if (format === "singbox") return "json";
+  return "txt";
 }
 
 export async function GET(request: NextRequest, { params }: Params) {
@@ -19,30 +26,20 @@ export async function GET(request: NextRequest, { params }: Params) {
     return new NextResponse("Not Found", { status: 404 });
   }
 
-  if (fmt === "clash") {
-    const subHost = request.headers.get("host");
-    const result = renderClash(group, subHost);
-    return new NextResponse(result.body, {
-      status: 200,
-      headers: {
-        "Content-Type": "text/yaml; charset=utf-8",
-        "Content-Disposition": `inline; filename="wiremesh-${safeFilename(group.name)}.yaml"`,
-        "profile-update-interval": "24",
-        "Cache-Control": "no-store",
-      },
-    });
+  const format = resolveFormat(fmt);
+  if (!format) {
+    return new NextResponse("Unsupported format", { status: 400 });
   }
 
-  if (fmt === "shadowrocket") {
-    const result = renderShadowrocket(group);
-    return new NextResponse(result.body, {
-      status: 200,
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Cache-Control": "no-store",
-      },
-    });
-  }
+  const subHost = request.headers.get("host");
+  const result = renderSubscription(group, format, subHost);
 
-  return new NextResponse("Unsupported format", { status: 400 });
+  const headers: Record<string, string> = {
+    "Content-Type": result.contentType,
+    "Cache-Control": "no-store",
+    "profile-update-interval": "24",
+    "Content-Disposition": `inline; filename="wiremesh-${safeFilename(group.name)}.${fileExtension(format)}"`,
+  };
+
+  return new NextResponse(result.body, { status: 200, headers });
 }

@@ -664,6 +664,44 @@
     "saveDevicesFailed": "保存设备列表失败",
     "urlClash": "Clash / Mihomo 订阅",
     "urlShadowrocket": "Shadowrocket 订阅",
+    "clients": {
+      "generic": {
+        "name": "通用链接",
+        "platforms": "多平台通用",
+        "note": "适用于绝大多数 V2Ray 系客户端，不支持 WireGuard"
+      },
+      "clashverge": {
+        "name": "Clash Verge",
+        "platforms": "Android / iOS / macOS / Windows / Linux",
+        "note": "Clash / Mihomo 内核家族，支持全部协议"
+      },
+      "shadowrocket": {
+        "name": "Shadowrocket",
+        "platforms": "iOS",
+        "note": "支持 WireGuard、VLESS、SOCKS5"
+      },
+      "hiddify": {
+        "name": "Hiddify-Next",
+        "platforms": "Android / iOS / macOS / Windows / Linux",
+        "note": "sing-box 内核，支持全部协议"
+      },
+      "v2rayn": {
+        "name": "V2RayN",
+        "platforms": "Windows / macOS / Linux",
+        "note": "V2Ray 内核，不支持 WireGuard"
+      },
+      "v2rayng": {
+        "name": "V2RayNG",
+        "platforms": "Android",
+        "note": "V2Ray 内核，不支持 WireGuard"
+      },
+      "passwall": {
+        "name": "Passwall",
+        "platforms": "OpenWRT / 路由器",
+        "note": "V2Ray 系，不支持 WireGuard"
+      }
+    },
+    "wgSkippedWarning": "本订阅会跳过 WireGuard 设备（{count} 台）",
     "copyUrl": "复制订阅链接",
     "copied": "已复制到剪贴板",
     "copyFailed": "复制失败",

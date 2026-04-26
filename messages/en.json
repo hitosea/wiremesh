@@ -664,6 +664,44 @@
     "saveDevicesFailed": "Failed to save device list",
     "urlClash": "Clash / Mihomo subscription",
     "urlShadowrocket": "Shadowrocket subscription",
+    "clients": {
+      "generic": {
+        "name": "Generic",
+        "platforms": "Multi-platform fallback",
+        "note": "Works with most V2Ray-family clients; WireGuard not supported"
+      },
+      "clashverge": {
+        "name": "Clash Verge",
+        "platforms": "Android / iOS / macOS / Windows / Linux",
+        "note": "Clash / Mihomo core family — all protocols supported"
+      },
+      "shadowrocket": {
+        "name": "Shadowrocket",
+        "platforms": "iOS",
+        "note": "Supports WireGuard, VLESS, and SOCKS5"
+      },
+      "hiddify": {
+        "name": "Hiddify-Next",
+        "platforms": "Android / iOS / macOS / Windows / Linux",
+        "note": "sing-box core — all protocols supported"
+      },
+      "v2rayn": {
+        "name": "V2RayN",
+        "platforms": "Windows / macOS / Linux",
+        "note": "V2Ray core — WireGuard not supported"
+      },
+      "v2rayng": {
+        "name": "V2RayNG",
+        "platforms": "Android",
+        "note": "V2Ray core — WireGuard not supported"
+      },
+      "passwall": {
+        "name": "Passwall",
+        "platforms": "OpenWRT / Router",
+        "note": "V2Ray family — WireGuard not supported"
+      }
+    },
+    "wgSkippedWarning": "{count} WireGuard device(s) will be skipped in this subscription",
     "copyUrl": "Copy link",
     "copied": "Copied to clipboard",
     "copyFailed": "Copy failed",

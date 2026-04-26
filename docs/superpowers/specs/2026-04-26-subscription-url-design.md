@@ -54,6 +54,17 @@ Give each "subscription group" of devices one stable URL. Clients (Clash family,
 
 ### Output format strategy
 
+**Update 2026-04-26:** v1 ships with **4 underlying formats** behind **7 client-named URL aliases**. Each client gets its own URL even when multiple share the same wire format, so admins can copy a tailored link and the UI can warn ahead of protocol drops.
+
+| Client URL slug | Underlying format | WG | Xray | SOCKS5 |
+|---|---|:-:|:-:|:-:|
+| `generic`, `v2rayn`, `v2rayng`, `passwall` | v2ray (base64 URI list) | ✗ | ✓ | ✓ |
+| `shadowrocket` | shadowrocket (base64 URI list, includes `wg://`) | ✓ | ✓ | ✓ |
+| `clashverge` | clash (Mihomo YAML) | ✓ | ✓ | ✓ |
+| `hiddify` | singbox (sing-box JSON) | ✓ | ✓ | ✓ |
+
+Canonical names `clash`, `shadowrocket`, `v2ray`, `singbox` also resolve. Format dispatch lives in `src/lib/subscription/formats.ts`. WG devices are silently skipped on v2ray-family URLs (V2Ray core has no native WG outbound) and the count is exposed in the UI as a per-card warning.
+
 #### Clash YAML (Mihomo / Clash Verge Rev / Stash / FlClash)
 
 - Repo-bundled template `src/lib/subscription/templates/clash-default.yaml`:

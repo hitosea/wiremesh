@@ -27,6 +27,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { usePublicUrlCheck } from "@/components/public-url-check-provider";
+import { ALL_CLIENT_IDS, CLIENT_TO_FORMAT, FORMAT_PROTOCOL_SUPPORT, type ClientId } from "@/lib/subscription/formats";
 
 type DeviceRow = {
   id: number;
@@ -67,7 +68,7 @@ export default function SubscriptionDetailPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [savingDevices, setSavingDevices] = useState(false);
 
-  const [showQrFor, setShowQrFor] = useState<"clash" | "shadowrocket" | null>(null);
+  const [showQrFor, setShowQrFor] = useState<ClientId | null>(null);
   const [rotateOpen, setRotateOpen] = useState(false);
   const [rotating, setRotating] = useState(false);
 
@@ -77,8 +78,12 @@ export default function SubscriptionDetailPage() {
     return "";
   }, [publicUrl]);
 
-  const clashUrl = group ? `${baseOrigin}/api/sub/${group.token}/clash` : "";
-  const shadowrocketUrl = group ? `${baseOrigin}/api/sub/${group.token}/shadowrocket` : "";
+  const wgDeviceCount = useMemo(
+    () => (group?.devices ?? []).filter((d) => d.protocol === "wireguard").length,
+    [group]
+  );
+  const clientUrl = (clientId: ClientId): string =>
+    group ? `${baseOrigin}/api/sub/${group.token}/${clientId}` : "";
 
   const fetchGroup = async () => {
     setLoading(true);
@@ -247,26 +252,43 @@ export default function SubscriptionDetailPage() {
               {t("publicUrlMissing")}
             </div>
           )}
-          {(["clash", "shadowrocket"] as const).map((fmt) => {
-            const url = fmt === "clash" ? clashUrl : shadowrocketUrl;
-            const labelKey = fmt === "clash" ? "urlClash" : "urlShadowrocket";
+          {ALL_CLIENT_IDS.map((clientId) => {
+            const url = clientUrl(clientId);
+            const format = CLIENT_TO_FORMAT[clientId];
+            const wgSupported = FORMAT_PROTOCOL_SUPPORT[format].wireguard;
+            const showWgWarn = !wgSupported && wgDeviceCount > 0;
             return (
-              <Card key={fmt}>
-                <CardHeader>
-                  <CardTitle className="text-base">{t(labelKey)}</CardTitle>
+              <Card key={clientId}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <CardTitle className="text-base">
+                      {t(`clients.${clientId}.name`)}
+                    </CardTitle>
+                    <span className="text-xs text-muted-foreground">
+                      {t(`clients.${clientId}.platforms`)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {t(`clients.${clientId}.note`)}
+                  </p>
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  {showWgWarn && (
+                    <div className="rounded border border-amber-200 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/40 px-3 py-1.5 text-xs text-amber-900 dark:text-amber-100">
+                      {t("wgSkippedWarning", { count: wgDeviceCount })}
+                    </div>
+                  )}
                   <div className="font-mono text-xs break-all bg-muted rounded p-2">{url}</div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <Button size="sm" variant="outline" onClick={() => handleCopy(url)}>
                       {t("copyUrl")}
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => setShowQrFor(showQrFor === fmt ? null : fmt)}
+                      onClick={() => setShowQrFor(showQrFor === clientId ? null : clientId)}
                     >
-                      {showQrFor === fmt ? t("hideQr") : t("showQr")}
+                      {showQrFor === clientId ? t("hideQr") : t("showQr")}
                     </Button>
                     <a
                       href={url}
@@ -277,7 +299,7 @@ export default function SubscriptionDetailPage() {
                       {tc("download")}
                     </a>
                   </div>
-                  {showQrFor === fmt && (
+                  {showQrFor === clientId && (
                     <div className="flex justify-center bg-white p-4 rounded">
                       <QRCodeSVG value={url} size={200} />
                     </div>
