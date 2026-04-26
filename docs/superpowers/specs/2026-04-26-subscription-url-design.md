@@ -82,9 +82,11 @@ base64(newline-joined URIs). One URI per device. Empty header line not needed.
 
 | Protocol | URI scheme |
 |---|---|
-| WireGuard | `wireguard://<base64-of-conf-body>#<name>` (SR's documented format) |
+| WireGuard | `wg://host:port?publicKey=...&privateKey=...&ip=...&dns=...&udp=1&mtu=1420#name` (Shadowrocket-compatible; base64 keys URL-encoded with `+`→`%2B`, `=`→`%3D`, `/` left raw) |
 | Xray | `vless://uuid@host:port?params#name` (reuse existing builder) |
 | SOCKS5 | `socks5://username:password@host:port#name` (RFC-style, SR-compatible) |
+
+URIs are joined with `\r\n` then base64-encoded (matches the line-separator convention real SR subscriptions use).
 
 ### File layout
 

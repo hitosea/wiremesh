@@ -84,6 +84,7 @@ function buildDeviceContext(device: DeviceRow): DeviceContext | null {
   const ctx: DeviceContext = {
     id: device.id,
     name: device.name,
+    remark: device.remark ?? null,
     protocol,
     lineId: device.lineId,
     lineXrayPort: linePorts?.xrayPort ?? null,

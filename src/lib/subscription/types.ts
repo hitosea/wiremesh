@@ -20,6 +20,7 @@ export type EntryNodeContext = {
 export type DeviceContext = {
   id: number;
   name: string;
+  remark: string | null;
   protocol: DeviceProtocol;
   lineId: number;
   lineXrayPort: number | null;

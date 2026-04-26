@@ -23,6 +23,7 @@ function wgCtx(): DeviceContext {
   return {
     id: 10,
     name: "phone",
+    remark: null,
     protocol: "wireguard",
     lineId: 1,
     lineXrayPort: 41443,
@@ -41,6 +42,7 @@ function xrayRealityCtx(): DeviceContext {
   return {
     id: 11,
     name: "laptop",
+    remark: null,
     protocol: "xray",
     lineId: 1,
     lineXrayPort: 41443,
@@ -54,6 +56,7 @@ function xrayWsCtx(): DeviceContext {
   return {
     id: 12,
     name: "tablet",
+    remark: null,
     protocol: "xray",
     lineId: 2,
     lineXrayPort: 41445,
@@ -72,6 +75,7 @@ function socks5Ctx(): DeviceContext {
   return {
     id: 13,
     name: "router",
+    remark: null,
     protocol: "socks5",
     lineId: 1,
     lineXrayPort: null,
@@ -159,6 +163,13 @@ describe("buildClashProxies", () => {
     // both have name "phone" — second should become "phone-2"
     const { proxies } = buildClashProxies([a, b]);
     expect(proxies.map((p) => p.name)).toEqual(["phone", "phone-2"]);
+  });
+
+  it("includes device.remark in the proxy display name", () => {
+    const ctx = wgCtx();
+    ctx.remark = "work";
+    const p = buildClashProxy(ctx)!;
+    expect(p.name).toBe("phone (work)");
   });
 
   it("skips devices that produce null and reports skipped count", () => {

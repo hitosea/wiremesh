@@ -1,4 +1,5 @@
 import type { DeviceContext, ClashProxy } from "./types";
+import { deviceDisplayName } from "./display-name";
 
 export function sanitizeProxyName(raw: string, fallback: string): string {
   const cleaned = raw.replace(/[,:#\n\r\t]/g, "_").trim();
@@ -6,7 +7,7 @@ export function sanitizeProxyName(raw: string, fallback: string): string {
 }
 
 export function buildClashProxy(ctx: DeviceContext): ClashProxy | null {
-  const name = sanitizeProxyName(ctx.name, `device-${ctx.id}`);
+  const name = sanitizeProxyName(deviceDisplayName(ctx), `device-${ctx.id}`);
   const server = ctx.entry.domain ?? ctx.entry.ip;
 
   if (ctx.protocol === "wireguard" && ctx.wg) {

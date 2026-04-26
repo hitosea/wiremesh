@@ -1,29 +1,35 @@
 import type { DeviceContext } from "./types";
+import { deviceDisplayName } from "./display-name";
 
 function fragment(name: string): string {
   return `#${encodeURIComponent(name)}`;
 }
 
+/**
+ * Encode a base64 value for inclusion in a wg:// query string.
+ * Real Shadowrocket WG share links leave `/` un-encoded but escape
+ * `+` and `=`, so we match that style; clients percent-decode either way.
+ */
+function encodeBase64Query(s: string): string {
+  return s.replace(/\+/g, "%2B").replace(/=/g, "%3D");
+}
+
 export function buildShadowrocketUri(ctx: DeviceContext): string | null {
   const server = ctx.entry.domain ?? ctx.entry.ip;
-  const tag = fragment(ctx.name);
+  const tag = fragment(deviceDisplayName(ctx));
 
   if (ctx.protocol === "wireguard" && ctx.wg) {
-    const conf = [
-      "[Interface]",
-      `PrivateKey = ${ctx.wg.privateKey}`,
-      `Address = ${ctx.wg.address}`,
-      `DNS = ${ctx.entry.wgAddress}`,
-      "",
-      "[Peer]",
-      `PublicKey = ${ctx.entry.wgPublicKey}`,
-      `Endpoint = ${server}:${ctx.entry.wgPort}`,
-      "AllowedIPs = 0.0.0.0/0",
-      "PersistentKeepalive = 25",
-      "",
-    ].join("\n");
-    const encoded = Buffer.from(conf, "utf8").toString("base64");
-    return `wireguard://${encoded}${tag}`;
+    // Shadowrocket-compatible wg:// scheme. Format reference:
+    //   wg://host:port?publicKey=...&privateKey=...&ip=...&dns=...&udp=1#name
+    const params = [
+      `publicKey=${encodeBase64Query(ctx.entry.wgPublicKey)}`,
+      `privateKey=${encodeBase64Query(ctx.wg.privateKey)}`,
+      `ip=${ctx.wg.addressIp}`,
+      `dns=${ctx.entry.wgAddress}`,
+      "udp=1",
+      "mtu=1420",
+    ].join("&");
+    return `wg://${server}:${ctx.entry.wgPort}?${params}${tag}`;
   }
 
   if (ctx.protocol === "xray" && ctx.xray) {
@@ -61,7 +67,6 @@ export function buildShadowrocketUri(ctx: DeviceContext): string | null {
     const port = ctx.lineSocks5Port ?? ctx.entry.xrayPort;
     if (!port) return null;
     const userpass = encodeURIComponent(`${ctx.socks5.username}:${ctx.socks5.password}`);
-    // Shadowrocket-compatible socks5 URI form
     return `socks5://${userpass}@${server}:${port}${tag}`;
   }
 
@@ -79,6 +84,7 @@ export function buildShadowrocketSubscription(ctxs: DeviceContext[]): { body: st
     }
     lines.push(uri);
   }
-  const text = lines.join("\n");
+  // Real subscriptions use \r\n between URIs; some clients are picky.
+  const text = lines.join("\r\n");
   return { body: Buffer.from(text, "utf8").toString("base64"), skipped };
 }
