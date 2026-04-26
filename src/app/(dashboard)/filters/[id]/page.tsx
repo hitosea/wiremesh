@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { FilterFormatHelp } from "@/components/filter-format-help";
 import { useAdminSSE } from "@/components/admin-sse-provider";
+import { useSetBreadcrumbLabel } from "@/components/breadcrumb-context";
 import { buildBranchChain, type LineNode } from "@/lib/branch-chain";
 
 type Branch = {
@@ -70,6 +71,8 @@ export default function EditFilterPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
+
+  useSetBreadcrumbLabel(filter?.name ?? null);
   const [syncingNodeCount, setSyncingNodeCount] = useState(0);
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [linesWithBranches, setLinesWithBranches] = useState<LineWithBranches[]>([]);

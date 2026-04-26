@@ -25,6 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { usePublicUrlCheck } from "@/components/public-url-check-provider";
+import { useSetBreadcrumbLabel } from "@/components/breadcrumb-context";
 import { ALL_CLIENT_IDS, CLIENT_TO_FORMAT, FORMAT_PROTOCOL_SUPPORT, clientI18nKey, type ClientId } from "@/lib/subscription/formats";
 
 type DeviceRow = {
@@ -70,6 +71,8 @@ export default function SubscriptionDetailPage() {
   const [showQrFor, setShowQrFor] = useState<ClientId | null>(null);
   const [rotateOpen, setRotateOpen] = useState(false);
   const [rotating, setRotating] = useState(false);
+
+  useSetBreadcrumbLabel(group?.name ?? null);
 
   const baseOrigin = useMemo(() => {
     if (publicUrl) return publicUrl;
@@ -316,8 +319,9 @@ export default function SubscriptionDetailPage() {
           })}
 
           <Card>
-            <CardHeader>
+            <CardHeader className="pb-3">
               <CardTitle className="text-base">{t("tokenLabel")}</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">{t("tokenDesc")}</p>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="font-mono text-xs break-all bg-muted rounded p-2">

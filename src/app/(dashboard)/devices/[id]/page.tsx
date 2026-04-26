@@ -33,6 +33,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import Link from "next/link";
+import { useSetBreadcrumbLabel } from "@/components/breadcrumb-context";
 
 type LineOption = { id: number; name: string };
 
@@ -76,6 +77,8 @@ function DeviceDetailContent() {
   const [device, setDevice] = useState<DeviceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  useSetBreadcrumbLabel(device?.name ?? null);
 
   const [name, setName] = useState("");
   const [remark, setRemark] = useState("");

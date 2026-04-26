@@ -28,6 +28,7 @@ import { xrayPortHintParams } from "@/lib/port-hint";
 import { parseTunnelPortBlacklist } from "@/lib/ip-allocator";
 import { NodePortsDetail } from "@/components/node-ports-detail";
 import { useAdminSSE } from "@/components/admin-sse-provider";
+import { useSetBreadcrumbLabel } from "@/components/breadcrumb-context";
 import { Loader2 } from "lucide-react";
 
 type NodeDetail = {
@@ -76,6 +77,8 @@ export default function NodeDetailPage() {
   const [node, setNode] = useState<NodeDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  useSetBreadcrumbLabel(node?.name ?? null);
 
   const [name, setName] = useState("");
   const [ip, setIp] = useState("");

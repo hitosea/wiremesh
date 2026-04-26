@@ -719,6 +719,7 @@
     "rotated": "Token rotated",
     "rotateFailed": "Rotate failed",
     "tokenLabel": "Token",
+    "tokenDesc": "The secret embedded in subscription URLs; rotating invalidates old links immediately and all clients must re-import",
     "showQr": "Show QR",
     "hideQr": "Hide QR",
     "noDevices": "No devices yet",

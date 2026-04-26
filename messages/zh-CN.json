@@ -719,6 +719,7 @@
     "rotated": "Token 已更新",
     "rotateFailed": "轮换失败",
     "tokenLabel": "Token",
+    "tokenDesc": "嵌入在订阅 URL 中的密钥；轮换后旧链接立即失效，所有客户端需重新导入",
     "showQr": "显示二维码",
     "hideQr": "隐藏二维码",
     "noDevices": "尚未添加设备",

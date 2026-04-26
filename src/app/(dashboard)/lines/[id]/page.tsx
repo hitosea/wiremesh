@@ -39,6 +39,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useSetBreadcrumbLabel } from "@/components/breadcrumb-context";
 
 type LineNode = {
   hopOrder: number;
@@ -112,6 +113,8 @@ export default function LineDetailPage() {
   const [line, setLine] = useState<LineDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  useSetBreadcrumbLabel(line?.name ?? null);
 
   const [name, setName] = useState("");
   const [remark, setRemark] = useState("");

@@ -9,6 +9,7 @@ import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePublicUrlCheck } from "@/components/public-url-check-provider";
+import { useSetBreadcrumbLabel } from "@/components/breadcrumb-context";
 
 export default function NodeScriptPage() {
   const params = useParams();
@@ -25,6 +26,8 @@ export default function NodeScriptPage() {
   const [showFull, setShowFull] = useState(false);
   const [loading, setLoading] = useState(true);
   const [nodeName, setNodeName] = useState("");
+
+  useSetBreadcrumbLabel(nodeName || null);
 
   useEffect(() => {
     // Fetch node detail to get agentToken

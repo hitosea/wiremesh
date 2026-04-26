@@ -1,16 +1,20 @@
 "use client";
 
-import { useRouter, usePathname } from "next/navigation";
+import { Suspense, useMemo } from "react";
+import Link from "next/link";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Menu, LogOut } from "lucide-react";
+import { Menu, LogOut, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LocaleToggle } from "@/components/locale-toggle";
 import { useSidebarMobile } from "@/components/sidebar";
 import { NAV_GROUPS, navItemMatches } from "@/components/sidebar-constants";
+import { useBreadcrumbLabel } from "@/components/breadcrumb-context";
+import { buildBreadcrumb } from "@/components/breadcrumb-routes";
 import { toast } from "sonner";
 
-function getPageTitleKey(pathname: string): string {
+function getNavTitleKey(pathname: string): string {
   for (const group of NAV_GROUPS) {
     for (const item of group.items) {
       if (navItemMatches(item, pathname)) return item.labelKey;
@@ -19,9 +23,64 @@ function getPageTitleKey(pathname: string): string {
   return "";
 }
 
+function TopbarTitle() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const dynamicLabel = useBreadcrumbLabel();
+  const t = useTranslations();
+
+  const segments = useMemo(
+    () => buildBreadcrumb(pathname, searchParams, dynamicLabel, t),
+    [pathname, searchParams, dynamicLabel, t],
+  );
+
+  if (!segments) {
+    const titleKey = getNavTitleKey(pathname);
+    return (
+      <h1 className="text-sm font-semibold">
+        {titleKey ? t(titleKey) : "WireMesh"}
+      </h1>
+    );
+  }
+
+  return (
+    <nav
+      aria-label="Breadcrumb"
+      className="flex items-center gap-1.5 text-sm font-semibold min-w-0"
+    >
+      {segments.map((seg, idx) => {
+        const isLast = idx === segments.length - 1;
+        return (
+          <span key={idx} className="flex items-center gap-1.5 min-w-0">
+            {idx > 0 && (
+              <ChevronRight
+                className="h-3.5 w-3.5 text-muted-foreground/70 shrink-0"
+                aria-hidden
+              />
+            )}
+            {seg.label === null ? (
+              <span className="inline-block h-4 w-16 rounded-md bg-muted animate-pulse" />
+            ) : seg.href && !isLast ? (
+              <Link
+                href={seg.href}
+                className="text-muted-foreground hover:text-foreground transition-colors truncate"
+              >
+                {seg.label}
+              </Link>
+            ) : (
+              <span className={isLast ? "truncate" : "text-muted-foreground truncate"}>
+                {seg.label}
+              </span>
+            )}
+          </span>
+        );
+      })}
+    </nav>
+  );
+}
+
 export default function Topbar() {
   const router = useRouter();
-  const pathname = usePathname();
   const { setMobileOpen } = useSidebarMobile();
   const t = useTranslations();
 
@@ -34,11 +93,9 @@ export default function Topbar() {
     }
   }
 
-  const titleKey = getPageTitleKey(pathname);
-
   return (
     <header className="h-14 flex-shrink-0 bg-background border-b flex items-center justify-between px-4 lg:px-6">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 min-w-0">
         <Button
           variant="ghost"
           size="icon"
@@ -47,9 +104,9 @@ export default function Topbar() {
         >
           <Menu className="h-4 w-4" />
         </Button>
-        <h1 className="text-sm font-semibold">
-          {titleKey ? t(titleKey) : "WireMesh"}
-        </h1>
+        <Suspense fallback={<h1 className="text-sm font-semibold">WireMesh</h1>}>
+          <TopbarTitle />
+        </Suspense>
       </div>
       <div className="flex items-center gap-1">
         <LocaleToggle />

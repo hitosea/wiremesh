@@ -9,6 +9,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useSetBreadcrumbLabel } from "@/components/breadcrumb-context";
 import { Loader2 } from "lucide-react";
 
 type ConfigData = {
@@ -105,6 +106,8 @@ export default function DeviceConfigPage() {
   const [lineLoading, setLineLoading] = useState(true);
   const [lineError, setLineError] = useState<string | null>(null);
   const [deviceName, setDeviceName] = useState<string>("");
+
+  useSetBreadcrumbLabel(deviceName || null);
 
   useEffect(() => {
     // Fetch config
