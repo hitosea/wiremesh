@@ -592,7 +592,8 @@
       "device": "Device",
       "line": "Line",
       "filter": "Filter Rule",
-      "setting": "Setting"
+      "settings": "Setting",
+      "subscription": "Subscription Group"
     },
     "noLogs": "No logs",
     "time": "Time",

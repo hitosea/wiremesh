@@ -592,7 +592,8 @@
       "device": "设备",
       "line": "线路",
       "filter": "过滤规则",
-      "setting": "设置"
+      "settings": "设置",
+      "subscription": "订阅组"
     },
     "noLogs": "暂无日志记录",
     "time": "时间",
