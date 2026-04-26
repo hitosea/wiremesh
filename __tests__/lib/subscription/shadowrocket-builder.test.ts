@@ -101,6 +101,15 @@ describe("buildShadowrocketSubscription", () => {
     expect(lines[2].startsWith("socks5://")).toBe(true);
   });
 
+  it("prepends a STATUS line when one is supplied", () => {
+    const status = "STATUS=↑:1.00GB,↓:2.00GB,✓:∞,〇:∞,⊖:∞";
+    const { body } = buildShadowrocketSubscription([sock], status);
+    const decoded = Buffer.from(body, "base64").toString("utf8");
+    const lines = decoded.split("\r\n");
+    expect(lines[0]).toBe(status);
+    expect(lines[1].startsWith("socks5://")).toBe(true);
+  });
+
   it("skips devices that produce null", () => {
     const broken: DeviceContext = { ...vlessReality, entry: { ...baseEntry, realityPublicKey: null } };
     const { body, skipped } = buildShadowrocketSubscription([broken, sock]);

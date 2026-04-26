@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isValidTokenShape } from "@/lib/subscription/token";
 import { findGroupByToken, renderSubscription } from "@/lib/subscription/render";
 import { resolveFormat } from "@/lib/subscription/formats";
+import { loadGroupTraffic, formatSubscriptionUserinfo } from "@/lib/subscription/traffic";
 
 type Params = { params: Promise<{ token: string; fmt: string }> };
 
@@ -33,12 +34,19 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   const subHost = request.headers.get("host");
   const result = renderSubscription(group, format, subHost, fmt.toLowerCase());
+  const traffic = loadGroupTraffic(group.id);
 
   const headers: Record<string, string> = {
     "Content-Type": result.contentType,
     "Cache-Control": "no-store",
     "profile-update-interval": "24",
     "Content-Disposition": `inline; filename="wiremesh-${safeFilename(group.name)}.${fileExtension(format)}"`,
+    // Subscription title — clients display this as the profile name on
+    // import. Convention is base64-prefixed text (Surge/sing-box flavour).
+    "profile-title": `base64:${Buffer.from(group.name, "utf8").toString("base64")}`,
+    // Traffic stats — Clash Verge / Hiddify / sing-box GUI parse this and
+    // render a usage banner. total=0/expire=0 means "no quota / no expire".
+    "subscription-userinfo": formatSubscriptionUserinfo(traffic),
   };
 
   return new NextResponse(result.body, { status: 200, headers });

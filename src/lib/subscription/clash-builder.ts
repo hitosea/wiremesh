@@ -41,6 +41,8 @@ export function buildClashProxy(ctx: DeviceContext): ClashProxy | null {
         uuid: ctx.xray.uuid,
         tls: true,
         network: "ws",
+        udp: true,
+        "packet-encoding": "xudp",
         servername: sni,
         "client-fingerprint": "chrome",
         "ws-opts": {
@@ -59,6 +61,8 @@ export function buildClashProxy(ctx: DeviceContext): ClashProxy | null {
       uuid: ctx.xray.uuid,
       tls: true,
       network: "tcp",
+      udp: true,
+      "packet-encoding": "xudp",
       flow: "xtls-rprx-vision",
       servername: ctx.entry.realityServerName ?? "www.microsoft.com",
       "client-fingerprint": "chrome",

@@ -116,7 +116,7 @@ describe("buildClashProxy — wireguard", () => {
 });
 
 describe("buildClashProxy — xray reality", () => {
-  it("emits a vless reality proxy on tcp", () => {
+  it("emits a vless reality proxy on tcp with udp + xudp", () => {
     const p = buildClashProxy(xrayRealityCtx())!;
     expect(p.type).toBe("vless");
     expect(p.network).toBe("tcp");
@@ -124,6 +124,8 @@ describe("buildClashProxy — xray reality", () => {
     expect(p.flow).toBe("xtls-rprx-vision");
     expect(p.servername).toBe("www.microsoft.com");
     expect(p.port).toBe(41443);
+    expect(p.udp).toBe(true);
+    expect(p["packet-encoding"]).toBe("xudp");
     expect(p["reality-opts"]).toEqual({ "public-key": "REALPUB", "short-id": "abcd" });
   });
 

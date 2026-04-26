@@ -9,6 +9,7 @@ import { buildClashProxies } from "./clash-builder";
 import { buildShadowrocketSubscription } from "./shadowrocket-builder";
 import { buildV2RaySubscription } from "./v2ray-builder";
 import { buildSingboxOutbounds } from "./singbox-builder";
+import { loadGroupTraffic, formatShadowrocketStatusLine } from "./traffic";
 import type { SubscriptionGroupRow } from "./types";
 import type { FormatKind } from "./formats";
 
@@ -86,7 +87,9 @@ function renderClash(group: SubscriptionGroupRow, subHost: string | null): Rende
 function renderShadowrocket(group: SubscriptionGroupRow): RenderResult {
   const deviceIds = loadGroupDeviceIds(group.id);
   const ctxs = loadDeviceContexts(deviceIds);
-  const { body, skipped } = buildShadowrocketSubscription(ctxs);
+  const traffic = loadGroupTraffic(group.id);
+  const statusLine = formatShadowrocketStatusLine(traffic);
+  const { body, skipped } = buildShadowrocketSubscription(ctxs, statusLine);
   return {
     group,
     body,

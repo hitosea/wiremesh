@@ -12,7 +12,10 @@ export function buildShadowrocketUri(ctx: DeviceContext): string | null {
   return null;
 }
 
-export function buildShadowrocketSubscription(ctxs: DeviceContext[]): { body: string; skipped: number } {
+export function buildShadowrocketSubscription(
+  ctxs: DeviceContext[],
+  statusLine?: string | null
+): { body: string; skipped: number } {
   const lines: string[] = [];
   let skipped = 0;
   for (const ctx of ctxs) {
@@ -23,7 +26,9 @@ export function buildShadowrocketSubscription(ctxs: DeviceContext[]): { body: st
     }
     lines.push(uri);
   }
-  // Real subscriptions use \r\n between URIs; some clients are picky.
-  const text = lines.join("\r\n");
+  // SR's STATUS=... banner is a single prefix line ahead of the URI list;
+  // the rest of the body is base64-decoded as a CRLF-joined URI list.
+  const allLines = statusLine ? [statusLine, ...lines] : lines;
+  const text = allLines.join("\r\n");
   return { body: Buffer.from(text, "utf8").toString("base64"), skipped };
 }
