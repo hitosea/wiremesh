@@ -24,6 +24,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import Link from "next/link";
 
 type LineOption = { id: number; name: string };
@@ -149,22 +157,18 @@ function DeviceDetailContent() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-48 text-muted-foreground">
-        {tc("loading")}
-      </div>
-    );
-  }
-
-  if (!device) return null;
-
   return (
     <div className="space-y-6 w-full">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold">{device.name}</h1>
-          {device.status !== "-" && (
+          <h1 className="text-2xl font-semibold">
+            {device ? (
+              device.name
+            ) : (
+              <span className="inline-block h-7 w-48 rounded-md bg-muted animate-pulse align-middle" />
+            )}
+          </h1>
+          {device && device.status !== "-" && (
             <StatusDotWithCount
               status={device.status}
               label={ts(`status.${device.status}`)}
@@ -181,6 +185,11 @@ function DeviceDetailContent() {
           </Button>
         </div>
       </div>
+      {loading ? (
+        <div className="flex items-center justify-center h-48 text-muted-foreground">
+          {tc("loading")}
+        </div>
+      ) : device && (<>
 
       {/* Read-only info */}
       <Card>
@@ -259,22 +268,22 @@ function DeviceDetailContent() {
                 return <div className="text-sm text-muted-foreground">{t("noActiveConnections")}</div>;
               }
               return (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-muted-foreground">
-                      <th className="py-1 font-medium">{t("sourceIp")}</th>
-                      <th className="py-1 font-medium">{t("lastSeen")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t("sourceIp")}</TableHead>
+                      <TableHead>{t("lastSeen")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {ips.map((entry) => (
-                      <tr key={entry.ip} className={ips.length > 1 ? "border-t" : ""}>
-                        <td className="py-1 font-mono">{entry.ip}</td>
-                        <td className="py-1">{new Date(entry.last_seen * 1000).toLocaleString()}</td>
-                      </tr>
+                      <TableRow key={entry.ip}>
+                        <TableCell><code className="text-xs">{entry.ip}</code></TableCell>
+                        <TableCell>{new Date(entry.last_seen * 1000).toLocaleString()}</TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               );
             })()}
           </CardContent>
@@ -339,6 +348,7 @@ function DeviceDetailContent() {
           {tc("back")}
         </Button>
       </div>
+      </>)}
     </div>
   );
 }

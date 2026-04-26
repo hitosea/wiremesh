@@ -43,9 +43,7 @@
     "devices": "Devices",
     "lines": "Lines",
     "filters": "Filter Rules",
-    "subscriptions": "Subscriptions",
     "settings": "Settings",
-    "auditLogs": "Audit Logs",
     "help": "Help"
   },
   "theme": {
@@ -227,6 +225,10 @@
     "expand": "Expand"
   },
   "devices": {
+    "tabs": {
+      "devices": "Devices",
+      "subscriptions": "Subscriptions"
+    },
     "status": {
       "online": "Online",
       "offline": "Offline",
@@ -439,7 +441,6 @@
     "refreshFailed": "Refresh failed",
     "lastUpdated": "Last updated {time}",
     "staleData": "Data may be stale, click refresh",
-    "actions": "Actions",
     "reallocate": "Reallocate ports",
     "reallocateConfirm": "Current ports {ports} will be added to node blacklist. Continue?",
     "reallocateTitle": "Reallocate tunnel ports",
@@ -476,8 +477,6 @@
     "statusCol": "Status",
     "countSuffix": "",
     "branchSuffix": "",
-    "statusEnabled": "Enabled",
-    "statusDisabled": "Disabled",
     "addRule": "Add Rule",
     "searchPlaceholder": "Search rule name...",
     "confirmDeleteFilter": "Are you sure you want to delete this filter rule? This action cannot be undone."
@@ -535,6 +534,10 @@
     "syncTimeout": "Sync result timeout. Please check that entry node Agent is online"
   },
   "settings": {
+    "tabs": {
+      "settings": "Settings",
+      "logs": "Audit Logs"
+    },
     "loadFailed": "Failed to load settings",
     "saved": "Settings saved",
     "changePassword": "Change Password",
@@ -595,13 +598,11 @@
       "settings": "Setting",
       "subscription": "Subscription Group"
     },
-    "noLogs": "No logs",
     "time": "Time",
     "actionCol": "Action",
     "typeCol": "Type",
     "target": "Target",
-    "details": "Details",
-    "paginationInfo": "{total} records, page {page} / {totalPages}"
+    "details": "Details"
   },
   "nodeStatusChart": {
     "loadFailed": "Failed to load status history",

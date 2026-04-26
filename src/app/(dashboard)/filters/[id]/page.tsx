@@ -195,16 +195,6 @@ export default function EditFilterPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-48 text-muted-foreground">
-        {tc("loading")}
-      </div>
-    );
-  }
-
-  if (!filter) return null;
-
   return (
     <div className="space-y-6 w-full">
       <div className="flex items-center justify-between">
@@ -213,6 +203,11 @@ export default function EditFilterPage() {
           {tc("back")}
         </Button>
       </div>
+      {loading ? (
+        <div className="flex items-center justify-center h-48 text-muted-foreground">
+          {tc("loading")}
+        </div>
+      ) : filter && (<>
 
       <Card>
         <CardHeader>
@@ -420,6 +415,7 @@ export default function EditFilterPage() {
           {tc("back")}
         </Button>
       </div>
+      </>)}
     </div>
   );
 }

@@ -295,27 +295,30 @@ export default function LineDetailPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-48 text-muted-foreground">
-        {tc("loading")}
-      </div>
-    );
-  }
-
-  if (!line) return null;
-
   return (
     <div className="space-y-6 w-full">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold">{line.name}</h1>
-          <StatusDot status={line.status} label={tl(`status.${line.status}` as "status.active" | "status.inactive") ?? line.status} />
+          <h1 className="text-2xl font-semibold">
+            {line ? (
+              line.name
+            ) : (
+              <span className="inline-block h-7 w-48 rounded-md bg-muted animate-pulse align-middle" />
+            )}
+          </h1>
+          {line && (
+            <StatusDot status={line.status} label={tl(`status.${line.status}` as "status.active" | "status.inactive") ?? line.status} />
+          )}
         </div>
         <Button variant="outline" onClick={() => router.push("/lines")}>
           {tc("back")}
         </Button>
       </div>
+      {loading ? (
+        <div className="flex items-center justify-center h-48 text-muted-foreground">
+          {tc("loading")}
+        </div>
+      ) : line && (<>
 
       {/* Basic info card */}
       {(() => {
@@ -501,7 +504,7 @@ export default function LineDetailPage() {
                   <TableHead>{t("targetPort")}</TableHead>
                   <TableHead>{t("lastHandshake")}</TableHead>
                   <TableHead>{t("transfer")}</TableHead>
-                  <TableHead className="text-right">{t("actions")}</TableHead>
+                  <TableHead className="text-right" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -653,6 +656,7 @@ export default function LineDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </>)}
     </div>
   );
 }

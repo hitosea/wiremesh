@@ -7,8 +7,6 @@ import { toast } from "sonner";
 import { translateError } from "@/lib/translate-error";
 import { useTranslations } from "next-intl";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,30 +19,22 @@ import {
 } from "@/components/ui/alert-dialog";
 import { DataTable, Column, PaginationInfo } from "@/components/data-table";
 
-type Filter = {
+type SubscriptionGroup = {
   id: number;
   name: string;
-  mode: string;
-  isEnabled: boolean;
-  rulesCount: number;
-  branchCount: number;
+  token: string;
   remark: string | null;
+  deviceCount: number;
+  createdAt: string;
 };
 
-const MODE_VARIANTS: Record<
-  string,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  whitelist: "default",
-  blacklist: "destructive",
-};
-
-export default function FiltersPage() {
+export function SubscriptionsList() {
   const router = useRouter();
-  const t = useTranslations("filters");
+  const t = useTranslations("subscriptions");
   const tc = useTranslations("common");
   const te = useTranslations("errors");
-  const [data, setData] = useState<Filter[]>([]);
+
+  const [data, setData] = useState<SubscriptionGroup[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
     pageSize: 20,
@@ -55,89 +45,54 @@ export default function FiltersPage() {
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [togglingId, setTogglingId] = useState<number | null>(null);
 
-  const fetchFilters = async (page = 1, q = search) => {
+  const fetchGroups = async (page = 1, q = search) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: String(page), pageSize: "20" });
       if (q) params.set("search", q);
-      const res = await fetch(`/api/filters?${params}`);
+      const res = await fetch(`/api/subscriptions?${params}`);
       const json = await res.json();
+      if (!res.ok) throw new Error(translateError(json.error, te, t("loadFailed")));
       setData(json.data ?? []);
       if (json.pagination) setPagination(json.pagination);
-    } catch {
-      toast.error(t("loadFailed"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("loadFailed"));
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchFilters(1, "");
+    fetchGroups(1, "");
   }, []);
-
-  const handleSearch = (q: string) => {
-    setSearch(q);
-    fetchFilters(1, q);
-  };
-
-  const handlePageChange = (page: number) => {
-    setPagination((p) => ({ ...p, page }));
-    fetchFilters(page);
-  };
-
-  const handleToggle = async (filter: Filter) => {
-    setTogglingId(filter.id);
-    try {
-      const res = await fetch(`/api/filters/${filter.id}/toggle`, {
-        method: "PUT",
-      });
-      const json = await res.json();
-      if (res.ok) {
-        setData((prev) =>
-          prev.map((f) =>
-            f.id === filter.id ? { ...f, isEnabled: json.data.isEnabled } : f
-          )
-        );
-        toast.success(json.data.isEnabled ? t("enabled") : t("disabled"));
-      } else {
-        toast.error(translateError(json.error, te, t("toggleFailed")));
-      }
-    } catch {
-      toast.error(t("toggleFailedRetry"));
-    } finally {
-      setTogglingId(null);
-    }
-  };
 
   const handleDelete = async () => {
     if (!deleteId) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/filters/${deleteId}`, { method: "DELETE" });
-      if (res.ok) {
-        toast.success(t("deleted"));
-        setDeleteId(null);
-        fetchFilters(pagination.page);
-      } else {
+      const res = await fetch(`/api/subscriptions/${deleteId}`, { method: "DELETE" });
+      if (!res.ok) {
         const json = await res.json();
-        toast.error(translateError(json.error, te, tc("deleteFailed")));
+        throw new Error(translateError(json.error, te, tc("deleteFailed")));
       }
-    } catch {
-      toast.error(tc("deleteFailedRetry"));
+      toast.success(t("deleted"));
+      setDeleteId(null);
+      fetchGroups(pagination.page, search);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : tc("deleteFailedRetry"));
     } finally {
       setDeleting(false);
     }
   };
 
-  const columns: Column<Filter>[] = [
+  const columns: Column<SubscriptionGroup>[] = [
     {
       key: "name",
       label: t("name"),
       render: (row) => (
         <Link
-          href={`/filters/${row.id}`}
+          href={`/subscriptions/${row.id}`}
           className="text-primary hover:underline font-medium"
         >
           {row.name}
@@ -145,33 +100,24 @@ export default function FiltersPage() {
       ),
     },
     {
-      key: "mode",
-      label: t("modeCol"),
+      key: "deviceCount",
+      label: t("deviceCount"),
+      render: (row) => <span>{row.deviceCount}</span>,
+    },
+    {
+      key: "remark",
+      label: t("remark"),
       render: (row) => (
-        <Badge variant={MODE_VARIANTS[row.mode] ?? "secondary"}>
-          {t(`mode.${row.mode}`)}
-        </Badge>
+        <span className="text-muted-foreground text-sm">{row.remark ?? "—"}</span>
       ),
     },
     {
-      key: "rulesCount",
-      label: t("ruleCount"),
-      render: (row) => <span>{row.rulesCount} {t("countSuffix")}</span>,
-    },
-    {
-      key: "branchCount",
-      label: t("linkedBranches"),
-      render: (row) => <span>{row.branchCount} {t("branchSuffix")}</span>,
-    },
-    {
-      key: "isEnabled",
-      label: t("statusCol"),
+      key: "createdAt",
+      label: t("createdAt"),
       render: (row) => (
-        <Switch
-          checked={row.isEnabled}
-          disabled={togglingId === row.id}
-          onCheckedChange={() => handleToggle(row)}
-        />
+        <span className="text-muted-foreground text-sm">
+          {new Date(row.createdAt).toLocaleString()}
+        </span>
       ),
     },
     {
@@ -179,11 +125,11 @@ export default function FiltersPage() {
       label: "",
       align: "right",
       render: (row) => (
-        <div className="flex gap-2">
+        <div className="flex gap-2 justify-end">
           <Button
             variant="outline"
             size="sm"
-            onClick={() => router.push(`/filters/${row.id}`)}
+            onClick={() => router.push(`/subscriptions/${row.id}`)}
           >
             {tc("edit")}
           </Button>
@@ -201,10 +147,6 @@ export default function FiltersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <Button onClick={() => router.push("/filters/new")}>{t("addRule")}</Button>
-      </div>
-
       {loading ? (
         <div className="flex items-center justify-center h-48 text-muted-foreground">
           {tc("loading")}
@@ -214,9 +156,12 @@ export default function FiltersPage() {
           data={data as unknown as Record<string, unknown>[]}
           columns={columns as Column<Record<string, unknown>>[]}
           pagination={pagination}
-          onPageChange={handlePageChange}
-          onSearch={handleSearch}
-          onRefresh={() => fetchFilters(pagination.page)}
+          onPageChange={(p) => fetchGroups(p, search)}
+          onSearch={(q) => {
+            setSearch(q);
+            fetchGroups(1, q);
+          }}
+          onRefresh={() => fetchGroups(pagination.page, search)}
           searchPlaceholder={t("searchPlaceholder")}
         />
       )}
@@ -230,7 +175,7 @@ export default function FiltersPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{tc("confirmDelete")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("confirmDeleteFilter")}</AlertDialogDescription>
+            <AlertDialogDescription>{t("deleteConfirm")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>{tc("cancel")}</AlertDialogCancel>

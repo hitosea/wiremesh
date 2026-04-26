@@ -14,7 +14,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { NAV_GROUPS, type NavItem } from "@/components/sidebar-constants";
+import { NAV_GROUPS, navItemMatches, type NavItem } from "@/components/sidebar-constants";
 
 const COLLAPSED_KEY = "wiremesh-sidebar-collapsed";
 
@@ -108,8 +108,7 @@ function SidebarNav({
               <div className="h-px bg-border mx-2 my-2" />
             )}
             {group.items.map((item) => {
-              const active =
-                pathname === item.href || pathname.startsWith(item.href + "/");
+              const active = navItemMatches(item, pathname);
               return (
                 <NavLink
                   key={item.href}

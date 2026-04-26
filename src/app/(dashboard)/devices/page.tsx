@@ -29,6 +29,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SubscriptionsList } from "@/components/subscriptions-list";
 
 type Device = {
   id: number;
@@ -60,12 +62,50 @@ export default function DevicesPage() {
   const tc = useTranslations("common");
   return (
     <Suspense fallback={<div className="flex items-center justify-center h-48 text-muted-foreground">{tc("loading")}</div>}>
-      <DevicesContent />
+      <DevicesContainer />
     </Suspense>
   );
 }
 
-function DevicesContent() {
+function DevicesContainer() {
+  const t = useTranslations("devices");
+  const tSub = useTranslations("subscriptions");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tab = searchParams.get("tab") === "subscriptions" ? "subscriptions" : "devices";
+
+  const handleTabChange = (value: string) => {
+    if (value === "subscriptions") {
+      router.replace("/devices?tab=subscriptions");
+    } else {
+      router.replace("/devices");
+    }
+  };
+
+  return (
+    <Tabs value={tab} onValueChange={handleTabChange}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <TabsList>
+          <TabsTrigger value="devices" className="px-4">{t("tabs.devices")}</TabsTrigger>
+          <TabsTrigger value="subscriptions" className="px-4">{t("tabs.subscriptions")}</TabsTrigger>
+        </TabsList>
+        {tab === "devices" ? (
+          <Button onClick={() => router.push("/devices/new")}>{t("addDevice")}</Button>
+        ) : (
+          <Button onClick={() => router.push("/subscriptions/new")}>{tSub("create")}</Button>
+        )}
+      </div>
+      <TabsContent value="devices" className="mt-4">
+        <DevicesListTab />
+      </TabsContent>
+      <TabsContent value="subscriptions" className="mt-4">
+        <SubscriptionsList />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function DevicesListTab() {
   const t = useTranslations("devices");
   const tc = useTranslations("common");
   const te = useTranslations("errors");
@@ -356,10 +396,6 @@ function DevicesContent() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <Button onClick={() => router.push("/devices/new")}>{t("addDevice")}</Button>
-      </div>
-
       {selectedIds.size > 0 && (
         <div className="flex items-center gap-3 p-3 bg-muted dark:bg-card border rounded-lg">
           <span className="text-sm font-medium">{tc("selectedItems", { count: selectedIds.size })}</span>

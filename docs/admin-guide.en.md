@@ -5,8 +5,8 @@ WireMesh is a WireGuard mesh VPN management platform for internal use. It lets y
 **Core concepts:**
 
 - **Nodes** — Linux servers running the `wiremesh-agent` binary. Each node has a public IP and connects to the management platform over SSE. Nodes form the backbone of the VPN network.
+- **Lines** — Multi-hop routes that chain nodes together. Each line has an entry node and one or more branches, where each branch defines a chain of relay and exit nodes. Clients are assigned to a line to determine their traffic path.
 - **Devices** — Client endpoints (laptops, phones) that connect to the VPN. Each device gets a WireGuard, Xray, or SOCKS5 configuration.
-- **Lines** — Multi-hop routes that chain nodes together. Each line has an entry node and one or more branches, where each branch defines a chain of relay and exit nodes. Devices are assigned to a line to determine their traffic path.
 - **Filter Rules** — Domain- or IP-based routing rules linked to line branches. They control which traffic goes through which branch, supporting whitelist and blacklist modes.
 
 ---
@@ -20,8 +20,8 @@ The dashboard gives a real-time snapshot of your network health.
 Three summary cards are displayed:
 
 - **Nodes** — Total count, with online (green), offline (gray), and error (red, shown only if > 0) breakdowns.
-- **Devices** — Total count, with online (green) and offline (gray) breakdowns.
 - **Lines** — Total count, with active (green) and disabled (gray) breakdowns.
+- **Devices** — Total count, with online (green) and offline (gray) breakdowns.
 
 ### Status Tables
 
@@ -116,6 +116,32 @@ This is a generic script that works on any node without requiring authentication
 
 ---
 
+## Line Orchestration
+
+Lines define how traffic flows from entry to exit through the network.
+
+### Creating a Line
+
+1. Go to **Lines → Create Line**.
+2. Fill in a **line name**, optional tags and notes.
+3. Select an **entry node** — where devices connect.
+4. Add one or more **branches**:
+   - Each branch has a **name** and a node chain (relay nodes + exit node).
+   - Click **Add Transit** to insert relay nodes in the chain.
+   - Select **filter rules** to associate with each branch.
+   - Mark one branch as the **default branch** — traffic that matches no filter rule goes through this branch.
+5. Click **Save**.
+
+WireMesh automatically allocates /30 subnets from the tunnel subnet (10.211.0.0/16), generates WireGuard key pairs, assigns tunnel ports (from 41830/UDP), and pushes configuration to all involved nodes.
+
+### Managing Lines
+
+- **Enable/Disable** — Change the line status between active and inactive from the detail page. Disabling stops traffic forwarding without deleting the configuration.
+- **Line Detail** — Shows entry node and status, branch topology with node chains and associated filters, tunnel info table (hop index, source/target nodes, WireGuard addresses and ports), and related device count.
+- **Delete** — Removes tunnel configuration from all nodes.
+
+---
+
 ## Device Management
 
 ### Adding a Device
@@ -153,31 +179,46 @@ Click a device to see its detail page with protocol info, WireGuard address/publ
 
 Delete from the list page via the delete button, or select multiple devices for **Batch Delete**. You can also batch-switch the line assignment for selected devices.
 
----
+### Subscription Groups
 
-## Line Orchestration
+Subscription groups bundle multiple devices into a single URL that clients poll on a schedule. When you change a node's IP, swap an exit, or rotate keys on the platform, every client behind a subscription picks up the new config on its next refresh — no need to redistribute `.conf` files or share links by hand.
 
-Lines define how traffic flows from entry to exit through the network.
+#### Creating a Group
 
-### Creating a Line
+1. Under the **Subscriptions** tab, click **New Subscription**.
+2. Fill in:
+   - **Name** (required) — e.g. "All my devices".
+   - **Remark** (optional) — purpose or context.
+3. Click **Save**. A unique token is generated automatically.
+4. Open the group's detail page and switch to the **Devices** tab to add existing devices to this group. A device may belong to multiple groups simultaneously.
 
-1. Go to **Lines → Create Line**.
-2. Fill in a **line name**, optional tags and notes.
-3. Select an **entry node** — where devices connect.
-4. Add one or more **branches**:
-   - Each branch has a **name** and a node chain (relay nodes + exit node).
-   - Click **Add Transit** to insert relay nodes in the chain.
-   - Select **filter rules** to associate with each branch.
-   - Mark one branch as the **default branch** — traffic that matches no filter rule goes through this branch.
-5. Click **Save**.
+#### Subscription URLs
 
-WireMesh automatically allocates /30 subnets from the tunnel subnet (10.211.0.0/16), generates WireGuard key pairs, assigns tunnel ports (from 41830/UDP), and pushes configuration to all involved nodes.
+The **Subscription URLs** tab exposes the same group as eight client-specific URLs. Each URL serves the same set of devices, but in the format that client expects:
 
-### Managing Lines
+| Client | Platforms | Notes |
+|--------|-----------|-------|
+| Generic | Multi-platform fallback | Works with most V2Ray-family clients; WireGuard not supported. |
+| Clash Verge | Android / iOS / macOS / Windows / Linux | Clash / Mihomo core — all protocols supported. |
+| Shadowrocket | iOS | Supports WireGuard, VLESS, and SOCKS5. |
+| Hiddify-Next | Android / iOS / macOS / Windows / Linux | Supports WireGuard, VLESS, and SOCKS5. |
+| sing-box v1.12 | Android / iOS / macOS / Windows / Linux | Official sing-box v1.12+; ships with a clash-api controller (127.0.0.1:9090) for yacd / metacubexd dashboards. |
+| V2RayN | Windows / macOS / Linux | V2Ray core — WireGuard not supported. |
+| V2RayNG | Android | V2Ray core — WireGuard not supported. |
+| Passwall | OpenWRT / Router | V2Ray family — WireGuard not supported. |
 
-- **Enable/Disable** — Change the line status between active and inactive from the detail page. Disabling stops traffic forwarding without deleting the configuration.
-- **Line Detail** — Shows entry node and status, branch topology with node chains and associated filters, tunnel info table (hop index, source/target nodes, WireGuard addresses and ports), and related device count.
-- **Delete** — Removes tunnel configuration from all nodes.
+Each row has a **Copy link** button and a **Show QR** toggle. Choose the row that matches the client app the user is installing.
+
+#### Rotating the Token
+
+If a subscription URL leaks, click **Rotate Token** in the detail page. The old URL stops working immediately and a fresh one is issued. All clients using the group must re-import the new link.
+
+#### Notes & Limitations
+
+- **WireGuard devices on V2Ray-family subscriptions are silently skipped.** V2Ray core has no WireGuard outbound, so V2RayN / V2RayNG / Passwall / Generic subscriptions only carry the device's Xray and SOCKS5 entries. The detail page shows a warning when this applies.
+- **Routing decisions stay on the server.** The subscription only delivers the device's *connection* config — which entry node, which key, which port. Domain / IP routing is enforced by filter rules on the entry node, not in the client. Keep the client side dumb so a config change here doesn't require touching every device.
+- **Tokens are path-based** (`/api/sub/<token>/<client>`), not query strings. This makes them resilient to URL-trimming clients and easy to audit.
+- **Deleting a group** invalidates its URLs immediately but does not delete the underlying devices — they remain available for direct config download or other groups.
 
 ---
 
@@ -223,49 +264,6 @@ From the detail page you can edit all fields. When a source URL is configured, t
 
 ---
 
-## Subscription Groups
-
-Subscription groups bundle multiple devices into a single URL that clients poll on a schedule. When you change a node's IP, swap an exit, or rotate keys on the platform, every client behind a subscription picks up the new config on its next refresh — no need to redistribute `.conf` files or share links by hand.
-
-### Creating a Group
-
-1. Go to **Subscription Groups → New Subscription**.
-2. Fill in:
-   - **Name** (required) — e.g. "All my devices".
-   - **Remark** (optional) — purpose or context.
-3. Click **Save**. A unique token is generated automatically.
-4. Open the group's detail page and switch to the **Devices** tab to add existing devices to this group. A device may belong to multiple groups simultaneously.
-
-### Subscription URLs
-
-The **Subscription URLs** tab exposes the same group as eight client-specific URLs. Each URL serves the same set of devices, but in the format that client expects:
-
-| Client | Platforms | Notes |
-|--------|-----------|-------|
-| Generic | Multi-platform fallback | Works with most V2Ray-family clients; WireGuard not supported. |
-| Clash Verge | Android / iOS / macOS / Windows / Linux | Clash / Mihomo core — all protocols supported. |
-| Shadowrocket | iOS | Supports WireGuard, VLESS, and SOCKS5. |
-| Hiddify-Next | Android / iOS / macOS / Windows / Linux | Supports WireGuard, VLESS, and SOCKS5. |
-| sing-box v1.12 | Android / iOS / macOS / Windows / Linux | Official sing-box v1.12+; ships with a clash-api controller (127.0.0.1:9090) for yacd / metacubexd dashboards. |
-| V2RayN | Windows / macOS / Linux | V2Ray core — WireGuard not supported. |
-| V2RayNG | Android | V2Ray core — WireGuard not supported. |
-| Passwall | OpenWRT / Router | V2Ray family — WireGuard not supported. |
-
-Each row has a **Copy link** button and a **Show QR** toggle. Choose the row that matches the client app the user is installing.
-
-### Rotating the Token
-
-If a subscription URL leaks, click **Rotate Token** in the detail page. The old URL stops working immediately and a fresh one is issued. All clients using the group must re-import the new link.
-
-### Notes & Limitations
-
-- **WireGuard devices on V2Ray-family subscriptions are silently skipped.** V2Ray core has no WireGuard outbound, so V2RayN / V2RayNG / Passwall / Generic subscriptions only carry the device's Xray and SOCKS5 entries. The detail page shows a warning when this applies.
-- **Routing decisions stay on the server.** The subscription only delivers the device's *connection* config — which entry node, which key, which port. Domain / IP routing is enforced by filter rules on the entry node, not in the client. Keep the client side dumb so a config change here doesn't require touching every device.
-- **Tokens are path-based** (`/api/sub/<token>/<client>`), not query strings. This makes them resilient to URL-trimming clients and easy to audit.
-- **Deleting a group** invalidates its URLs immediately but does not delete the underlying devices — they remain available for direct config download or other groups.
-
----
-
 ## System Settings
 
 Go to **Settings** to adjust global parameters. Settings are organized into groups:
@@ -300,7 +298,7 @@ Update your login password from the settings page. Enter current password, new p
 
 ### Audit Logs
 
-Audit logs are available at **Settings → Audit Logs** (separate page). They record all management operations with timestamps and affected resources.
+Audit logs live under the **Audit Logs** tab at the top of the **System Settings** page. They record all management operations with timestamps and affected resources.
 
 ---
 

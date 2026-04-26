@@ -43,9 +43,7 @@
     "devices": "设备管理",
     "lines": "线路管理",
     "filters": "分流规则",
-    "subscriptions": "订阅组",
     "settings": "系统设置",
-    "auditLogs": "审计日志",
     "help": "帮助"
   },
   "theme": {
@@ -227,6 +225,10 @@
     "expand": "展开"
   },
   "devices": {
+    "tabs": {
+      "devices": "设备",
+      "subscriptions": "订阅组"
+    },
     "status": {
       "online": "在线",
       "offline": "离线",
@@ -439,7 +441,6 @@
     "refreshFailed": "刷新失败",
     "lastUpdated": "上次更新 {time}",
     "staleData": "数据可能不新鲜，请点刷新",
-    "actions": "操作",
     "reallocate": "重新分配端口",
     "reallocateConfirm": "当前端口 {ports} 将加入节点黑名单，是否继续？",
     "reallocateTitle": "重新分配端口",
@@ -476,8 +477,6 @@
     "statusCol": "状态",
     "countSuffix": "条",
     "branchSuffix": "个",
-    "statusEnabled": "已启用",
-    "statusDisabled": "已停用",
     "addRule": "新增规则",
     "searchPlaceholder": "搜索规则名称...",
     "confirmDeleteFilter": "确定要删除该过滤规则吗？此操作不可恢复。"
@@ -535,6 +534,10 @@
     "syncTimeout": "等待同步结果超时，请确认入口节点 Agent 在线"
   },
   "settings": {
+    "tabs": {
+      "settings": "系统设置",
+      "logs": "审计日志"
+    },
     "loadFailed": "加载设置失败",
     "saved": "设置已保存",
     "changePassword": "修改密码",
@@ -595,13 +598,11 @@
       "settings": "设置",
       "subscription": "订阅组"
     },
-    "noLogs": "暂无日志记录",
     "time": "时间",
     "actionCol": "操作",
     "typeCol": "类型",
     "target": "对象",
-    "details": "详情",
-    "paginationInfo": "共 {total} 条记录，第 {page} / {totalPages} 页"
+    "details": "详情"
   },
   "nodeStatusChart": {
     "loadFailed": "加载历史状态失败",

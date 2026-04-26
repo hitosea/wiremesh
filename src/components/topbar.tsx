@@ -7,23 +7,14 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LocaleToggle } from "@/components/locale-toggle";
 import { useSidebarMobile } from "@/components/sidebar";
+import { NAV_GROUPS, navItemMatches } from "@/components/sidebar-constants";
 import { toast } from "sonner";
 
-const TITLE_KEYS: Record<string, string> = {
-  "/dashboard": "nav.dashboard",
-  "/nodes": "nav.nodes",
-  "/devices": "nav.devices",
-  "/lines": "nav.lines",
-  "/filters": "nav.filters",
-  "/settings": "nav.settings",
-  "/settings/logs": "nav.auditLogs",
-};
-
 function getPageTitleKey(pathname: string): string {
-  if (TITLE_KEYS[pathname]) return TITLE_KEYS[pathname];
-  for (const [path, key] of Object.entries(TITLE_KEYS)) {
-    if (pathname.startsWith(path + "/")) return key;
-    if (pathname.startsWith(path)) return key;
+  for (const group of NAV_GROUPS) {
+    for (const item of group.items) {
+      if (navItemMatches(item, pathname)) return item.labelKey;
+    }
   }
   return "";
 }

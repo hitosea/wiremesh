@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -10,9 +11,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { translateError } from "@/lib/translate-error";
 import { useTranslations } from "next-intl";
+import { AuditLogsList } from "@/components/audit-logs-list";
 
 type SettingsData = Record<string, string>;
 
@@ -65,6 +68,45 @@ const SETTING_GROUPS: SettingGroup[] = [
 ];
 
 export default function SettingsPage() {
+  const tc = useTranslations("common");
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-48 text-muted-foreground">{tc("loading")}</div>}>
+      <SettingsContainer />
+    </Suspense>
+  );
+}
+
+function SettingsContainer() {
+  const t = useTranslations("settings");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tab = searchParams.get("tab") === "logs" ? "logs" : "settings";
+
+  const handleTabChange = (value: string) => {
+    if (value === "logs") {
+      router.replace("/settings?tab=logs");
+    } else {
+      router.replace("/settings");
+    }
+  };
+
+  return (
+    <Tabs value={tab} onValueChange={handleTabChange}>
+      <TabsList>
+        <TabsTrigger value="settings" className="px-4">{t("tabs.settings")}</TabsTrigger>
+        <TabsTrigger value="logs" className="px-4">{t("tabs.logs")}</TabsTrigger>
+      </TabsList>
+      <TabsContent value="settings" className="mt-4">
+        <SettingsTab />
+      </TabsContent>
+      <TabsContent value="logs" className="mt-4">
+        <AuditLogsList />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function SettingsTab() {
   const t = useTranslations("settings");
   const tg = useTranslations("settingsGroups");
   const tf = useTranslations("settingsFields");

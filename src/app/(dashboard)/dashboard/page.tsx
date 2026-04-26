@@ -136,19 +136,6 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">{t("devices")}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{data.devices.total}</div>
-            <div className="text-sm text-muted-foreground mt-1 space-x-3">
-              <span className="text-emerald-500 dark:text-emerald-400">{t("online")} {data.devices.online}</span>
-              <span>{t("offline")} {data.devices.offline}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">{t("lines")}</CardTitle>
           </CardHeader>
           <CardContent>
@@ -156,6 +143,19 @@ export default function DashboardPage() {
             <div className="text-sm text-muted-foreground mt-1 space-x-3">
               <span className="text-emerald-500 dark:text-emerald-400">{t("active")} {data.lines.active}</span>
               <span>{t("disabled")} {data.lines.inactive}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">{t("devices")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{data.devices.total}</div>
+            <div className="text-sm text-muted-foreground mt-1 space-x-3">
+              <span className="text-emerald-500 dark:text-emerald-400">{t("online")} {data.devices.online}</span>
+              <span>{t("offline")} {data.devices.offline}</span>
             </div>
           </CardContent>
         </Card>
@@ -168,7 +168,7 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle>{t("nodeStatus")}</CardTitle>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -214,7 +214,7 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle>{t("deviceStatus")}</CardTitle>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -270,7 +270,7 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle>{t("nodeTraffic")}</CardTitle>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>

@@ -238,27 +238,30 @@ export default function NodeDetailPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-48 text-muted-foreground">
-        {tc("loading")}
-      </div>
-    );
-  }
-
-  if (!node) return null;
-
   return (
     <div className="space-y-6 w-full">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold">{node.name}</h1>
-          <StatusDot status={node.status} label={ts(`status.${node.status}`)} />
+          <h1 className="text-2xl font-semibold">
+            {node ? (
+              node.name
+            ) : (
+              <span className="inline-block h-7 w-48 rounded-md bg-muted animate-pulse align-middle" />
+            )}
+          </h1>
+          {node && (
+            <StatusDot status={node.status} label={ts(`status.${node.status}`)} />
+          )}
         </div>
         <Button variant="outline" onClick={() => router.push("/nodes")}>
           {tc("back")}
         </Button>
       </div>
+      {loading ? (
+        <div className="flex items-center justify-center h-48 text-muted-foreground">
+          {tc("loading")}
+        </div>
+      ) : node && (<>
       {/* Read-only info */}
       <Card>
         <CardHeader>
@@ -557,6 +560,7 @@ export default function NodeDetailPage() {
       </div>
 
       <NodeStatusChart nodeId={nodeId} />
+      </>)}
     </div>
   );
 }

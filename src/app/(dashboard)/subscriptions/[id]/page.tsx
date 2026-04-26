@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { translateError } from "@/lib/translate-error";
 import { useTranslations } from "next-intl";
 import { QRCodeSVG } from "qrcode.react";
-import { Loader2 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -207,41 +206,30 @@ export default function SubscriptionDetailPage() {
     });
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-48 text-muted-foreground">
-        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-        {tc("loading")}
-      </div>
-    );
-  }
-
-  if (!group) {
-    return (
-      <div className="space-y-6 w-full">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">{t("title")}</h1>
-          <Button variant="outline" onClick={() => router.push("/subscriptions")}>
-            {tc("back")}
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6 w-full">
       <div className="flex items-center justify-between">
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-semibold truncate">{group.name}</h1>
-          {group.remark && (
+          <h1 className="text-2xl font-semibold truncate">
+            {loading ? (
+              <span className="inline-block h-7 w-48 rounded-md bg-muted animate-pulse align-middle" />
+            ) : (
+              group?.name ?? t("title")
+            )}
+          </h1>
+          {group?.remark && (
             <p className="text-sm text-muted-foreground mt-1 truncate">{group.remark}</p>
           )}
         </div>
-        <Button variant="outline" onClick={() => router.push("/subscriptions")}>
+        <Button variant="outline" onClick={() => router.push("/devices?tab=subscriptions")}>
           {tc("back")}
         </Button>
       </div>
+      {loading ? (
+        <div className="flex items-center justify-center h-48 text-muted-foreground">
+          {tc("loading")}
+        </div>
+      ) : group && (<>
 
       <Tabs defaultValue="urls">
         <TabsList>
@@ -443,6 +431,7 @@ export default function SubscriptionDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </>)}
     </div>
   );
 }

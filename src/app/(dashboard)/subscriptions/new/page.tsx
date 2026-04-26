@@ -51,12 +51,12 @@ export default function NewSubscriptionPage() {
     <div className="space-y-6 w-full">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">{t("create")}</h1>
-        <Button variant="outline" onClick={() => router.push("/subscriptions")}>
+        <Button variant="outline" onClick={() => router.back()}>
           {tc("back")}
         </Button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
+      <form onSubmit={handleSubmit} className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>{t("tabBasic")}</CardTitle>
@@ -89,17 +89,17 @@ export default function NewSubscriptionPage() {
           </CardContent>
         </Card>
 
-        <div className="flex gap-2 justify-end">
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button type="submit" disabled={submitting}>
+            {submitting ? tc("creating") : t("create")}
+          </Button>
           <Button
             type="button"
             variant="outline"
-            onClick={() => router.push("/subscriptions")}
+            onClick={() => router.back()}
             disabled={submitting}
           >
             {tc("cancel")}
-          </Button>
-          <Button type="submit" disabled={submitting}>
-            {submitting ? tc("creating") : tc("create")}
           </Button>
         </div>
       </form>
