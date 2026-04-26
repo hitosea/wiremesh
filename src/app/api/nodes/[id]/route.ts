@@ -10,6 +10,7 @@ import { generateRealityKeypair, generateShortId } from "@/lib/reality";
 import { normalizeRealityDest } from "@/lib/reality-dest";
 import { sseManager } from "@/lib/sse-manager";
 import { getNodePorts } from "@/lib/node-ports";
+import { getPeerNodeIds } from "@/lib/node-peers";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -75,6 +76,8 @@ export async function PUT(request: NextRequest, { params }: Params) {
     .select({
       id: nodes.id,
       name: nodes.name,
+      ip: nodes.ip,
+      domain: nodes.domain,
       xrayWsPath: nodes.xrayWsPath,
       xrayTlsDomain: nodes.xrayTlsDomain,
       xrayTransport: nodes.xrayTransport,
@@ -218,6 +221,17 @@ export async function PUT(request: NextRequest, { params }: Params) {
   });
 
   sseManager.notifyNodeConfigUpdate(nodeId);
+
+  // When a node's address (ip/domain) changes, peer nodes' inter-node tunnels
+  // point at the old endpoint until their next heartbeat. Push them config_update
+  // so wm-tunN reapplies with the new peerAddress immediately.
+  const ipChanged = ip !== undefined && ip !== existing.ip;
+  const domainChanged = domain !== undefined && (domain || null) !== (existing.domain || null);
+  if (ipChanged || domainChanged) {
+    for (const peerId of getPeerNodeIds(nodeId)) {
+      sseManager.notifyNodeConfigUpdate(peerId);
+    }
+  }
 
   return success(updated);
 }
