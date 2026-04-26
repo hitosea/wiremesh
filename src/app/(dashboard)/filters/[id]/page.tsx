@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { FilterFormatHelp } from "@/components/filter-format-help";
 import { useAdminSSE } from "@/components/admin-sse-provider";
+import { buildBranchChain, type LineNode } from "@/lib/branch-chain";
 
 type Branch = {
   id: number;
@@ -36,6 +37,7 @@ type LineWithBranches = {
   id: number;
   name: string;
   branches?: Branch[];
+  nodes?: LineNode[];
 };
 
 type FilterDetail = {
@@ -382,11 +384,9 @@ export default function EditFilterPage() {
                               }
                             >
                               {branch.name}{branch.isDefault ? ` (${tf("defaultLabel")})` : ""}
-                              {branch.isDefault && (
-                                <span className="ml-2 text-xs text-muted-foreground">
-                                  · {tf("defaultBranchHint")}
-                                </span>
-                              )}
+                              <span className="ml-2 text-xs text-muted-foreground">
+                                · {buildBranchChain(line.nodes, branch.id, tf("directExit"))}
+                              </span>
                             </label>
                           </div>
                         ))

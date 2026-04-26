@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FilterFormatHelp } from "@/components/filter-format-help";
+import { buildBranchChain, type LineNode } from "@/lib/branch-chain";
 
 type Branch = {
   id: number;
@@ -35,6 +36,7 @@ type LineWithBranches = {
   id: number;
   name: string;
   branches?: Branch[];
+  nodes?: LineNode[];
 };
 
 export default function NewFilterPage() {
@@ -218,11 +220,9 @@ export default function NewFilterPage() {
                               }
                             >
                               {branch.name}{branch.isDefault ? ` (${t("defaultLabel")})` : ""}
-                              {branch.isDefault && (
-                                <span className="ml-2 text-xs text-muted-foreground">
-                                  · {t("defaultBranchHint")}
-                                </span>
-                              )}
+                              <span className="ml-2 text-xs text-muted-foreground">
+                                · {buildBranchChain(line.nodes, branch.id, t("directExit"))}
+                              </span>
                             </label>
                           </div>
                         ))

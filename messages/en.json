@@ -480,6 +480,7 @@
   },
   "filterNew": {
     "title": "Add Filter Rule",
+    "directExit": "Direct exit",
     "nameRequired": "Rule name is required",
     "rulesRequired": "At least one of IP/CIDR rules, domain rules, or external source is required",
     "created": "Filter rule created",
