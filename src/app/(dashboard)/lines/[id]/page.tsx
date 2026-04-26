@@ -306,7 +306,7 @@ export default function LineDetailPage() {
   if (!line) return null;
 
   return (
-    <div className="space-y-6 w-full max-w-4xl">
+    <div className="space-y-6 w-full">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold">{line.name}</h1>

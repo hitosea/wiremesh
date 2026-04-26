@@ -206,7 +206,7 @@ export default function EditFilterPage() {
   if (!filter) return null;
 
   return (
-    <div className="space-y-6 w-full max-w-2xl">
+    <div className="space-y-6 w-full">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">{t("title")}</h1>
         <Button variant="outline" onClick={() => router.push("/filters")}>

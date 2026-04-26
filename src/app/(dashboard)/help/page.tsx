@@ -100,7 +100,7 @@ export default async function HelpPage() {
   });
 
   return (
-    <div className="flex gap-6 max-w-6xl mx-auto pt-12 lg:pt-0">
+    <div className="flex gap-6 pt-12 lg:pt-0">
       <HelpToc headings={headings} title={t("toc")} />
       <article className="prose prose-neutral dark:prose-invert max-w-none flex-1 min-w-0">
         <h1>{t("title")}</h1>

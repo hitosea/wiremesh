@@ -170,7 +170,7 @@ export default function DeviceConfigPage() {
   const clashConfig = configData ? buildClashMeta(configData) : null;
 
   return (
-    <div className="space-y-6 w-full max-w-3xl">
+    <div className="space-y-6 w-full">
       <div className="flex items-center justify-between">
         <div className="flex items-baseline gap-3">
           <h1 className="text-2xl font-semibold">{t("title")}</h1>
