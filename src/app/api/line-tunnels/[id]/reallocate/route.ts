@@ -11,13 +11,22 @@ import { sseManager } from "@/lib/sse-manager";
 export const dynamic = "force-dynamic";
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
   const tunnelId = parseInt(id, 10);
   if (!Number.isFinite(tunnelId)) {
     return Response.json({ error: { code: "BAD_REQUEST", message: "Invalid tunnel id" } }, { status: 400 });
+  }
+
+  // Body is optional; default behavior preserves the original auto-blacklist.
+  let addToBlacklist = true;
+  try {
+    const body = await req.json();
+    if (typeof body?.addToBlacklist === "boolean") addToBlacklist = body.addToBlacklist;
+  } catch {
+    // empty / non-JSON body — keep default
   }
 
   const tunnel = db.select().from(lineTunnels).where(eq(lineTunnels.id, tunnelId)).get();
@@ -31,14 +40,14 @@ export async function POST(
     return Response.json({ error: { code: "NOT_FOUND", message: "Node not found" } }, { status: 404 });
   }
 
-  // The user's intent in calling reallocate is "this port pair is bad" —
-  // auto-add it to each end's blacklist before picking new ports.
   const fromBL = new Set(parseTunnelPortBlacklist(fromNode.tunnelPortBlacklist));
   const toBL = new Set(parseTunnelPortBlacklist(toNode.tunnelPortBlacklist));
   const oldFromPort = tunnel.fromWgPort;
   const oldToPort = tunnel.toWgPort;
-  fromBL.add(oldFromPort);
-  toBL.add(oldToPort);
+  if (addToBlacklist) {
+    fromBL.add(oldFromPort);
+    toBL.add(oldToPort);
+  }
 
   const newFromBLCsv = [...fromBL].sort((a, b) => a - b).join(",");
   const newToBLCsv = [...toBL].sort((a, b) => a - b).join(",");
@@ -54,7 +63,10 @@ export async function POST(
     .filter((t) => t.id !== tunnelId)
     .flatMap((t) => [t.from, t.to]);
 
-  const combinedBL = new Set([...fromBL, ...toBL]);
+  // Always exclude the old ports for *this* allocation pass — the whole point
+  // of "reallocate" is to pick something different. Whether they get persisted
+  // to the node blacklist is controlled separately by addToBlacklist above.
+  const combinedBL = new Set([...fromBL, ...toBL, oldFromPort, oldToPort]);
   const newFromPort = allocateTunnelPort(usedPorts, tunnelPortStart, combinedBL);
   usedPorts.push(newFromPort);
   const newToPort = allocateTunnelPort(usedPorts, tunnelPortStart, combinedBL);
@@ -98,7 +110,7 @@ export async function POST(
     targetType: "line",
     targetId: tunnelId,
     targetName: `tunnel#${tunnelId}`,
-    detail: `reallocate: old=${oldFromPort}/${oldToPort} new=${newFromPort}/${newToPort}; auto-blacklisted on nodes ${tunnel.fromNodeId},${tunnel.toNodeId}`,
+    detail: `reallocate: old=${oldFromPort}/${oldToPort} new=${newFromPort}/${newToPort}; ${addToBlacklist ? `blacklisted on nodes ${tunnel.fromNodeId},${tunnel.toNodeId}` : "blacklist skipped"}`,
   });
 
   return Response.json({

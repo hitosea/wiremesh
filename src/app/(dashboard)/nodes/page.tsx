@@ -6,15 +6,19 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { translateError } from "@/lib/translate-error";
 import { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { StatusDot } from "@/components/status-dot";
 import { useAdminSSE } from "@/components/admin-sse-provider";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { DataTable, Column, PaginationInfo } from "@/components/data-table";
 import {
   Popover,
@@ -362,63 +366,90 @@ export default function NodesPage() {
         />
       )}
 
-      <Dialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{tc("confirmDelete")}</DialogTitle>
-          </DialogHeader>
-          <p className="text-muted-foreground">{t("confirmDeleteNode")}</p>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setDeleteId(null)}>
-              {tc("cancel")}
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
+      <AlertDialog
+        open={deleteId !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setDeleteId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{tc("confirmDelete")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("confirmDeleteNode")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>{tc("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              className={buttonVariants({ variant: "destructive" })}
               disabled={deleting}
+              onClick={(e) => {
+                e.preventDefault();
+                handleDelete();
+              }}
             >
               {deleting ? tc("deleting") : tc("confirmDelete")}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={showBatchDelete} onOpenChange={() => setShowBatchDelete(false)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{tc("batchDelete")}</DialogTitle>
-          </DialogHeader>
-          <p className="text-muted-foreground">
-            {t("confirmBatchDelete", { count: selectedIds.size })}
-          </p>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setShowBatchDelete(false)}>{tc("cancel")}</Button>
-            <Button variant="destructive" onClick={handleBatchDelete} disabled={batchDeleting}>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={showBatchDelete}
+        onOpenChange={(open) => {
+          if (!open && !batchDeleting) setShowBatchDelete(false);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{tc("batchDelete")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("confirmBatchDelete", { count: selectedIds.size })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={batchDeleting}>{tc("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              className={buttonVariants({ variant: "destructive" })}
+              disabled={batchDeleting}
+              onClick={(e) => {
+                e.preventDefault();
+                handleBatchDelete();
+              }}
+            >
               {batchDeleting ? tc("deleting") : tc("confirmDelete")}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={upgradeNodeId !== null} onOpenChange={() => setUpgradeNodeId(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("upgradeConfirmTitle")}</DialogTitle>
-          </DialogHeader>
-          <p className="text-muted-foreground">
-            {t("upgradeConfirmMessage", {
-              current: data.find((n) => n.id === upgradeNodeId)?.agentVersion ?? "?",
-              latest: latestAgentVersion,
-            })}
-          </p>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setUpgradeNodeId(null)}>
-              {tc("cancel")}
-            </Button>
-            <Button onClick={handleUpgrade} disabled={upgrading}>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={upgradeNodeId !== null}
+        onOpenChange={(open) => {
+          if (!open && !upgrading) setUpgradeNodeId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("upgradeConfirmTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("upgradeConfirmMessage", {
+                current: data.find((n) => n.id === upgradeNodeId)?.agentVersion ?? "?",
+                latest: latestAgentVersion,
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={upgrading}>{tc("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={upgrading}
+              onClick={(e) => {
+                e.preventDefault();
+                handleUpgrade();
+              }}
+            >
               {upgrading ? t("status.upgrading") : t("upgrade")}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   );

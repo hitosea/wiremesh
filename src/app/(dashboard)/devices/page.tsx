@@ -6,17 +6,21 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { translateError } from "@/lib/translate-error";
 import { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { StatusDotWithCount } from "@/components/status-dot-with-count";
 import { formatBytes } from "@/lib/format-bytes";
 import { useAdminSSE } from "@/components/admin-sse-provider";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { DataTable, Column, PaginationInfo } from "@/components/data-table";
 import {
   Select,
@@ -404,51 +408,74 @@ function DevicesContent() {
         />
       )}
 
-      <Dialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{tc("confirmDelete")}</DialogTitle>
-          </DialogHeader>
-          <p className="text-muted-foreground">{t("confirmDeleteDevice")}</p>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setDeleteId(null)}>
-              {tc("cancel")}
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
+      <AlertDialog
+        open={deleteId !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setDeleteId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{tc("confirmDelete")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("confirmDeleteDevice")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>{tc("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              className={buttonVariants({ variant: "destructive" })}
               disabled={deleting}
+              onClick={(e) => {
+                e.preventDefault();
+                handleDelete();
+              }}
             >
               {deleting ? tc("deleting") : tc("confirmDelete")}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={showBatchDelete} onOpenChange={() => setShowBatchDelete(false)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{tc("batchDelete")}</DialogTitle>
-          </DialogHeader>
-          <p className="text-muted-foreground">
-            {t("confirmBatchDelete", { count: selectedIds.size })}
-          </p>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setShowBatchDelete(false)}>{tc("cancel")}</Button>
-            <Button variant="destructive" onClick={handleBatchDelete} disabled={batchDeleting}>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={showBatchDelete}
+        onOpenChange={(open) => {
+          if (!open && !batchDeleting) setShowBatchDelete(false);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{tc("batchDelete")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("confirmBatchDelete", { count: selectedIds.size })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={batchDeleting}>{tc("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              className={buttonVariants({ variant: "destructive" })}
+              disabled={batchDeleting}
+              onClick={(e) => {
+                e.preventDefault();
+                handleBatchDelete();
+              }}
+            >
               {batchDeleting ? tc("deleting") : tc("confirmDelete")}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-      <Dialog open={showBatchLine} onOpenChange={() => setShowBatchLine(false)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("batchSwitchTitle")}</DialogTitle>
-          </DialogHeader>
-          <p className="text-muted-foreground text-sm mb-2">
-            {t("batchSwitchDescription", { count: selectedIds.size })}
-          </p>
+      <AlertDialog
+        open={showBatchLine}
+        onOpenChange={(open) => {
+          if (!open && !batchSwitching) setShowBatchLine(false);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("batchSwitchTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("batchSwitchDescription", { count: selectedIds.size })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
           <Select value={batchLineId} onValueChange={setBatchLineId}>
             <SelectTrigger>
               <SelectValue placeholder={t("selectLine")} />
@@ -462,14 +489,20 @@ function DevicesContent() {
               ))}
             </SelectContent>
           </Select>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setShowBatchLine(false)}>{tc("cancel")}</Button>
-            <Button onClick={handleBatchSwitchLine} disabled={batchSwitching || !batchLineId}>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={batchSwitching}>{tc("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={batchSwitching || !batchLineId}
+              onClick={(e) => {
+                e.preventDefault();
+                handleBatchSwitchLine();
+              }}
+            >
               {batchSwitching ? tc("saving") : t("confirmSwitch")}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -28,6 +28,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type LineNode = {
   hopOrder: number;
@@ -114,6 +125,14 @@ export default function LineDetailPage() {
   const [editingBranchId, setEditingBranchId] = useState<number | null>(null);
   const [branchNameDraft, setBranchNameDraft] = useState("");
   const [branchSaving, setBranchSaving] = useState(false);
+
+  const [reallocateTarget, setReallocateTarget] = useState<{
+    tunnelId: number;
+    fromPort: number;
+    toPort: number;
+  } | null>(null);
+  const [reallocateBlacklist, setReallocateBlacklist] = useState(true);
+  const [reallocating, setReallocating] = useState(false);
 
   const startEditBranch = (branch: Branch) => {
     setEditingBranchId(branch.id);
@@ -208,15 +227,30 @@ export default function LineDetailPage() {
     }
   };
 
-  const handleReallocate = async (tunnelId: number, oldFrom: number, oldTo: number) => {
-    if (!confirm(t("reallocateConfirm", { ports: `${oldFrom}/${oldTo}` }))) return;
-    const r = await fetch(`/api/line-tunnels/${tunnelId}/reallocate`, { method: "POST" });
-    if (r.ok) {
-      const data = await r.json();
-      toast.success(t("reallocateSuccess", { ports: `${data.newPorts.from}/${data.newPorts.to}` }));
-      location.reload();
-    } else {
-      toast.error(t("reallocateFailed"));
+  const openReallocate = (tunnelId: number, fromPort: number, toPort: number) => {
+    setReallocateTarget({ tunnelId, fromPort, toPort });
+    setReallocateBlacklist(true);
+  };
+
+  const confirmReallocate = async () => {
+    if (!reallocateTarget) return;
+    setReallocating(true);
+    try {
+      const r = await fetch(`/api/line-tunnels/${reallocateTarget.tunnelId}/reallocate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ addToBlacklist: reallocateBlacklist }),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        toast.success(t("reallocateSuccess", { ports: `${data.newPorts.from}/${data.newPorts.to}` }));
+        location.reload();
+      } else {
+        toast.error(t("reallocateFailed"));
+      }
+    } finally {
+      setReallocating(false);
+      setReallocateTarget(null);
     }
   };
 
@@ -446,7 +480,7 @@ export default function LineDetailPage() {
               onClick={handleRefresh}
               disabled={refreshing}
             >
-              <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? "animate-spin" : ""}`} />
+              <RefreshCw className={`h-4 w-4 mr-1 ${refreshing || tunnelStatus === null ? "animate-spin" : ""}`} />
               {t("refresh")}
             </Button>
           </div>
@@ -478,11 +512,7 @@ export default function LineDetailPage() {
                   const tx = status?.txBytes ?? 0;
                   const stale = status?.stale ?? false;
                   const offline = !!status && !status.fromNodeReachable && !status.toNodeReachable;
-                  const ageOK = lastHs > 0 && (Math.floor(Date.now() / 1000) - lastHs) < 300;
-                  // Wait until we've fetched at least one snapshot before showing
-                  // the reallocate button — otherwise every row briefly flashes it
-                  // on first paint while tunnelStatus is still null.
-                  const showReallocate = tunnelStatus !== null && !ageOK;
+                  const initialLoading = tunnelStatus === null;
 
                   return (
                     <TableRow key={tun.id}>
@@ -494,24 +524,26 @@ export default function LineDetailPage() {
                       <TableCell>{tun.fromWgPort}</TableCell>
                       <TableCell>{tun.toWgPort}</TableCell>
                       <TableCell className={stale ? "text-muted-foreground" : ""}>
-                        {offline ? "—" : formatHandshake(lastHs)}
-                        {stale && !offline && (
+                        {initialLoading ? (
+                          <span className="inline-block h-3 w-16 rounded bg-muted animate-pulse align-middle" />
+                        ) : offline ? "—" : formatHandshake(lastHs)}
+                        {!initialLoading && stale && !offline && (
                           <span title={t("staleData")} className="ml-1 opacity-50">ⓘ</span>
                         )}
                       </TableCell>
                       <TableCell className="text-xs">
-                        {offline ? "—" : `↓${formatBytes(rx)} ↑${formatBytes(tx)}`}
+                        {initialLoading ? (
+                          <span className="inline-block h-3 w-20 rounded bg-muted animate-pulse align-middle" />
+                        ) : offline ? "—" : `↓${formatBytes(rx)} ↑${formatBytes(tx)}`}
                       </TableCell>
                       <TableCell>
-                        {showReallocate && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleReallocate(tun.id, tun.fromWgPort, tun.toWgPort)}
-                          >
-                            {t("reallocate")}
-                          </Button>
-                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openReallocate(tun.id, tun.fromWgPort, tun.toWgPort)}
+                        >
+                          {t("reallocate")}
+                        </Button>
                       </TableCell>
                     </TableRow>
                   );
@@ -576,6 +608,51 @@ export default function LineDetailPage() {
           {tc("back")}
         </Button>
       </div>
+
+      <AlertDialog
+        open={reallocateTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !reallocating) setReallocateTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("reallocateTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {reallocateTarget &&
+                t("reallocateDescription", {
+                  ports: `${reallocateTarget.fromPort}/${reallocateTarget.toPort}`,
+                })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {reallocateTarget && (
+            <label className="flex items-start gap-2 text-sm cursor-pointer select-none">
+              <Checkbox
+                checked={reallocateBlacklist}
+                onCheckedChange={(v) => setReallocateBlacklist(v === true)}
+                className="mt-0.5"
+              />
+              <span>
+                {t("reallocateAddToBlacklist", {
+                  ports: `${reallocateTarget.fromPort}/${reallocateTarget.toPort}`,
+                })}
+              </span>
+            </label>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={reallocating}>{tc("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={reallocating}
+              onClick={(e) => {
+                e.preventDefault();
+                confirmReallocate();
+              }}
+            >
+              {tc("confirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
