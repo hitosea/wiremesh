@@ -111,7 +111,7 @@ function renderV2Ray(group: SubscriptionGroupRow): RenderResult {
   };
 }
 
-function renderSingbox(group: SubscriptionGroupRow): RenderResult {
+function renderSingbox(group: SubscriptionGroupRow, subHost: string | null): RenderResult {
   const deviceIds = loadGroupDeviceIds(group.id);
   const ctxs = loadDeviceContexts(deviceIds);
   const { outbounds, skipped } = buildSingboxOutbounds(ctxs);
@@ -141,6 +141,16 @@ function renderSingbox(group: SubscriptionGroupRow): RenderResult {
   }
   template.outbounds = expanded;
 
+  // Anti-loop: traffic to the subscription host itself must go DIRECT,
+  // otherwise polling for updates would be tunnelled and break when the
+  // wm hop is unhealthy.
+  if (subHost) {
+    const route = (template.route as Record<string, unknown>) ?? {};
+    const rules = (route.rules as Array<Record<string, unknown>>) ?? [];
+    route.rules = [{ domain: [subHost], outbound: "direct" }, ...rules];
+    template.route = route;
+  }
+
   return {
     group,
     body: JSON.stringify(template, null, 2),
@@ -160,6 +170,6 @@ export function renderSubscription(
     case "clash": return renderClash(group, subHost);
     case "shadowrocket": return renderShadowrocket(group);
     case "v2ray": return renderV2Ray(group);
-    case "singbox": return renderSingbox(group);
+    case "singbox": return renderSingbox(group, subHost);
   }
 }

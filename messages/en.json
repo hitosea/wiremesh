@@ -725,7 +725,10 @@
       "nameTaken": "Name already in use",
       "deviceIdsRequired": "deviceIds must be an array"
     },
-    "rulesNote": "Default client rules: traffic to the subscription host itself, .cn domains, and CN GeoIP go DIRECT; everything else goes through Select. Server-side filters handle the rest."
+    "routingNote": {
+      "clash": "Default client-side bypass: subscription host, .cn domains, CN IPs, and LAN go DIRECT. Everything else enters wm and is routed by server-side filters.",
+      "singbox": "Default client-side bypass: subscription host, .cn domains, CN IPs, and private networks go DIRECT. Everything else enters wm and is routed by server-side filters."
+    }
   },
   "errors": {
     "system": {

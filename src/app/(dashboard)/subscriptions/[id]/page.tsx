@@ -263,6 +263,10 @@ export default function SubscriptionDetailPage() {
             const format = CLIENT_TO_FORMAT[clientId];
             const wgSupported = FORMAT_PROTOCOL_SUPPORT[format].wireguard;
             const showWgWarn = !wgSupported && wgDeviceCount > 0;
+            // Only Clash and Sing-box subscriptions ship embedded routing
+            // rules; URI-list formats (SR, V2Ray-family) carry no rules
+            // and the client decides routing entirely on its own.
+            const carriesRoutingRules = format === "clash" || format === "singbox";
             return (
               <Card key={clientId}>
                 <CardHeader className="pb-3">
@@ -310,6 +314,11 @@ export default function SubscriptionDetailPage() {
                       <QRCodeSVG value={url} size={200} />
                     </div>
                   )}
+                  {carriesRoutingRules && (
+                    <p className="text-xs text-muted-foreground pt-1 border-t">
+                      {t(`routingNote.${format}` as "routingNote.clash" | "routingNote.singbox")}
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             );
@@ -332,8 +341,6 @@ export default function SubscriptionDetailPage() {
               </Button>
             </CardContent>
           </Card>
-
-          <p className="text-xs text-muted-foreground">{t("rulesNote")}</p>
         </TabsContent>
 
         <TabsContent value="devices" className="space-y-4 mt-4">

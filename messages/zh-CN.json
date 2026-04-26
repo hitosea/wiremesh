@@ -725,7 +725,10 @@
       "nameTaken": "该名称已被使用",
       "deviceIdsRequired": "deviceIds 必须为数组"
     },
-    "rulesNote": "客户端订阅默认包含：本订阅 URL 域名直连、cn 域名直连、CN GeoIP 直连，其他流量走 Select。其余分流由服务端 filter 决定。"
+    "routingNote": {
+      "clash": "默认在客户端直连：本订阅 URL、.cn 域名、CN IP、局域网；其余流量进入 wm，由服务端 filter 决定出口。",
+      "singbox": "默认在客户端直连：本订阅 URL、.cn 域名、CN IP、内网；其余流量进入 wm，由服务端 filter 决定出口。"
+    }
   },
   "errors": {
     "system": {
