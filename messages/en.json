@@ -214,7 +214,7 @@
     "title": "Install Script",
     "oneClickInstall": "One-Click Install Command",
     "instruction": "Run the following command as root on the target server:",
-    "copy": "Copy",
+    "copy": "Copy command",
     "usageTitle": "Usage Guide",
     "usage1": "Copy the command above and paste it into the node server terminal, run as root",
     "usage2": "The script will automatically install WireGuard, download and start the Agent",

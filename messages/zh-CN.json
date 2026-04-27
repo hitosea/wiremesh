@@ -214,7 +214,7 @@
     "title": "安装脚本",
     "oneClickInstall": "一键安装命令",
     "instruction": "在目标服务器上以 root 身份执行以下命令：",
-    "copy": "复制",
+    "copy": "复制命令",
     "usageTitle": "使用说明",
     "usage1": "复制上方命令，粘贴到节点服务器终端以 root 身份运行",
     "usage2": "脚本将自动安装 WireGuard、下载并启动 Agent",

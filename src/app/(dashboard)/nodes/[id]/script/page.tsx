@@ -99,14 +99,14 @@ export default function NodeScriptPage() {
               </div>
             </div>
           )}
-          <div className="flex gap-2">
+          <div className="flex">
             <pre className="flex-1 code-block p-3 rounded-lg text-sm overflow-x-auto whitespace-pre-wrap break-all">
               {oneliner || tc("loading")}
             </pre>
-            <Button onClick={handleCopy} disabled={!oneliner}>
+          </div>
+            <Button size="sm" variant="outline" onClick={handleCopy} disabled={!oneliner}>
               {t("copy")}
             </Button>
-          </div>
         </CardContent>
       </Card>
 
@@ -123,7 +123,7 @@ export default function NodeScriptPage() {
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="gap-0">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">{t("fullScript")}</CardTitle>
             <Button
