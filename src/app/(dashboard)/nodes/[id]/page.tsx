@@ -231,7 +231,7 @@ export default function NodeDetailPage() {
       const json = await res.json();
       if (res.ok) {
         toast.success(tc("save"));
-        setNode(json.data);
+        setNode((prev) => (prev ? { ...prev, ...json.data } : json.data));
       } else {
         toast.error(translateError(json.error, te, tc("saveFailed")));
       }

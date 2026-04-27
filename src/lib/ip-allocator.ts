@@ -81,7 +81,8 @@ export function allocateTunnelPort(
   throw new Error("No available tunnel ports");
 }
 
-export function parseTunnelPortBlacklist(csv: string): number[] {
+export function parseTunnelPortBlacklist(csv: string | null | undefined): number[] {
+  if (!csv) return [];
   return csv
     .split(",")
     .map((s) => parseInt(s.trim(), 10))
