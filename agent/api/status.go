@@ -15,6 +15,15 @@ type StatusReport struct {
 	XrayVersion      string                 `json:"xray_version,omitempty"`
 	XrayRunning      bool                   `json:"xray_running"`
 	TunnelStatuses   []TunnelStatusReport   `json:"tunnel_statuses,omitempty"`
+	PeerPings        []PeerPingReport       `json:"peer_pings,omitempty"`
+}
+
+// PeerPingReport: round-trip ping from this node to another node's public host
+// over the default route (not through any tunnel). LatencyMs is nil when the
+// peer is unreachable.
+type PeerPingReport struct {
+	NodeID    int  `json:"node_id"`
+	LatencyMs *int `json:"latency_ms,omitempty"`
 }
 
 // TransferReport: per-peer traffic delta since last report, from the peer's

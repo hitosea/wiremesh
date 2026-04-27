@@ -102,6 +102,16 @@ class SSEManager {
   notifyNodeTunnelUpdate(nodeId: number): boolean {
     return this.debouncedNotify(nodeId, "tunnel_update");
   }
+
+  // Push config_update to every connected node except the optional excluded one.
+  // Used when a node is added/removed/renamed so all peers refresh their mesh
+  // peer list (and any other config that depends on the global node set).
+  notifyAllConfigUpdate(excludeNodeId?: number): void {
+    for (const id of this.getConnectedNodeIds()) {
+      if (id === excludeNodeId) continue;
+      this.debouncedNotify(id, "config_update");
+    }
+  }
 }
 
 // Singleton stored on globalThis to survive Next.js hot reload

@@ -5,6 +5,7 @@ import { eq, sql, and, gt, lt } from "drizzle-orm";
 import { authenticateAgent } from "@/lib/agent-auth";
 import { adminSseManager } from "@/lib/admin-sse-manager";
 import { setNodeSnapshot } from "@/lib/tunnel-status-cache";
+import { setSourceSnapshot } from "@/lib/node-latency-matrix";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,7 @@ export async function POST(request: NextRequest) {
     xray_version?: string;
     xray_running?: boolean;
     tunnel_statuses?: { iface: string; peer_public_key: string; last_handshake: number; rx_bytes: number; tx_bytes: number; latency_ms?: number }[];
+    peer_pings?: { node_id: number; latency_ms?: number }[];
   };
 
   const {
@@ -203,6 +205,13 @@ export async function POST(request: NextRequest) {
       rxBytes: t.rx_bytes,
       txBytes: t.tx_bytes,
       latencyMs: typeof t.latency_ms === "number" ? t.latency_ms : null,
+    })));
+  }
+
+  if (Array.isArray(body.peer_pings)) {
+    setSourceSnapshot(node.id, body.peer_pings.map((p) => ({
+      toNodeId: p.node_id,
+      latencyMs: typeof p.latency_ms === "number" ? p.latency_ms : null,
     })));
   }
 

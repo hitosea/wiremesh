@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { translateError } from "@/lib/translate-error";
 import { useTranslations } from "next-intl";
 import { isPrivateIp } from "@/lib/ip-utils";
+import { lookupRtt } from "@/lib/latency-pair";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,6 +63,7 @@ export default function NewLinePage() {
   const [nodeOptions, setNodeOptions] = useState<NodeOption[]>([]);
   const [availableFilters, setAvailableFilters] = useState<FilterOption[]>([]);
   const [loadingNodes, setLoadingNodes] = useState(true);
+  const [latencyPairs, setLatencyPairs] = useState<Record<string, number>>({});
 
   const handleEntryChange = (newEntryId: string) => {
     setEntryNodeId(newEntryId);
@@ -94,6 +96,12 @@ export default function NewLinePage() {
         toast.error(t("loadFailed"));
         setLoadingNodes(false);
       });
+    // Mesh latency matrix is best-effort; if it's not yet populated (no agent
+    // has reported peer pings), the chain preview just omits per-segment RTT.
+    fetch("/api/nodes/latency-matrix")
+      .then((r) => r.json())
+      .then((json) => setLatencyPairs(json.data?.pairs ?? {}))
+      .catch(() => {});
   }, [t]);
 
   // --- Helper functions ---
@@ -193,13 +201,48 @@ export default function NewLinePage() {
   const isSingleNodeBranch = (branch: BranchInput) =>
     branch.nodeIds.length === 0;
 
+  const segmentRtt = (idA: string, idB: string): number | null => {
+    if (!idA || !idB) return null;
+    return lookupRtt(latencyPairs, Number(idA), Number(idB));
+  };
+
   const branchChainPreview = (branch: BranchInput) => {
     const entryName = entryNodeId ? getNodeName(entryNodeId) : "?";
     if (isSingleNodeBranch(branch)) {
-      return `${entryName} (${t("directExit")})`;
+      return <span>{entryName} ({t("directExit")})</span>;
     }
-    const rest = branch.nodeIds.map((id) => (id ? getNodeName(id) : "?"));
-    return [entryName, ...rest].join(" \u2192 ");
+    const ids = [entryNodeId, ...branch.nodeIds];
+    const names = ids.map((id) => (id ? getNodeName(id) : "?"));
+    return (
+      <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 align-middle">
+        {names.map((name, i) => {
+          if (i === 0) return <span key={i}>{name}</span>;
+          const rtt = segmentRtt(ids[i - 1], ids[i]);
+          return (
+            <span key={i} className="inline-flex items-center gap-1.5">
+              {rtt !== null ? (
+                <span className="inline-flex items-center gap-1 text-muted-foreground/70">
+                  <svg width="8" height="2" viewBox="0 0 8 2" aria-hidden className="shrink-0">
+                    <line x1="0" y1="1" x2="8" y2="1" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+                  </svg>
+                  <span className="text-xs tabular-nums">{rtt} ms</span>
+                  <svg width="14" height="8" viewBox="0 0 14 8" aria-hidden className="shrink-0">
+                    <line x1="0" y1="4" x2="8" y2="4" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+                    <polygon points="8,1 14,4 8,7" fill="currentColor" />
+                  </svg>
+                </span>
+              ) : (
+                <svg width="14" height="8" viewBox="0 0 14 8" aria-hidden className="shrink-0 text-muted-foreground/70">
+                  <line x1="0" y1="4" x2="8" y2="4" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+                  <polygon points="8,1 14,4 8,7" fill="currentColor" />
+                </svg>
+              )}
+              <span>{name}</span>
+            </span>
+          );
+        })}
+      </span>
+    );
   };
 
   // --- Node label in branch ---
@@ -510,7 +553,7 @@ export default function NewLinePage() {
                 {/* Chain preview */}
                 {(entryNodeId || branch.nodeIds.some((id) => id)) && (
                   <div className="p-3 bg-muted rounded text-sm">
-                    <span className="text-muted-foreground">{t("chainLabel")}</span>
+                    <span className="text-muted-foreground mr-1">{t("chainLabel")}</span>
                     {branchChainPreview(branch)}
                   </div>
                 )}

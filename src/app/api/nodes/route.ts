@@ -14,6 +14,7 @@ import { allocateNodeIp } from "@/lib/ip-allocator";
 import { generateRealityKeypair, generateShortId } from "@/lib/reality";
 import { normalizeRealityDest } from "@/lib/reality-dest";
 import { writeAuditLog } from "@/lib/audit-log";
+import { sseManager } from "@/lib/sse-manager";
 
 export async function GET(request: NextRequest) {
   const params = parsePaginationParams(request.nextUrl.searchParams);
@@ -281,6 +282,10 @@ export async function POST(request: NextRequest) {
     targetName: name,
     detail: `ip=${ip}, wgAddress=${wgAddress}`,
   });
+
+  // Existing agents need to refresh their mesh peer list to start probing the
+  // new node. The new node hasn't connected yet, so excluding it is fine.
+  sseManager.notifyAllConfigUpdate(result.id);
 
   return created(result);
 }

@@ -52,7 +52,7 @@ var (
 	xrayIpCacheMu sync.Mutex
 )
 
-func Collect(serverURL string, agentVersion string, tunnels map[string]wg.ActiveTunnel) *api.StatusReport {
+func Collect(serverURL string, agentVersion string, tunnels map[string]wg.ActiveTunnel, meshPeers []api.MeshPeer) *api.StatusReport {
 	report := &api.StatusReport{IsOnline: true}
 	latency := measureLatency(serverURL)
 	if latency >= 0 {
@@ -78,6 +78,7 @@ func Collect(serverURL string, agentVersion string, tunnels map[string]wg.Active
 	} else {
 		log.Printf("[collector] WgShowAllDump failed: %v", err)
 	}
+	report.PeerPings = collectPeerPings(meshPeers)
 	return report
 }
 
@@ -511,12 +512,40 @@ func measureTunnelLatencies(statuses []api.TunnelStatusReport, tunnels map[strin
 		grp.Add(1)
 		go func() {
 			defer grp.Done()
-			if ms := pingPeer(statuses[i].Iface, peerIP); ms != nil {
+			if ms := pingHost(statuses[i].Iface, peerIP); ms != nil {
 				statuses[i].LatencyMs = ms
 			}
 		}()
 	}
 	grp.Wait()
+}
+
+// collectPeerPings probes each mesh peer's public host over the default route
+// (not through any tunnel) so /lines/new can show baseline node-to-node latency
+// before any tunnel is built. Each peer emits a report row even on timeout
+// (with LatencyMs nil), so the platform can distinguish "unreachable now" from
+// "no measurement attempted".
+func collectPeerPings(peers []api.MeshPeer) []api.PeerPingReport {
+	if len(peers) == 0 {
+		return nil
+	}
+	reports := make([]api.PeerPingReport, len(peers))
+	var grp sync.WaitGroup
+	for i, p := range peers {
+		reports[i] = api.PeerPingReport{NodeID: p.NodeID}
+		if p.Host == "" {
+			continue
+		}
+		grp.Add(1)
+		go func() {
+			defer grp.Done()
+			if ms := pingHost("", p.Host); ms != nil {
+				reports[i].LatencyMs = ms
+			}
+		}()
+	}
+	grp.Wait()
+	return reports
 }
 
 // peerInnerIp returns the peer's WG inner IP for a /30 tunnel pair given the
@@ -549,11 +578,20 @@ func peerInnerIp(localAddr string) string {
 
 var pingRttRe = regexp.MustCompile(`time=([0-9.]+) ms`)
 
-// pingPeer probes the peer with one ICMP packet, then sends two more to refine
-// the estimate. Returns the minimum RTT in ms, or nil if the probe times out —
-// fail-fast on the first packet so unreachable peers don't stall the report.
-func pingPeer(iface, peerIP string) *int {
-	out, err := exec.Command("ping", "-n", "-c", "1", "-W", "1", "-I", iface, peerIP).Output()
+// pingHost probes host with one ICMP packet, then sends two more to refine the
+// estimate. iface="" pings via the default route. Returns the minimum RTT in
+// ms, or nil if the first packet times out — fail-fast so unreachable peers
+// don't stall the report.
+func pingHost(iface, host string) *int {
+	args1 := []string{"-n", "-c", "1", "-W", "1"}
+	args2 := []string{"-n", "-c", "2", "-W", "1", "-i", "0.2"}
+	if iface != "" {
+		args1 = append(args1, "-I", iface)
+		args2 = append(args2, "-I", iface)
+	}
+	args1 = append(args1, host)
+	args2 = append(args2, host)
+	out, err := exec.Command("ping", args1...).Output()
 	if err != nil {
 		return nil
 	}
@@ -561,7 +599,7 @@ func pingPeer(iface, peerIP string) *int {
 	if len(rtts) == 0 {
 		return nil
 	}
-	if more, err := exec.Command("ping", "-n", "-c", "2", "-W", "1", "-i", "0.2", "-I", iface, peerIP).Output(); err == nil {
+	if more, err := exec.Command("ping", args2...).Output(); err == nil {
 		rtts = append(rtts, parsePingRtts(string(more))...)
 	}
 	ms := int(slices.Min(rtts) + 0.5)

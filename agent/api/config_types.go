@@ -12,8 +12,16 @@ type ConfigData struct {
 	Xray    *XrayConfig    `json:"xray"`
 	Socks5  *Socks5Config  `json:"socks5"`
 	Routing *RoutingConfig `json:"routing"`
+	MeshPeers []MeshPeer   `json:"meshPeers,omitempty"`
 	Version string         `json:"version"`
 	PendingDelete bool           `json:"pending_delete"`
+}
+
+// MeshPeer is another node this agent should periodically ping for the all-pairs
+// latency matrix. Host is the most reachable form (domain or public IP).
+type MeshPeer struct {
+	NodeID int    `json:"nodeId"`
+	Host   string `json:"host"`
 }
 
 type NodeConfig struct {

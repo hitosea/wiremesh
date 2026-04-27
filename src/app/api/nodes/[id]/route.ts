@@ -10,7 +10,7 @@ import { generateRealityKeypair, generateShortId } from "@/lib/reality";
 import { normalizeRealityDest } from "@/lib/reality-dest";
 import { sseManager } from "@/lib/sse-manager";
 import { getNodePorts } from "@/lib/node-ports";
-import { getPeerNodeIds } from "@/lib/node-peers";
+import { deleteSource as deleteLatencySource } from "@/lib/node-latency-matrix";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -222,15 +222,13 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
   sseManager.notifyNodeConfigUpdate(nodeId);
 
-  // When a node's address (ip/domain) changes, peer nodes' inter-node tunnels
-  // point at the old endpoint until their next heartbeat. Push them config_update
-  // so wm-tunN reapplies with the new peerAddress immediately.
+  // When a node's address (ip/domain) changes, every other agent's tunnel
+  // peerAddress and mesh ping target for this node go stale. Notify all so
+  // wm-tunN reapplies the new endpoint and the mesh probe targets refresh.
   const ipChanged = ip !== undefined && ip !== existing.ip;
   const domainChanged = domain !== undefined && (domain || null) !== (existing.domain || null);
   if (ipChanged || domainChanged) {
-    for (const peerId of getPeerNodeIds(nodeId)) {
-      sseManager.notifyNodeConfigUpdate(peerId);
-    }
+    sseManager.notifyAllConfigUpdate(nodeId);
   }
 
   return success(updated);
@@ -294,6 +292,11 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 
   // Try to notify agent via SSE
   const sent = sseManager.sendEvent(nodeId, "node_delete");
+
+  // Other agents need to drop the deleted node from their mesh peer list so
+  // they stop pinging it.
+  sseManager.notifyAllConfigUpdate(nodeId);
+  deleteLatencySource(nodeId);
 
   writeAuditLog({
     action: "delete",

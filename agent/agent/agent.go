@@ -22,6 +22,7 @@ type Agent struct {
 	client        *api.Client
 	sse           *api.SSEClient
 	activeTunnels  map[string]wg.ActiveTunnel
+	meshPeers      []api.MeshPeer
 	socks5Manager  *socks5.Manager
 	routingManager *routing.Manager
 	lastVersion    string
@@ -179,6 +180,7 @@ func (a *Agent) pullAndApplyConfigForce(force bool) error {
 		log.Printf("[agent] Tunnel sync had errors: %v", err)
 	}
 	a.activeTunnels = newActive
+	a.meshPeers = cfgData.MeshPeers
 
 	// 3. Sync iptables rules
 	if err := iptables.SyncRules(cfgData.Tunnels.IptablesRules); err != nil {
@@ -250,7 +252,7 @@ func (a *Agent) pullAndApplyConfigForce(force bool) error {
 }
 
 func (a *Agent) reportStatus() {
-	report := collector.Collect(a.cfg.ServerURL, a.version, a.activeTunnels)
+	report := collector.Collect(a.cfg.ServerURL, a.version, a.activeTunnels, a.meshPeers)
 	if err := a.client.ReportStatus(report); err != nil {
 		log.Printf("[agent] Status report failed: %v", err)
 	} else {

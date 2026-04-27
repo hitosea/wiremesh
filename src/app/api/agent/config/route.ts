@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { nodes, lineNodes, lineTunnels, devices, lineBranches, branchFilters, filters, settings, lines } from "@/lib/db/schema";
-import { eq, or, and, count, inArray } from "drizzle-orm";
+import { eq, or, and, count, inArray, ne } from "drizzle-orm";
 import { decrypt } from "@/lib/crypto";
 import { authenticateAgent } from "@/lib/agent-auth";
 import { getXrayDefaultPort } from "@/lib/proxy-port";
@@ -679,6 +679,17 @@ export async function GET(request: NextRequest) {
     };
   }
 
+  // Mesh peers for the all-pairs latency matrix. Skip self, pending-delete nodes,
+  // and nodes whose only address is a private IP (a peer pinging that IP would
+  // hit a different machine in its own LAN and report bogus RTT).
+  const meshPeers = db
+    .select({ id: nodes.id, ip: nodes.ip, domain: nodes.domain })
+    .from(nodes)
+    .where(and(ne(nodes.id, nodeId), eq(nodes.pendingDelete, false)))
+    .all()
+    .filter((n) => n.domain || !isPrivateIp(n.ip))
+    .map((n) => ({ nodeId: n.id, host: n.domain || n.ip }));
+
   const config = {
     node: {
       id: node.id,
@@ -697,6 +708,7 @@ export async function GET(request: NextRequest) {
     xray: xrayConfig,
     socks5: socks5Config,
     routing: routingConfig,
+    meshPeers,
     version: node.updatedAt,
     pending_delete: !!node.pendingDelete,
   };
