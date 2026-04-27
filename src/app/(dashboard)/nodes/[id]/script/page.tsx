@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePublicUrlCheck } from "@/components/public-url-check-provider";
 import { useSetBreadcrumbLabel } from "@/components/breadcrumb-context";
+import { PageHeader } from "@/components/page-header";
 
 export default function NodeScriptPage() {
   const params = useParams();
@@ -66,17 +67,15 @@ export default function NodeScriptPage() {
 
   return (
     <div className="space-y-6 w-full">
-      <div className="flex items-center justify-between">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-2xl font-semibold">{t("title")}</h1>
-          {nodeName && (
-            <span className="text-base text-muted-foreground">{nodeName}</span>
-          )}
-        </div>
-        <Button variant="outline" onClick={() => router.push("/nodes")}>
-          {tc("back")}
-        </Button>
-      </div>
+      <PageHeader
+        title={t("title")}
+        subtitle={nodeName || undefined}
+        actions={
+          <Button variant="outline" onClick={() => router.push("/nodes")}>
+            {tc("back")}
+          </Button>
+        }
+      />
 
       <Card>
         <CardHeader>

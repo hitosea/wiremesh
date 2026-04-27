@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { PageHeader } from "@/components/page-header";
 import {
   Card,
   CardContent,
@@ -281,12 +282,14 @@ export default function NewLinePage() {
 
   return (
     <div className="space-y-6 w-full">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{t("title")}</h1>
-        <Button variant="outline" onClick={() => router.back()}>
-          {tc("back")}
-        </Button>
-      </div>
+      <PageHeader
+        title={t("title")}
+        actions={
+          <Button variant="outline" onClick={() => router.back()}>
+            {tc("back")}
+          </Button>
+        }
+      />
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Basic Info Card */}

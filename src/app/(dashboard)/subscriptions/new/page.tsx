@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/page-header";
 
 export default function NewSubscriptionPage() {
   const t = useTranslations("subscriptions");
@@ -49,12 +50,14 @@ export default function NewSubscriptionPage() {
 
   return (
     <div className="space-y-6 w-full">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{t("create")}</h1>
-        <Button variant="outline" onClick={() => router.back()}>
-          {tc("back")}
-        </Button>
-      </div>
+      <PageHeader
+        title={t("create")}
+        actions={
+          <Button variant="outline" onClick={() => router.back()}>
+            {tc("back")}
+          </Button>
+        }
+      />
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card>

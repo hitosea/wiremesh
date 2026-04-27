@@ -16,6 +16,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { StatusDotWithCount } from "@/components/status-dot-with-count";
+import { PageHeader } from "@/components/page-header";
 import { formatBytes } from "@/lib/format-bytes";
 import {
   Select,
@@ -162,32 +163,34 @@ function DeviceDetailContent() {
 
   return (
     <div className="space-y-6 w-full">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold">
-            {device ? (
-              device.name
-            ) : (
-              <span className="inline-block h-7 w-48 rounded-md bg-muted animate-pulse align-middle" />
-            )}
-          </h1>
-          {device && device.status !== "-" && (
+      <PageHeader
+        title={
+          device ? (
+            device.name
+          ) : (
+            <span className="inline-block h-7 w-48 rounded-md bg-muted animate-pulse align-middle" />
+          )
+        }
+        badge={
+          device && device.status !== "-" && (
             <StatusDotWithCount
               status={device.status}
               label={ts(`status.${device.status}`)}
               count={device.connectionCount}
             />
-          )}
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => router.push(`/devices/${deviceId}/config`)}>
-            {ts("config")}
-          </Button>
-          <Button variant="outline" onClick={() => router.push("/devices")}>
-            {tc("back")}
-          </Button>
-        </div>
-      </div>
+          )
+        }
+        actions={
+          <>
+            <Button variant="outline" onClick={() => router.push(`/devices/${deviceId}/config`)}>
+              {ts("config")}
+            </Button>
+            <Button variant="outline" onClick={() => router.push("/devices")}>
+              {tc("back")}
+            </Button>
+          </>
+        }
+      />
       {loading ? (
         <div className="flex items-center justify-center h-48 text-muted-foreground">
           {tc("loading")}

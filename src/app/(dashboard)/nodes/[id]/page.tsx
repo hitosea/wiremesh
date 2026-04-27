@@ -23,6 +23,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { StatusDot } from "@/components/status-dot";
+import { PageHeader } from "@/components/page-header";
 import { NodeStatusChart } from "@/components/node-status-chart";
 import { xrayPortHintParams } from "@/lib/port-hint";
 import { parseTunnelPortBlacklist } from "@/lib/ip-allocator";
@@ -243,23 +244,21 @@ export default function NodeDetailPage() {
 
   return (
     <div className="space-y-6 w-full">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold">
-            {node ? (
-              node.name
-            ) : (
-              <span className="inline-block h-7 w-48 rounded-md bg-muted animate-pulse align-middle" />
-            )}
-          </h1>
-          {node && (
-            <StatusDot status={node.status} label={ts(`status.${node.status}`)} />
-          )}
-        </div>
-        <Button variant="outline" onClick={() => router.push("/nodes")}>
-          {tc("back")}
-        </Button>
-      </div>
+      <PageHeader
+        title={
+          node ? (
+            node.name
+          ) : (
+            <span className="inline-block h-7 w-48 rounded-md bg-muted animate-pulse align-middle" />
+          )
+        }
+        badge={node && <StatusDot status={node.status} label={ts(`status.${node.status}`)} />}
+        actions={
+          <Button variant="outline" onClick={() => router.push("/nodes")}>
+            {tc("back")}
+          </Button>
+        }
+      />
       {loading ? (
         <div className="flex items-center justify-center h-48 text-muted-foreground">
           {tc("loading")}

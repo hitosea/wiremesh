@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSetBreadcrumbLabel } from "@/components/breadcrumb-context";
+import { PageHeader } from "@/components/page-header";
 import { Loader2 } from "lucide-react";
 
 type ConfigData = {
@@ -174,23 +175,20 @@ export default function DeviceConfigPage() {
 
   return (
     <div className="space-y-6 w-full">
-      <div className="flex items-center justify-between">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-2xl font-semibold">{t("title")}</h1>
-          {deviceName && (
-            <span className="text-base text-muted-foreground">{deviceName}</span>
-          )}
-        </div>
-
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => router.push(`/devices/${deviceId}`)}>
-            {tc("edit")}
-          </Button>
-          <Button variant="outline" onClick={() => router.push("/devices")}>
-            {tc("back")}
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title={t("title")}
+        subtitle={deviceName}
+        actions={
+          <>
+            <Button variant="outline" onClick={() => router.push(`/devices/${deviceId}`)}>
+              {tc("edit")}
+            </Button>
+            <Button variant="outline" onClick={() => router.push("/devices")}>
+              {tc("back")}
+            </Button>
+          </>
+        }
+      />
 
       {loading ? (
         <Card>

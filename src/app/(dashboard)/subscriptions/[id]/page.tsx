@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -211,23 +212,21 @@ export default function SubscriptionDetailPage() {
 
   return (
     <div className="space-y-6 w-full">
-      <div className="flex items-center justify-between">
-        <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-semibold truncate">
-            {loading ? (
-              <span className="inline-block h-7 w-48 rounded-md bg-muted animate-pulse align-middle" />
-            ) : (
-              group?.name ?? t("title")
-            )}
-          </h1>
-          {group?.remark && (
-            <p className="text-sm text-muted-foreground mt-1 truncate">{group.remark}</p>
-          )}
-        </div>
-        <Button variant="outline" onClick={() => router.push("/devices?tab=subscriptions")}>
-          {tc("back")}
-        </Button>
-      </div>
+      <PageHeader
+        title={
+          loading ? (
+            <span className="inline-block h-7 w-48 rounded-md bg-muted animate-pulse align-middle" />
+          ) : (
+            group?.name ?? t("title")
+          )
+        }
+        subtitle={group?.remark}
+        actions={
+          <Button variant="outline" onClick={() => router.push("/devices?tab=subscriptions")}>
+            {tc("back")}
+          </Button>
+        }
+      />
       {loading ? (
         <div className="flex items-center justify-center h-48 text-muted-foreground">
           {tc("loading")}

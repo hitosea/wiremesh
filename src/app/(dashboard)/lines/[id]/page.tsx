@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { StatusDot } from "@/components/status-dot";
+import { PageHeader } from "@/components/page-header";
 import { Pencil, Check, X, RefreshCw } from "lucide-react";
 import {
   Card,
@@ -300,23 +301,25 @@ export default function LineDetailPage() {
 
   return (
     <div className="space-y-6 w-full">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold">
-            {line ? (
-              line.name
-            ) : (
-              <span className="inline-block h-7 w-48 rounded-md bg-muted animate-pulse align-middle" />
-            )}
-          </h1>
-          {line && (
+      <PageHeader
+        title={
+          line ? (
+            line.name
+          ) : (
+            <span className="inline-block h-7 w-48 rounded-md bg-muted animate-pulse align-middle" />
+          )
+        }
+        badge={
+          line && (
             <StatusDot status={line.status} label={tl(`status.${line.status}` as "status.active" | "status.inactive") ?? line.status} />
-          )}
-        </div>
-        <Button variant="outline" onClick={() => router.push("/lines")}>
-          {tc("back")}
-        </Button>
-      </div>
+          )
+        }
+        actions={
+          <Button variant="outline" onClick={() => router.push("/lines")}>
+            {tc("back")}
+          </Button>
+        }
+      />
       {loading ? (
         <div className="flex items-center justify-center h-48 text-muted-foreground">
           {tc("loading")}

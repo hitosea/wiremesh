@@ -26,6 +26,7 @@ import {
 import { FilterFormatHelp } from "@/components/filter-format-help";
 import { useAdminSSE } from "@/components/admin-sse-provider";
 import { useSetBreadcrumbLabel } from "@/components/breadcrumb-context";
+import { PageHeader } from "@/components/page-header";
 import { buildBranchChain, type LineNode } from "@/lib/branch-chain";
 
 type Branch = {
@@ -200,12 +201,14 @@ export default function EditFilterPage() {
 
   return (
     <div className="space-y-6 w-full">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{t("title")}</h1>
-        <Button variant="outline" onClick={() => router.push("/filters")}>
-          {tc("back")}
-        </Button>
-      </div>
+      <PageHeader
+        title={t("title")}
+        actions={
+          <Button variant="outline" onClick={() => router.push("/filters")}>
+            {tc("back")}
+          </Button>
+        }
+      />
       {loading ? (
         <div className="flex items-center justify-center h-48 text-muted-foreground">
           {tc("loading")}
