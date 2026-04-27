@@ -17,7 +17,7 @@ describe("tunnel-status-cache", () => {
 
   it("stores and retrieves snapshot", () => {
     const tunnels: TunnelStatusReport[] = [
-      { iface: "wm-tun11", peerPublicKey: "abc=", lastHandshake: 1777111630, rxBytes: 100, txBytes: 200 },
+      { iface: "wm-tun11", peerPublicKey: "abc=", lastHandshake: 1777111630, rxBytes: 100, txBytes: 200, latencyMs: null },
     ];
     setNodeSnapshot(5, tunnels);
     const got = getNodeSnapshot(5);
@@ -27,12 +27,12 @@ describe("tunnel-status-cache", () => {
   });
 
   it("overwrites previous snapshot for same nodeId", () => {
-    setNodeSnapshot(5, [{ iface: "wm-tun11", peerPublicKey: "a=", lastHandshake: 100, rxBytes: 0, txBytes: 0 }]);
+    setNodeSnapshot(5, [{ iface: "wm-tun11", peerPublicKey: "a=", lastHandshake: 100, rxBytes: 0, txBytes: 0, latencyMs: null }]);
     const firstAt = getNodeSnapshot(5)!.reportedAt;
     // wait at least 1s so reportedAt advances
     return new Promise<void>((resolve) => {
       setTimeout(() => {
-        setNodeSnapshot(5, [{ iface: "wm-tun11", peerPublicKey: "b=", lastHandshake: 200, rxBytes: 1, txBytes: 2 }]);
+        setNodeSnapshot(5, [{ iface: "wm-tun11", peerPublicKey: "b=", lastHandshake: 200, rxBytes: 1, txBytes: 2, latencyMs: null }]);
         const second = getNodeSnapshot(5)!;
         expect(second.tunnels[0].peerPublicKey).toBe("b=");
         expect(second.reportedAt).toBeGreaterThanOrEqual(firstAt);
@@ -42,14 +42,14 @@ describe("tunnel-status-cache", () => {
   });
 
   it("isolates snapshots by nodeId", () => {
-    setNodeSnapshot(5, [{ iface: "wm-tun11", peerPublicKey: "a=", lastHandshake: 100, rxBytes: 0, txBytes: 0 }]);
-    setNodeSnapshot(6, [{ iface: "wm-tun11", peerPublicKey: "b=", lastHandshake: 200, rxBytes: 0, txBytes: 0 }]);
+    setNodeSnapshot(5, [{ iface: "wm-tun11", peerPublicKey: "a=", lastHandshake: 100, rxBytes: 0, txBytes: 0, latencyMs: null }]);
+    setNodeSnapshot(6, [{ iface: "wm-tun11", peerPublicKey: "b=", lastHandshake: 200, rxBytes: 0, txBytes: 0, latencyMs: null }]);
     expect(getNodeSnapshot(5)!.tunnels[0].peerPublicKey).toBe("a=");
     expect(getNodeSnapshot(6)!.tunnels[0].peerPublicKey).toBe("b=");
   });
 
   it("clearAllSnapshots empties the cache", () => {
-    setNodeSnapshot(5, [{ iface: "wm-tun11", peerPublicKey: "a=", lastHandshake: 100, rxBytes: 0, txBytes: 0 }]);
+    setNodeSnapshot(5, [{ iface: "wm-tun11", peerPublicKey: "a=", lastHandshake: 100, rxBytes: 0, txBytes: 0, latencyMs: null }]);
     clearAllSnapshots();
     expect(getNodeSnapshot(5)).toBeNull();
   });

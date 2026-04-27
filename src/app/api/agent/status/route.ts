@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     agent_version?: string;
     xray_version?: string;
     xray_running?: boolean;
-    tunnel_statuses?: { iface: string; peer_public_key: string; last_handshake: number; rx_bytes: number; tx_bytes: number }[];
+    tunnel_statuses?: { iface: string; peer_public_key: string; last_handshake: number; rx_bytes: number; tx_bytes: number; latency_ms?: number }[];
   };
 
   const {
@@ -202,6 +202,7 @@ export async function POST(request: NextRequest) {
       lastHandshake: t.last_handshake,
       rxBytes: t.rx_bytes,
       txBytes: t.tx_bytes,
+      latencyMs: typeof t.latency_ms === "number" ? t.latency_ms : null,
     })));
   }
 

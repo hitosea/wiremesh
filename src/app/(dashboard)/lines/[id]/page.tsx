@@ -72,6 +72,7 @@ type TunnelStatusView = {
   fromWgAddress: string; toWgAddress: string;
   fromWgPort: number; toWgPort: number;
   lastHandshake: number; rxBytes: number; txBytes: number;
+  latencyMs: number | null;
   dataFromToNode: boolean; stale: boolean;
   fromNodeReachable: boolean; toNodeReachable: boolean;
 };
@@ -509,6 +510,7 @@ export default function LineDetailPage() {
                   <TableHead>{t("sourcePort")}</TableHead>
                   <TableHead>{t("targetPort")}</TableHead>
                   <TableHead>{t("lastHandshake")}</TableHead>
+                  <TableHead>{t("latency")}</TableHead>
                   <TableHead>{t("transfer")}</TableHead>
                   <TableHead className="text-right" />
                 </TableRow>
@@ -519,6 +521,7 @@ export default function LineDetailPage() {
                   const lastHs = status?.lastHandshake ?? 0;
                   const rx = status?.rxBytes ?? 0;
                   const tx = status?.txBytes ?? 0;
+                  const latencyMs = status?.latencyMs;
                   const stale = status?.stale ?? false;
                   const offline = !!status && !status.fromNodeReachable && !status.toNodeReachable;
                   const initialLoading = tunnelStatus === null;
@@ -539,6 +542,11 @@ export default function LineDetailPage() {
                         {!initialLoading && stale && !offline && (
                           <span title={t("staleData")} className="ml-1 opacity-50">ⓘ</span>
                         )}
+                      </TableCell>
+                      <TableCell className={stale ? "text-muted-foreground" : ""}>
+                        {initialLoading ? (
+                          <span className="inline-block h-3 w-12 rounded bg-muted animate-pulse align-middle" />
+                        ) : offline || latencyMs == null ? "—" : `${latencyMs} ms`}
                       </TableCell>
                       <TableCell className="text-xs">
                         {initialLoading ? (

@@ -250,7 +250,7 @@ func (a *Agent) pullAndApplyConfigForce(force bool) error {
 }
 
 func (a *Agent) reportStatus() {
-	report := collector.Collect(a.cfg.ServerURL, a.version)
+	report := collector.Collect(a.cfg.ServerURL, a.version, a.activeTunnels)
 	if err := a.client.ReportStatus(report); err != nil {
 		log.Printf("[agent] Status report failed: %v", err)
 	} else {

@@ -18,6 +18,7 @@ export type TunnelView = {
   lastHandshake: number;
   rxBytes: number;
   txBytes: number;
+  latencyMs: number | null;
   dataFromToNode: boolean;
   stale: boolean;
   fromNodeReachable: boolean;
@@ -68,6 +69,11 @@ export function buildTunnelsView(lineId: number): TunnelsViewResponse {
       dataFromToNode = true;
     }
 
+    // Either node's RTT is valid for the same /30 link; prefer the lower one.
+    const lats = [fromReport?.latencyMs, toReport?.latencyMs]
+      .filter((x): x is number => typeof x === "number");
+    const latencyMs = lats.length > 0 ? Math.min(...lats) : null;
+
     const reportedTimes = [fromSnap?.reportedAt, toSnap?.reportedAt].filter((x): x is number => typeof x === "number");
     if (reportedTimes.length > 0) {
       const newest = Math.max(...reportedTimes);
@@ -91,6 +97,7 @@ export function buildTunnelsView(lineId: number): TunnelsViewResponse {
       lastHandshake,
       rxBytes,
       txBytes,
+      latencyMs,
       dataFromToNode,
       stale,
       fromNodeReachable: fromSnap !== null,

@@ -434,6 +434,7 @@
     "branchRenamed": "分支名称已更新",
     "branchNameEmpty": "分支名称不能为空",
     "lastHandshake": "最近握手",
+    "latency": "延迟",
     "transfer": "收发",
     "never": "从未",
     "refresh": "刷新",

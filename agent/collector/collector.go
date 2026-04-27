@@ -6,6 +6,8 @@ import (
 	"log"
 	"net/http"
 	"os/exec"
+	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -50,7 +52,7 @@ var (
 	xrayIpCacheMu sync.Mutex
 )
 
-func Collect(serverURL string, agentVersion string) *api.StatusReport {
+func Collect(serverURL string, agentVersion string, tunnels map[string]wg.ActiveTunnel) *api.StatusReport {
 	report := &api.StatusReport{IsOnline: true}
 	latency := measureLatency(serverURL)
 	if latency >= 0 {
@@ -70,7 +72,9 @@ func Collect(serverURL string, agentVersion string) *api.StatusReport {
 	report.XrayRunning = xray.IsRunning()
 	// Collect wm-tun* states (best-effort; failure shouldn't fail the whole report)
 	if dump, err := wg.WgShowAllDump(); err == nil {
-		report.TunnelStatuses = parseTunnelStatuses(dump)
+		statuses := parseTunnelStatuses(dump)
+		measureTunnelLatencies(statuses, tunnels)
+		report.TunnelStatuses = statuses
 	} else {
 		log.Printf("[collector] WgShowAllDump failed: %v", err)
 	}
@@ -488,6 +492,94 @@ func parseInt64Safe(s string) int64 {
 		return 0
 	}
 	return n
+}
+
+func measureTunnelLatencies(statuses []api.TunnelStatusReport, tunnels map[string]wg.ActiveTunnel) {
+	if len(statuses) == 0 || len(tunnels) == 0 {
+		return
+	}
+	var grp sync.WaitGroup
+	for i := range statuses {
+		t, ok := tunnels[statuses[i].Iface]
+		if !ok {
+			continue
+		}
+		peerIP := peerInnerIp(t.Address)
+		if peerIP == "" {
+			continue
+		}
+		grp.Add(1)
+		go func() {
+			defer grp.Done()
+			if ms := pingPeer(statuses[i].Iface, peerIP); ms != nil {
+				statuses[i].LatencyMs = ms
+			}
+		}()
+	}
+	grp.Wait()
+}
+
+// peerInnerIp returns the peer's WG inner IP for a /30 tunnel pair given the
+// local CIDR address. Returns "" if the address can't be parsed or isn't a /30.
+func peerInnerIp(localAddr string) string {
+	parts := strings.Split(localAddr, "/")
+	if len(parts) != 2 || parts[1] != "30" {
+		return ""
+	}
+	octets := strings.Split(parts[0], ".")
+	if len(octets) != 4 {
+		return ""
+	}
+	last, err := strconv.Atoi(octets[3])
+	if err != nil {
+		return ""
+	}
+	base := last & 0xFC
+	var peer int
+	switch last {
+	case base + 1:
+		peer = base + 2
+	case base + 2:
+		peer = base + 1
+	default:
+		return ""
+	}
+	return fmt.Sprintf("%s.%s.%s.%d", octets[0], octets[1], octets[2], peer)
+}
+
+var pingRttRe = regexp.MustCompile(`time=([0-9.]+) ms`)
+
+// pingPeer probes the peer with one ICMP packet, then sends two more to refine
+// the estimate. Returns the minimum RTT in ms, or nil if the probe times out —
+// fail-fast on the first packet so unreachable peers don't stall the report.
+func pingPeer(iface, peerIP string) *int {
+	out, err := exec.Command("ping", "-n", "-c", "1", "-W", "1", "-I", iface, peerIP).Output()
+	if err != nil {
+		return nil
+	}
+	rtts := parsePingRtts(string(out))
+	if len(rtts) == 0 {
+		return nil
+	}
+	if more, err := exec.Command("ping", "-n", "-c", "2", "-W", "1", "-i", "0.2", "-I", iface, peerIP).Output(); err == nil {
+		rtts = append(rtts, parsePingRtts(string(more))...)
+	}
+	ms := int(slices.Min(rtts) + 0.5)
+	return &ms
+}
+
+func parsePingRtts(output string) []float64 {
+	matches := pingRttRe.FindAllStringSubmatch(output, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+	out := make([]float64, 0, len(matches))
+	for _, m := range matches {
+		if v, err := strconv.ParseFloat(m[1], 64); err == nil {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 // listTunnelInterfaces returns all `wm-tun*` interface names currently up.

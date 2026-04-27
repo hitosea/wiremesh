@@ -13,6 +13,7 @@ export type TunnelStatusReport = {
   lastHandshake: number;  // unix seconds, 0 = never
   rxBytes: number;
   txBytes: number;
+  latencyMs: number | null;  // null = unreachable or measurement skipped
 };
 
 export type NodeSnapshot = {

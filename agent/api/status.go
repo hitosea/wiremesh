@@ -65,10 +65,13 @@ type ErrorReport struct {
 
 // TunnelStatusReport: snapshot of one wm-tun* peer's wg state at report time.
 // LastHandshake is unix seconds (0 = never handshaked).
+// LatencyMs is the round-trip ping to the peer's WG inner address; nil when
+// the peer is unreachable or measurement was skipped.
 type TunnelStatusReport struct {
 	Iface         string `json:"iface"`
 	PeerPublicKey string `json:"peer_public_key"`
 	LastHandshake int64  `json:"last_handshake"`
 	RxBytes       int64  `json:"rx_bytes"`
 	TxBytes       int64  `json:"tx_bytes"`
+	LatencyMs     *int   `json:"latency_ms,omitempty"`
 }

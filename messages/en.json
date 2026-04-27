@@ -434,6 +434,7 @@
     "branchRenamed": "Branch name updated",
     "branchNameEmpty": "Branch name is required",
     "lastHandshake": "Last handshake",
+    "latency": "Latency",
     "transfer": "Transfer",
     "never": "Never",
     "refresh": "Refresh",
