@@ -361,7 +361,10 @@
     "details": "Details",
     "addLine": "Add Line",
     "searchPlaceholder": "Search line name...",
-    "confirmDeleteLine": "Are you sure you want to delete this line? Bound devices will be unlinked. This action cannot be undone."
+    "confirmDeleteLine": "Are you sure you want to delete this line? Bound devices will be unlinked. This action cannot be undone.",
+    "directExit": "Direct exit",
+    "defaultBadge": "Default",
+    "branchListTitle": "All branches"
   },
   "lineNew": {
     "title": "Add Line",
@@ -461,7 +464,8 @@
     "branchCreated": "Branch created",
     "branchDeleted": "Branch deleted",
     "deleteBranchTitle": "Delete branch",
-    "deleteBranchDescription": "Delete branch \"{name}\"? Its tunnels and rule bindings will be removed."
+    "deleteBranchDescription": "Delete branch \"{name}\"? Its tunnels and rule bindings will be removed.",
+    "willReplaceDefault": "Saving will replace the current default branch \"{name}\""
   },
   "filters": {
     "mode": {

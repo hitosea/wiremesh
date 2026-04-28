@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -233,6 +233,11 @@ export default function LineDetailPage() {
   const entryNode = line?.nodes.find((n) => n.role === "entry") ?? null;
   const entryNodeId = entryNode ? String(entryNode.nodeId) : "";
 
+  const replaceableDefault =
+    branchDraft.isDefault && !editingBranch?.isDefault
+      ? line?.branches.find((b) => b.isDefault && b.id !== editingBranch?.id) ?? null
+      : null;
+
   const openAddBranch = () => {
     setEditingBranch(null);
     setBranchDraft({
@@ -443,14 +448,22 @@ export default function LineDetailPage() {
     }
   };
 
-  const formatHandshake = (unixSec: number): string => {
-    if (unixSec === 0) return t("never");
-    const ago = Math.floor(Date.now() / 1000) - unixSec;
-    if (ago < 60) return t("secondsAgo", { n: ago });
-    if (ago < 3600) return t("minutesAgo", { n: Math.floor(ago / 60) });
-    if (ago < 86400) return t("hoursAgo", { n: Math.floor(ago / 3600) });
-    return t("daysAgo", { n: Math.floor(ago / 86400) });
-  };
+  // Frozen per tunnelStatus snapshot so a click-triggered re-render
+  // doesn't recompute "X seconds ago" against a fresh Date.now() and flicker.
+  const handshakeLabels = useMemo(() => {
+    if (!tunnelStatus) return null;
+    const nowSec = Math.floor(Date.now() / 1000);
+    const labelFor = (unixSec: number): string => {
+      if (unixSec === 0) return t("never");
+      const ago = nowSec - unixSec;
+      if (ago < 60) return t("secondsAgo", { n: ago });
+      if (ago < 3600) return t("minutesAgo", { n: Math.floor(ago / 60) });
+      if (ago < 86400) return t("hoursAgo", { n: Math.floor(ago / 3600) });
+      return t("daysAgo", { n: Math.floor(ago / 86400) });
+    };
+    return new Map(tunnelStatus.tunnels.map((tun) => [tun.id, labelFor(tun.lastHandshake)]));
+  }, [tunnelStatus, t]);
+
   const formatTime = (unixSec: number): string => {
     return new Date(unixSec * 1000).toLocaleTimeString();
   };
@@ -677,7 +690,6 @@ export default function LineDetailPage() {
               <TableBody>
                 {line.tunnels.map((tun) => {
                   const status = tunnelStatus?.tunnels.find((s) => s.id === tun.id);
-                  const lastHs = status?.lastHandshake ?? 0;
                   const rx = status?.rxBytes ?? 0;
                   const tx = status?.txBytes ?? 0;
                   const latencyMs = status?.latencyMs;
@@ -697,7 +709,7 @@ export default function LineDetailPage() {
                       <TableCell className={stale ? "text-muted-foreground" : ""}>
                         {initialLoading ? (
                           <span className="inline-block h-3 w-16 rounded bg-muted animate-pulse align-middle" />
-                        ) : offline ? "—" : formatHandshake(lastHs)}
+                        ) : offline ? "—" : (handshakeLabels?.get(tun.id) ?? "—")}
                         {!initialLoading && stale && !offline && (
                           <span title={t("staleData")} className="ml-1 opacity-50">ⓘ</span>
                         )}
@@ -802,12 +814,9 @@ export default function LineDetailPage() {
               <div className="flex items-center justify-between">
                 <Label>{tNew("branchName")}</Label>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="detailDefaultBranch"
+                  <Checkbox
                     checked={branchDraft.isDefault}
-                    onChange={() => updateBranchDraft({ isDefault: true, filterIds: [] })}
-                    className="accent-primary"
+                    onCheckedChange={(checked) => updateBranchDraft({ isDefault: checked === true })}
                   />
                   <span className="text-sm whitespace-nowrap">{tNew("defaultBranch")}</span>
                 </label>
@@ -817,6 +826,11 @@ export default function LineDetailPage() {
                 onChange={(e) => updateBranchDraft({ name: e.target.value })}
                 placeholder={tNew("branchName")}
               />
+              {replaceableDefault && (
+                <p className="text-xs text-muted-foreground">
+                  {t("willReplaceDefault", { name: replaceableDefault.name })}
+                </p>
+              )}
             </div>
 
             <div className="space-y-3">

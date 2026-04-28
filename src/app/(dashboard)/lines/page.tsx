@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { translateError } from "@/lib/translate-error";
 import { useTranslations } from "next-intl";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { StatusDot } from "@/components/status-dot";
 import {
   AlertDialog,
@@ -18,13 +19,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { DataTable, Column, PaginationInfo } from "@/components/data-table";
+import { buildBranchChain, type LineNode } from "@/lib/branch-chain";
 
-type LineNode = {
-  hopOrder: number;
-  role: string;
-  nodeId: number;
-  nodeName: string;
+type LineBranch = {
+  id: number;
+  name: string;
+  isDefault: boolean;
 };
 
 type Line = {
@@ -32,6 +38,7 @@ type Line = {
   name: string;
   status: string;
   nodes: LineNode[];
+  branches: LineBranch[];
 };
 
 export default function LinesPage() {
@@ -50,12 +57,6 @@ export default function LinesPage() {
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
-
-  const renderNodeChain = (nodes: LineNode[]): string => {
-    return nodes
-      .map((n) => `${n.nodeName}(${t(`role.${n.role}` as "role.entry" | "role.relay" | "role.exit") ?? n.role})`)
-      .join(" \u2192 ");
-  };
 
   const fetchLines = async (page = 1, q = search) => {
     setLoading(true);
@@ -126,11 +127,54 @@ export default function LinesPage() {
     {
       key: "nodes",
       label: t("nodeChain"),
-      render: (row) => (
-        <span className="text-sm text-muted-foreground">
-          {row.nodes.length > 0 ? renderNodeChain(row.nodes) : "\u2014"}
-        </span>
-      ),
+      render: (row) => {
+        const defaultBranch = row.branches.find((b) => b.isDefault) ?? row.branches[0];
+        if (!defaultBranch) {
+          return <span className="text-sm text-muted-foreground">\u2014</span>;
+        }
+        const otherCount = row.branches.length - 1;
+        return (
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">
+              {buildBranchChain(row.nodes, defaultBranch.id, t("directExit"))}
+            </span>
+            {otherCount > 0 && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Badge
+                    variant="secondary"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={t("branchListTitle")}
+                    className="cursor-pointer hover:bg-muted"
+                  >
+                    +{otherCount}
+                  </Badge>
+                </PopoverTrigger>
+                <PopoverContent className="w-80">
+                  <div className="space-y-3 text-sm">
+                    {row.branches.map((branch) => (
+                      <div key={branch.id}>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{branch.name}</span>
+                          {branch.isDefault && (
+                            <Badge variant="outline" className="text-xs px-1.5 py-0">
+                              {t("defaultBadge")}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground font-mono mt-0.5">
+                          {buildBranchChain(row.nodes, branch.id, t("directExit"))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: "status",

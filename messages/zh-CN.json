@@ -361,7 +361,10 @@
     "details": "详情",
     "addLine": "新增线路",
     "searchPlaceholder": "搜索线路名称...",
-    "confirmDeleteLine": "确定要删除该线路吗？关联设备将取消绑定，此操作不可恢复。"
+    "confirmDeleteLine": "确定要删除该线路吗？关联设备将取消绑定，此操作不可恢复。",
+    "directExit": "直出",
+    "defaultBadge": "默认",
+    "branchListTitle": "所有分支"
   },
   "lineNew": {
     "title": "新增线路",
@@ -461,7 +464,8 @@
     "branchCreated": "分支已创建",
     "branchDeleted": "分支已删除",
     "deleteBranchTitle": "删除分支",
-    "deleteBranchDescription": "确定要删除分支「{name}」吗？该分支的隧道和规则绑定会被删除。"
+    "deleteBranchDescription": "确定要删除分支「{name}」吗？该分支的隧道和规则绑定会被删除。",
+    "willReplaceDefault": "保存后会取代当前默认分支「{name}」"
   },
   "filters": {
     "mode": {
