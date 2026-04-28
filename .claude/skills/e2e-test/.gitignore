@@ -1,0 +1,9 @@
+# Local secrets — copy servers.env.example → servers.env, fill values
+servers.env
+
+# Build cache (extracted xray binary etc.)
+.build/
+
+# Test artifacts
+*.log
+results.tsv
