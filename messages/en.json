@@ -452,7 +452,16 @@
     "minutesAgo": "{n} minutes ago",
     "hoursAgo": "{n} hours ago",
     "daysAgo": "{n} days ago",
-    "reallocateFailed": "Reallocate failed"
+    "reallocateFailed": "Reallocate failed",
+    "addBranch": "Add branch",
+    "editBranch": "Edit branch",
+    "editBranchDescription": "Edit the branch name, default route, node chain, and bound routing rules. Changing the node chain rebuilds this branch's tunnels and notifies related agents.",
+    "deleteBranch": "Delete branch",
+    "branchSaved": "Branch saved",
+    "branchCreated": "Branch created",
+    "branchDeleted": "Branch deleted",
+    "deleteBranchTitle": "Delete branch",
+    "deleteBranchDescription": "Delete branch \"{name}\"? Its tunnels and rule bindings will be removed."
   },
   "filters": {
     "mode": {
@@ -801,7 +810,12 @@
       "dnsUpstream": "DNS upstream must be comma-separated valid IP addresses",
       "privateIpNotAllowedAsRelayOrExit": "Node \"{name}\" uses a private IP and cannot be used as relay or exit",
       "wsTlsDomainRequired": "Domain is required for WebSocket + TLS mode",
-      "deviceIdsRequired": "deviceIds must be an array"
+      "deviceIdsRequired": "deviceIds must be an array",
+      "cannotDeleteLastBranch": "A line must keep at least one branch",
+      "cannotDeleteDefaultBranch": "Cannot delete the default branch. Set another branch as default first.",
+      "nodeIdsMustBeArray": "nodeIds must be an array",
+      "filterIdsMustBeArray": "filterIds must be an array",
+      "isDefaultMustBeBoolean": "isDefault must be a boolean"
     },
     "auth": {
       "unauthorized": "Invalid username or password",

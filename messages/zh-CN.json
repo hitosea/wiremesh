@@ -452,7 +452,16 @@
     "minutesAgo": "{n} 分钟前",
     "hoursAgo": "{n} 小时前",
     "daysAgo": "{n} 天前",
-    "reallocateFailed": "重新分配端口失败"
+    "reallocateFailed": "重新分配端口失败",
+    "addBranch": "添加分支",
+    "editBranch": "编辑分支",
+    "editBranchDescription": "修改分支名称、默认出口、节点链路和绑定的分流规则。修改节点链路会重建该分支隧道并通知相关 Agent。",
+    "deleteBranch": "删除分支",
+    "branchSaved": "分支已保存",
+    "branchCreated": "分支已创建",
+    "branchDeleted": "分支已删除",
+    "deleteBranchTitle": "删除分支",
+    "deleteBranchDescription": "确定要删除分支「{name}」吗？该分支的隧道和规则绑定会被删除。"
   },
   "filters": {
     "mode": {
@@ -801,7 +810,12 @@
       "dnsUpstream": "DNS 上游服务器必须是逗号分隔的合法 IP 地址",
       "privateIpNotAllowedAsRelayOrExit": "节点 \"{name}\" 使用内网 IP，不能作为中继或出口节点",
       "wsTlsDomainRequired": "WebSocket + TLS 模式必须设置域名",
-      "deviceIdsRequired": "deviceIds 必须为数组"
+      "deviceIdsRequired": "deviceIds 必须为数组",
+      "cannotDeleteLastBranch": "线路至少需要保留一个分支",
+      "cannotDeleteDefaultBranch": "不能删除默认分支，请先将其他分支设为默认分支",
+      "nodeIdsMustBeArray": "nodeIds 必须为数组",
+      "filterIdsMustBeArray": "filterIds 必须为数组",
+      "isDefaultMustBeBoolean": "isDefault 必须为布尔值"
     },
     "auth": {
       "unauthorized": "用户名或密码错误",

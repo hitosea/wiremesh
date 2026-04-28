@@ -28,6 +28,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       nodeId: lineNodes.nodeId,
       nodeName: nodes.name,
       nodeStatus: nodes.status,
+      branchId: lineNodes.branchId,
     })
     .from(lineNodes)
     .innerJoin(nodes, eq(lineNodes.nodeId, nodes.id))
@@ -89,6 +90,7 @@ export async function GET(request: NextRequest, { params }: Params) {
         nodeId: lineNodes.nodeId,
         nodeName: nodes.name,
         nodeStatus: nodes.status,
+        branchId: lineNodes.branchId,
       })
       .from(lineNodes)
       .innerJoin(nodes, eq(lineNodes.nodeId, nodes.id))

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { translateError } from "@/lib/translate-error";
 import { formatBytes } from "@/lib/format-bytes";
+import { isPrivateIp } from "@/lib/ip-utils";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { StatusDot } from "@/components/status-dot";
 import { PageHeader } from "@/components/page-header";
-import { Pencil, Check, X, RefreshCw } from "lucide-react";
+import { Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -40,6 +41,21 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useSetBreadcrumbLabel } from "@/components/breadcrumb-context";
 
 type LineNode = {
@@ -48,6 +64,7 @@ type LineNode = {
   nodeId: number;
   nodeName: string;
   nodeStatus: string;
+  branchId: number | null;
 };
 
 type LineTunnel = {
@@ -101,6 +118,24 @@ type LineDetail = {
   deviceCount: number;
 };
 
+type NodeOption = {
+  id: number;
+  name: string;
+  ip: string;
+};
+
+type FilterOption = {
+  id: number;
+  name: string;
+};
+
+type BranchDraft = {
+  name: string;
+  isDefault: boolean;
+  nodeIds: string[];
+  filterIds: number[];
+};
+
 export default function LineDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -127,9 +162,20 @@ export default function LineDetailPage() {
   } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [editingBranchId, setEditingBranchId] = useState<number | null>(null);
-  const [branchNameDraft, setBranchNameDraft] = useState("");
+  const [nodeOptions, setNodeOptions] = useState<NodeOption[]>([]);
+  const [availableFilters, setAvailableFilters] = useState<FilterOption[]>([]);
+  const [loadingBranchOptions, setLoadingBranchOptions] = useState(true);
+  const [branchDialogOpen, setBranchDialogOpen] = useState(false);
+  const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
+  const [branchDraft, setBranchDraft] = useState<BranchDraft>({
+    name: "",
+    isDefault: false,
+    nodeIds: [""],
+    filterIds: [],
+  });
   const [branchSaving, setBranchSaving] = useState(false);
+  const [deleteBranchTarget, setDeleteBranchTarget] = useState<Branch | null>(null);
+  const [deletingBranch, setDeletingBranch] = useState(false);
 
   const [reallocateTarget, setReallocateTarget] = useState<{
     tunnelId: number;
@@ -139,50 +185,184 @@ export default function LineDetailPage() {
   const [reallocateBlacklist, setReallocateBlacklist] = useState(true);
   const [reallocating, setReallocating] = useState(false);
 
-  const startEditBranch = (branch: Branch) => {
-    setEditingBranchId(branch.id);
-    setBranchNameDraft(branch.name);
-  };
 
-  const cancelEditBranch = () => {
-    setEditingBranchId(null);
-    setBranchNameDraft("");
-  };
-
-  const saveBranchName = async (branchId: number) => {
-    const trimmed = branchNameDraft.trim();
-    if (!trimmed) {
-      toast.error(t("branchNameEmpty"));
-      return;
+  const loadLine = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/lines/${lineId}`);
+      const json = await res.json();
+      const l = json.data;
+      if (!l) {
+        toast.error(t("notFound"));
+        router.push("/lines");
+        return;
+      }
+      setLine(l);
+      setName(l.name ?? "");
+      setRemark(l.remark ?? "");
+    } catch {
+      toast.error(t("loadFailed"));
+    } finally {
+      setLoading(false);
     }
+  }, [lineId, router, t]);
+
+  useEffect(() => {
+    loadLine();
+  }, [loadLine]);
+
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/nodes?pageSize=100").then((r) => r.json()),
+      fetch("/api/filters?pageSize=100").then((r) => r.json()),
+    ])
+      .then(([nodesJson, filtersJson]) => {
+        setNodeOptions(nodesJson.data ?? []);
+        setAvailableFilters(filtersJson.data ?? []);
+      })
+      .catch(() => toast.error(tc("loadFailed")))
+      .finally(() => setLoadingBranchOptions(false));
+  }, [tc]);
+
+  const refreshLineAfterBranchChange = async () => {
+    await loadLine();
+    setTunnelStatus(null);
+    await loadStatus();
+  };
+
+  const entryNode = line?.nodes.find((n) => n.role === "entry") ?? null;
+  const entryNodeId = entryNode ? String(entryNode.nodeId) : "";
+
+  const openAddBranch = () => {
+    setEditingBranch(null);
+    setBranchDraft({
+      name: tNew("branch", { index: (line?.branches.length ?? 0) + 1 }),
+      isDefault: !line?.branches.some((b) => b.isDefault),
+      nodeIds: [""],
+      filterIds: [],
+    });
+    setBranchDialogOpen(true);
+  };
+
+  const openEditBranch = (branch: Branch) => {
+    setEditingBranch(branch);
+    setBranchDraft({
+      name: branch.name,
+      isDefault: branch.isDefault,
+      nodeIds: [...branch.nodes].sort((a, b) => a.hopOrder - b.hopOrder).map((n) => String(n.nodeId)),
+      filterIds: branch.filters.map((f) => f.filterId),
+    });
+    setBranchDialogOpen(true);
+  };
+
+  const updateBranchDraft = (partial: Partial<BranchDraft>) => {
+    setBranchDraft((prev) => ({ ...prev, ...partial }));
+  };
+
+  const isDirectExitDraft = branchDraft.nodeIds.length === 0;
+
+  const setBranchNodeAt = (nodeIdx: number, value: string) => {
+    setBranchDraft((prev) => {
+      const next = [...prev.nodeIds];
+      next[nodeIdx] = value;
+      return { ...prev, nodeIds: next };
+    });
+  };
+
+  const addBranchRelay = () => {
+    setBranchDraft((prev) => {
+      const next = [...prev.nodeIds];
+      next.splice(Math.max(0, next.length - 1), 0, "");
+      return { ...prev, nodeIds: next.length === 0 ? [""] : next };
+    });
+  };
+
+  const removeBranchRelay = (nodeIdx: number) => {
+    setBranchDraft((prev) => ({
+      ...prev,
+      nodeIds: prev.nodeIds.filter((_, i) => i !== nodeIdx),
+    }));
+  };
+
+  const toggleBranchFilter = (filterId: number) => {
+    setBranchDraft((prev) => ({
+      ...prev,
+      filterIds: prev.filterIds.includes(filterId)
+        ? prev.filterIds.filter((id) => id !== filterId)
+        : [...prev.filterIds, filterId],
+    }));
+  };
+
+  const getNodeName = (id: string) => {
+    const found = nodeOptions.find((n) => String(n.id) === id);
+    return found ? found.name : "?";
+  };
+
+  const getBranchNodeLabel = (nodeIdx: number): string => {
+    if (nodeIdx === branchDraft.nodeIds.length - 1) return tNew("exitNode");
+    return tNew("transitNode");
+  };
+
+  const branchChainPreview = () => {
+    const entryName = entryNodeId ? getNodeName(entryNodeId) : "?";
+    if (isDirectExitDraft) return `${entryName} (${t("directExit")})`;
+    return [entryName, ...branchDraft.nodeIds.map((id) => (id ? getNodeName(id) : "?"))].join(" \u2192 ");
+  };
+
+  const validateBranchDraft = () => {
+    if (!branchDraft.name.trim()) {
+      toast.error(t("branchNameEmpty"));
+      return false;
+    }
+    if (branchDraft.nodeIds.length > 0 && branchDraft.nodeIds.some((id) => !id)) {
+      toast.error(tNew("branchNodeMissing", { name: branchDraft.name }));
+      return false;
+    }
+    const seen = new Set<string>();
+    for (const id of branchDraft.nodeIds) {
+      if (!id) continue;
+      if (id === entryNodeId) {
+        toast.error(te("validation.branchContainsEntryNode", { name: branchDraft.name }));
+        return false;
+      }
+      if (seen.has(id)) {
+        toast.error(tNew("duplicateNodeInBranch", { name: branchDraft.name }));
+        return false;
+      }
+      seen.add(id);
+    }
+    return true;
+  };
+
+  const saveBranch = async () => {
+    if (!validateBranchDraft()) return;
     setBranchSaving(true);
     try {
+      const payload = {
+        name: branchDraft.name.trim(),
+        isDefault: branchDraft.isDefault,
+        nodeIds: branchDraft.nodeIds.map(Number),
+        filterIds: branchDraft.isDefault ? [] : branchDraft.filterIds,
+      };
       const res = await fetch(
-        `/api/lines/${lineId}/branches/${branchId}`,
+        editingBranch
+          ? `/api/lines/${lineId}/branches/${editingBranch.id}`
+          : `/api/lines/${lineId}/branches`,
         {
-          method: "PATCH",
+          method: editingBranch ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: trimmed }),
+          body: JSON.stringify(payload),
         }
       );
       const json = await res.json();
-      if (res.ok) {
-        toast.success(t("branchRenamed"));
-        setLine((prev) =>
-          prev
-            ? {
-                ...prev,
-                branches: prev.branches.map((b) =>
-                  b.id === branchId ? { ...b, name: trimmed } : b
-                ),
-              }
-            : prev
-        );
-        setEditingBranchId(null);
-        setBranchNameDraft("");
-      } else {
+      if (!res.ok) {
         toast.error(translateError(json.error, te, tc("saveFailed")));
+        return;
       }
+      toast.success(editingBranch ? t("branchSaved") : t("branchCreated"));
+      setBranchDialogOpen(false);
+      setEditingBranch(null);
+      await refreshLineAfterBranchChange();
     } catch {
       toast.error(tc("saveFailedRetry"));
     } finally {
@@ -190,29 +370,33 @@ export default function LineDetailPage() {
     }
   };
 
-  useEffect(() => {
-    fetch(`/api/lines/${lineId}`)
-      .then((res) => res.json())
-      .then((json) => {
-        const l = json.data;
-        if (!l) {
-          toast.error(t("notFound"));
-          router.push("/lines");
-          return;
-        }
-        setLine(l);
-        setName(l.name ?? "");
-        setRemark(l.remark ?? "");
-      })
-      .catch(() => toast.error(t("loadFailed")))
-      .finally(() => setLoading(false));
-  }, [lineId, router]);
+  const deleteBranch = async () => {
+    if (!deleteBranchTarget) return;
+    setDeletingBranch(true);
+    try {
+      const res = await fetch(`/api/lines/${lineId}/branches/${deleteBranchTarget.id}`, {
+        method: "DELETE",
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(translateError(json.error, te, tc("deleteFailed")));
+        return;
+      }
+      toast.success(t("branchDeleted"));
+      setDeleteBranchTarget(null);
+      await refreshLineAfterBranchChange();
+    } catch {
+      toast.error(tc("deleteFailedRetry"));
+    } finally {
+      setDeletingBranch(false);
+    }
+  };
+
 
   const loadStatus = useCallback(async () => {
-    if (!line) return;
-    const r = await fetch(`/api/lines/${line.id}/tunnels`);
+    const r = await fetch(`/api/lines/${lineId}/tunnels`);
     if (r.ok) setTunnelStatus(await r.json());
-  }, [line?.id]);
+  }, [lineId]);
 
   useEffect(() => { loadStatus(); }, [loadStatus]);
 
@@ -363,8 +547,12 @@ export default function LineDetailPage() {
 
       {/* Branch topology */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle>{t("branchTopology")}</CardTitle>
+          <Button size="sm" variant="outline" onClick={openAddBranch}>
+            <Plus className="h-4 w-4 mr-1" />
+            {t("addBranch")}
+          </Button>
         </CardHeader>
         <CardContent>
           {line.branches.length === 0 ? (
@@ -373,7 +561,7 @@ export default function LineDetailPage() {
             <div className="space-y-3">
               {line.branches.map((branch) => {
                 const entryNode = line.nodes.find((n) => n.role === "entry");
-                const branchNodeNames = branch.nodes
+                const branchNodeNames = [...branch.nodes]
                   .sort((a, b) => a.hopOrder - b.hopOrder)
                   .map((n) => n.nodeName);
                 const chainParts = entryNode
@@ -389,65 +577,36 @@ export default function LineDetailPage() {
                     key={branch.id}
                     className="border rounded-lg p-4 space-y-2"
                   >
-                    <div className="flex items-center gap-2">
-                      {editingBranchId === branch.id ? (
-                        <>
-                          <Input
-                            value={branchNameDraft}
-                            onChange={(e) => setBranchNameDraft(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                saveBranchName(branch.id);
-                              } else if (e.key === "Escape") {
-                                e.preventDefault();
-                                cancelEditBranch();
-                              }
-                            }}
-                            disabled={branchSaving}
-                            autoFocus
-                            className="h-8 max-w-xs"
-                          />
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8"
-                            onClick={() => saveBranchName(branch.id)}
-                            disabled={branchSaving}
-                            aria-label={tc("save")}
-                          >
-                            <Check className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8"
-                            onClick={cancelEditBranch}
-                            disabled={branchSaving}
-                            aria-label={tc("cancel")}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <div className="flex items-center h-8">
-                            <span className="font-medium">{branch.name}</span>
-                          </div>
-                          {branch.isDefault && (
-                            <Badge variant="outline">{t("default")}</Badge>
-                          )}
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                            onClick={() => startEditBranch(branch)}
-                            aria-label={t("renameBranch")}
-                          >
-                            <Pencil className="h-4 w-4 scale-90" />
-                          </Button>
-                        </>
-                      )}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center h-8">
+                          <span className="font-medium">{branch.name}</span>
+                        </div>
+                        {branch.isDefault && (
+                          <Badge variant="outline">{t("default")}</Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                          onClick={() => openEditBranch(branch)}
+                          aria-label={t("editBranch")}
+                        >
+                          <Pencil className="h-4 w-4 scale-90" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          onClick={() => setDeleteBranchTarget(branch)}
+                          disabled={line.branches.length <= 1 || branch.isDefault}
+                          aria-label={t("deleteBranch")}
+                        >
+                          <Trash2 className="h-4 w-4 scale-90" />
+                        </Button>
+                      </div>
                     </div>
                     <div className="text-sm font-mono text-muted-foreground">
                       {chainStr || tc("noData")}
@@ -625,6 +784,183 @@ export default function LineDetailPage() {
           {tc("back")}
         </Button>
       </div>
+
+      <Dialog open={branchDialogOpen} onOpenChange={(open) => {
+        if (!open && !branchSaving) {
+          setBranchDialogOpen(false);
+          setEditingBranch(null);
+        }
+      }}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingBranch ? t("editBranch") : t("addBranch")}</DialogTitle>
+            <DialogDescription>{t("editBranchDescription")}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>{tNew("branchName")}</Label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="detailDefaultBranch"
+                    checked={branchDraft.isDefault}
+                    onChange={() => updateBranchDraft({ isDefault: true, filterIds: [] })}
+                    className="accent-primary"
+                  />
+                  <span className="text-sm whitespace-nowrap">{tNew("defaultBranch")}</span>
+                </label>
+              </div>
+              <Input
+                value={branchDraft.name}
+                onChange={(e) => updateBranchDraft({ name: e.target.value })}
+                placeholder={tNew("branchName")}
+              />
+            </div>
+
+            <div className="space-y-3">
+              <Label>{tNew("nodeChain")}</Label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={isDirectExitDraft}
+                  onCheckedChange={(checked) => {
+                    updateBranchDraft({ nodeIds: checked ? [] : [""] });
+                  }}
+                />
+                <span className="text-sm">{tNew("directExit")}</span>
+              </label>
+              {!isDirectExitDraft && (
+                <div className="rounded-md border border-border p-3 space-y-2">
+                  {branchDraft.nodeIds.map((nodeId, nodeIdx) => (
+                    <div key={nodeIdx} className="flex items-center gap-2">
+                      <span className="shrink-0 text-sm text-muted-foreground w-16">
+                        {getBranchNodeLabel(nodeIdx)}
+                      </span>
+                      <div className="flex-1">
+                        <Select
+                          value={nodeId}
+                          onValueChange={(val) => setBranchNodeAt(nodeIdx, val)}
+                          disabled={loadingBranchOptions}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder={tNew("selectNode", { label: getBranchNodeLabel(nodeIdx) })} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {nodeOptions.map((n) => {
+                              const isPrivate = isPrivateIp(n.ip);
+                              const isEntry = String(n.id) === entryNodeId;
+                              return (
+                                <SelectItem
+                                  key={n.id}
+                                  value={String(n.id)}
+                                  disabled={isPrivate || isEntry}
+                                >
+                                  {n.name} ({n.ip})
+                                  {isPrivate ? ` (${tNew("privateIpTag")})` : ""}
+                                  {isEntry && !isPrivate ? ` (${tNew("entryNode")})` : ""}
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {nodeIdx < branchDraft.nodeIds.length - 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground hover:text-destructive"
+                          onClick={() => removeBranchRelay(nodeIdx)}
+                        >
+                          {tc("remove")}
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full border-dashed"
+                    onClick={addBranchRelay}
+                  >
+                    {tNew("addTransit")}
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {availableFilters.length > 0 && (
+              <div className="space-y-3">
+                <Label>{tNew("filterRules")}</Label>
+                {branchDraft.isDefault ? (
+                  <p className="text-xs text-muted-foreground">
+                    {tNew("filterHiddenDefault")}
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-x-5 gap-y-2.5">
+                    {availableFilters.map((f) => (
+                      <label key={f.id} className="flex items-center gap-2 cursor-pointer">
+                        <Checkbox
+                          checked={branchDraft.filterIds.includes(f.id)}
+                          onCheckedChange={() => toggleBranchFilter(f.id)}
+                        />
+                        <span className="text-sm">{f.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {(entryNodeId || branchDraft.nodeIds.some((id) => id)) && (
+              <div className="p-3 bg-muted rounded text-sm">
+                <span className="text-muted-foreground mr-1">{tNew("chainLabel")}</span>
+                {branchChainPreview()}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBranchDialogOpen(false)} disabled={branchSaving}>
+              {tc("cancel")}
+            </Button>
+            <Button onClick={saveBranch} disabled={branchSaving}>
+              {branchSaving ? tc("saving") : tc("save")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={deleteBranchTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !deletingBranch) setDeleteBranchTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("deleteBranchTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteBranchTarget &&
+                t("deleteBranchDescription", { name: deleteBranchTarget.name })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingBranch}>{tc("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deletingBranch}
+              onClick={(e) => {
+                e.preventDefault();
+                deleteBranch();
+              }}
+            >
+              {tc("delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={reallocateTarget !== null}
