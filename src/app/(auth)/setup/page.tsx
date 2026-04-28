@@ -28,7 +28,6 @@ export default function SetupPage() {
     username: "",
     password: "",
     confirmPassword: "",
-    wgDefaultSubnet: "",
   });
 
   useEffect(() => {
@@ -64,7 +63,6 @@ export default function SetupPage() {
         body: JSON.stringify({
           username: form.username,
           password: form.password,
-          wgDefaultSubnet: form.wgDefaultSubnet || undefined,
         }),
       });
       const data = await res.json();
@@ -123,15 +121,6 @@ export default function SetupPage() {
               onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
               placeholder={t("confirmPasswordPlaceholder")}
               required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="wgDefaultSubnet">{t("defaultSubnet")}</Label>
-            <Input
-              id="wgDefaultSubnet"
-              value={form.wgDefaultSubnet}
-              onChange={(e) => setForm({ ...form, wgDefaultSubnet: e.target.value })}
-              placeholder="10.210.0.0/24"
             />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>

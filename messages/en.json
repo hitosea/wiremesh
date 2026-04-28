@@ -70,7 +70,6 @@
     "confirmPassword": "Confirm Password",
     "confirmPasswordPlaceholder": "Re-enter password",
     "passwordMinLength": "At least 6 characters",
-    "defaultSubnet": "WireGuard Default Subnet (optional)",
     "initializing": "Initializing...",
     "initializeSystem": "Initialize System",
     "passwordMismatch": "Passwords do not match",

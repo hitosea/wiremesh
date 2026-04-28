@@ -70,7 +70,6 @@
     "confirmPassword": "确认密码",
     "confirmPasswordPlaceholder": "再次输入密码",
     "passwordMinLength": "至少 6 位字符",
-    "defaultSubnet": "WireGuard 默认子网（可选）",
     "initializing": "初始化中...",
     "initializeSystem": "初始化系统",
     "passwordMismatch": "两次输入的密码不一致",
