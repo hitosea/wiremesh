@@ -34,4 +34,22 @@ describe("resolveFormat", () => {
     expect(FORMAT_PROTOCOL_SUPPORT.shadowrocket.wireguard).toBe(true);
     expect(FORMAT_PROTOCOL_SUPPORT.singbox.wireguard).toBe(true);
   });
+  it("all four formats support xray-reality", () => {
+    expect(FORMAT_PROTOCOL_SUPPORT.clash["xray-reality"]).toBe(true);
+    expect(FORMAT_PROTOCOL_SUPPORT.shadowrocket["xray-reality"]).toBe(true);
+    expect(FORMAT_PROTOCOL_SUPPORT.v2ray["xray-reality"]).toBe(true);
+    expect(FORMAT_PROTOCOL_SUPPORT.singbox["xray-reality"]).toBe(true);
+  });
+  it("all four formats support xray-wstls", () => {
+    expect(FORMAT_PROTOCOL_SUPPORT.clash["xray-wstls"]).toBe(true);
+    expect(FORMAT_PROTOCOL_SUPPORT.shadowrocket["xray-wstls"]).toBe(true);
+    expect(FORMAT_PROTOCOL_SUPPORT.v2ray["xray-wstls"]).toBe(true);
+    expect(FORMAT_PROTOCOL_SUPPORT.singbox["xray-wstls"]).toBe(true);
+  });
+  it("all four formats support socks5", () => {
+    expect(FORMAT_PROTOCOL_SUPPORT.clash.socks5).toBe(true);
+    expect(FORMAT_PROTOCOL_SUPPORT.shadowrocket.socks5).toBe(true);
+    expect(FORMAT_PROTOCOL_SUPPORT.v2ray.socks5).toBe(true);
+    expect(FORMAT_PROTOCOL_SUPPORT.singbox.socks5).toBe(true);
+  });
 });

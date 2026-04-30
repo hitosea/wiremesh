@@ -148,22 +148,27 @@ func addIifRoute(inIface, outIface, table, label string) error {
 }
 
 // SyncXrayRouting applies fwmark-based routing for Xray traffic.
-// Each XrayLineRoute has a mark value — packets marked by Xray are routed
+// Each XrayInbound has a mark value — packets marked by Xray are routed
 // to the correct tunnel via policy routing.
-func SyncXrayRouting(routes []api.XrayLineRoute) error {
+func SyncXrayRouting(inbounds []api.XrayInbound) error {
 	cleanPolicyRange(xrayRouteTableStart, xrayRouteTableEnd, true)
 
-	if len(routes) == 0 {
+	if len(inbounds) == 0 {
 		return nil
 	}
 
-	for _, route := range routes {
-		table := fmt.Sprintf("%d", route.Mark) // use mark value as table number
-		markHex := fmt.Sprintf("0x%x", route.Mark)
+	processedLines := make(map[int]bool)
+	for _, inb := range inbounds {
+		if processedLines[inb.LineID] {
+			continue
+		}
+		processedLines[inb.LineID] = true
+		table := fmt.Sprintf("%d", inb.Mark) // use mark value as table number
+		markHex := fmt.Sprintf("0x%x", inb.Mark)
 		priority := table // unified: priority == table number
 
 		// Add route: default via tunnel in this table
-		if err := AddDefaultRoute(route.Tunnel, table); err != nil {
+		if err := AddDefaultRoute(inb.Tunnel, table); err != nil {
 			log.Printf("[routing] Error adding xray route table %s: %v", table, err)
 			continue
 		}
@@ -177,10 +182,10 @@ func SyncXrayRouting(routes []api.XrayLineRoute) error {
 		}
 
 		log.Printf("[routing] Xray: fwmark %s → %s (wm-xray-line-%d, table %s, priority %s)",
-			markHex, route.Tunnel, route.LineID, table, priority)
+			markHex, inb.Tunnel, inb.LineID, table, priority)
 	}
 
-	log.Printf("[routing] Xray routing configured: %d lines", len(routes))
+	log.Printf("[routing] Xray routing configured: %d inbounds", len(inbounds))
 	return nil
 }
 

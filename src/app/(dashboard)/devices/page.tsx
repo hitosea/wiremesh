@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SubscriptionsList } from "@/components/subscriptions-list";
+import { type DeviceProtocol, isXrayProtocol } from "@/lib/protocols";
 
 type Device = {
   id: number;
@@ -38,6 +39,7 @@ type Device = {
   protocol: string;
   wgAddress: string | null;
   xrayUuid: string | null;
+  socks5Username: string | null;
   lineId: number | null;
   status: string;
   uploadBytes: number;
@@ -50,13 +52,18 @@ type LineOption = {
   name: string;
 };
 
-const PROTOCOL_VARIANTS: Record<
-  string,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
+const PROTOCOL_VARIANTS: Record<DeviceProtocol, "default" | "secondary" | "destructive" | "outline"> = {
   wireguard: "default",
-  xray: "outline",
+  "xray-reality": "outline",
+  "xray-wstls": "secondary",
+  socks5: "destructive",
 };
+
+function protocolToKey(p: string): string {
+  if (p === "xray-reality") return "xrayReality";
+  if (p === "xray-wstls") return "xrayWsTls";
+  return p;
+}
 
 export default function DevicesPage() {
   const tc = useTranslations("common");
@@ -313,8 +320,8 @@ function DevicesListTab() {
       key: "protocol",
       label: t("protocolCol"),
       render: (row) => (
-        <Badge variant={PROTOCOL_VARIANTS[row.protocol] ?? "secondary"}>
-          {t(`protocol.${row.protocol}`)}
+        <Badge variant={PROTOCOL_VARIANTS[row.protocol as DeviceProtocol] ?? "secondary"}>
+          {t(`protocol.${protocolToKey(row.protocol)}`)}
         </Badge>
       ),
     },
@@ -325,7 +332,9 @@ function DevicesListTab() {
         <span className="text-sm font-mono">
           {row.protocol === "wireguard"
             ? (row.wgAddress ?? "—")
-            : (row.xrayUuid ?? "—")}
+            : (isXrayProtocol(row.protocol) || row.protocol === "socks5")
+              ? (row.xrayUuid ?? row.socks5Username ?? "—")
+              : "—"}
         </span>
       ),
     },

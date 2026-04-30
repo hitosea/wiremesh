@@ -10,34 +10,44 @@ const baseEntry: EntryNodeContext = {
   wgPort: 41820,
   wgPublicKey: "ENTRYWGPUB+KEY/abc==",
   wgAddress: "10.210.0.1",
-  xrayPort: 41443,
-  xrayTransport: "reality",
-  xrayTlsDomain: null,
-  xrayWsPath: null,
-  realityPublicKey: "REALPUB",
-  realityShortId: "abcd",
-  realityServerName: "www.microsoft.com",
+};
+
+const realityEntry: EntryNodeContext = {
+  ...baseEntry,
+  xrayReality: {
+    publicKey: "REALPUB",
+    shortId: "abcd",
+    dest: "www.microsoft.com:443",
+    serverName: "www.microsoft.com",
+  },
+};
+
+const wstlsEntry: EntryNodeContext = {
+  ...baseEntry,
+  xrayWsTls: {
+    wsPath: "/sub-ws",
+    tlsDomain: "edge.example.com",
+  },
 };
 
 const wg: DeviceContext = {
   id: 1, name: "phone", remark: null, protocol: "wireguard", lineId: 1,
-  lineXrayPort: 41443, lineSocks5Port: 41444, entry: baseEntry,
+  linePort: null, entry: baseEntry,
   wg: { privateKey: "PRIV+KEY/xyz==", publicKey: "PUB", address: "10.210.0.100/32", addressIp: "10.210.0.100" },
 };
 const vlessReality: DeviceContext = {
-  id: 2, name: "laptop", remark: null, protocol: "xray", lineId: 1,
-  lineXrayPort: 41443, lineSocks5Port: null, entry: baseEntry,
+  id: 2, name: "laptop", remark: null, protocol: "xray-reality", lineId: 1,
+  linePort: 41443, entry: realityEntry,
   xray: { uuid: "uuid-1234" },
 };
 const vlessWs: DeviceContext = {
-  id: 3, name: "tablet", remark: null, protocol: "xray", lineId: 2,
-  lineXrayPort: 41445, lineSocks5Port: null,
-  entry: { ...baseEntry, xrayTransport: "ws-tls", xrayTlsDomain: "edge.example.com", xrayWsPath: "/sub-ws" },
+  id: 3, name: "tablet", remark: null, protocol: "xray-wstls", lineId: 2,
+  linePort: 41445, entry: wstlsEntry,
   xray: { uuid: "uuid-5678" },
 };
 const sock: DeviceContext = {
   id: 4, name: "router", remark: null, protocol: "socks5", lineId: 1,
-  lineXrayPort: null, lineSocks5Port: 41444, entry: baseEntry,
+  linePort: 41444, entry: baseEntry,
   socks5: { username: "user@x", password: "p:s" },
 };
 
@@ -66,7 +76,7 @@ describe("buildShadowrocketUri — wireguard", () => {
   });
 });
 
-describe("buildShadowrocketUri — xray + socks5", () => {
+describe("buildShadowrocketUri — xray-reality", () => {
   it("VLESS reality emits standard vless:// share link", () => {
     const uri = buildShadowrocketUri(vlessReality)!;
     expect(uri.startsWith("vless://uuid-1234@203.0.113.10:41443?")).toBe(true);
@@ -74,7 +84,9 @@ describe("buildShadowrocketUri — xray + socks5", () => {
     expect(uri).toContain("pbk=REALPUB");
     expect(uri.endsWith("#laptop")).toBe(true);
   });
+});
 
+describe("buildShadowrocketUri — xray-wstls", () => {
   it("VLESS ws-tls uses tls security and ws type", () => {
     const uri = buildShadowrocketUri(vlessWs)!;
     expect(uri).toContain("security=tls");
@@ -82,6 +94,13 @@ describe("buildShadowrocketUri — xray + socks5", () => {
     expect(uri).toContain("@edge.example.com:41445");
   });
 
+  it("VLESS ws-tls uses tlsDomain as server host", () => {
+    const uri = buildShadowrocketUri(vlessWs)!;
+    expect(uri.startsWith("vless://uuid-5678@edge.example.com:41445?")).toBe(true);
+  });
+});
+
+describe("buildShadowrocketUri — socks5", () => {
   it("SOCKS5 percent-encodes user:pass payload", () => {
     const uri = buildShadowrocketUri(sock)!;
     expect(uri.startsWith("socks5://user%40x%3Ap%3As@")).toBe(true);
@@ -101,6 +120,17 @@ describe("buildShadowrocketSubscription", () => {
     expect(lines[2].startsWith("socks5://")).toBe(true);
   });
 
+  it("includes xray-wstls in subscription", () => {
+    const { body, skipped } = buildShadowrocketSubscription([vlessReality, vlessWs, sock]);
+    expect(skipped).toBe(0);
+    const decoded = Buffer.from(body, "base64").toString("utf8");
+    const lines = decoded.split("\r\n");
+    expect(lines).toHaveLength(3);
+    expect(lines[0].startsWith("vless://")).toBe(true);
+    expect(lines[1].startsWith("vless://")).toBe(true);
+    expect(lines[2].startsWith("socks5://")).toBe(true);
+  });
+
   it("prepends a STATUS line when one is supplied", () => {
     const status = "STATUS=↑:1.00GB,↓:2.00GB,✓:∞,〇:∞,⊖:∞";
     const { body } = buildShadowrocketSubscription([sock], status);
@@ -111,7 +141,10 @@ describe("buildShadowrocketSubscription", () => {
   });
 
   it("skips devices that produce null", () => {
-    const broken: DeviceContext = { ...vlessReality, entry: { ...baseEntry, realityPublicKey: null } };
+    const broken: DeviceContext = {
+      ...vlessReality,
+      entry: { ...realityEntry, xrayReality: { publicKey: "", shortId: "abcd", dest: "", serverName: "www.microsoft.com" } },
+    };
     const { body, skipped } = buildShadowrocketSubscription([broken, sock]);
     expect(skipped).toBe(1);
     const decoded = Buffer.from(body, "base64").toString("utf8");

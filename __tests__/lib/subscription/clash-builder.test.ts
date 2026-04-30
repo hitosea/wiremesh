@@ -10,13 +10,24 @@ const baseEntry: EntryNodeContext = {
   wgPort: 41820,
   wgPublicKey: "ENTRYWGPUBLICKEY=================",
   wgAddress: "10.210.0.1",
-  xrayPort: 41443,
-  xrayTransport: "reality",
-  xrayTlsDomain: null,
-  xrayWsPath: null,
-  realityPublicKey: "REALPUB",
-  realityShortId: "abcd",
-  realityServerName: "www.microsoft.com",
+};
+
+const realityEntry: EntryNodeContext = {
+  ...baseEntry,
+  xrayReality: {
+    publicKey: "REALPUB",
+    shortId: "abcd",
+    dest: "www.microsoft.com:443",
+    serverName: "www.microsoft.com",
+  },
+};
+
+const wstlsEntry: EntryNodeContext = {
+  ...baseEntry,
+  xrayWsTls: {
+    wsPath: "/sub-ws",
+    tlsDomain: "edge.example.com",
+  },
 };
 
 function wgCtx(): DeviceContext {
@@ -26,8 +37,7 @@ function wgCtx(): DeviceContext {
     remark: null,
     protocol: "wireguard",
     lineId: 1,
-    lineXrayPort: 41443,
-    lineSocks5Port: 41444,
+    linePort: null,
     entry: baseEntry,
     wg: {
       privateKey: "DEVICEPRIVATEKEY",
@@ -43,30 +53,23 @@ function xrayRealityCtx(): DeviceContext {
     id: 11,
     name: "laptop",
     remark: null,
-    protocol: "xray",
+    protocol: "xray-reality",
     lineId: 1,
-    lineXrayPort: 41443,
-    lineSocks5Port: null,
-    entry: baseEntry,
+    linePort: 41443,
+    entry: realityEntry,
     xray: { uuid: "11111111-2222-3333-4444-555555555555" },
   };
 }
 
-function xrayWsCtx(): DeviceContext {
+function xrayWsTlsCtx(): DeviceContext {
   return {
     id: 12,
     name: "tablet",
     remark: null,
-    protocol: "xray",
+    protocol: "xray-wstls",
     lineId: 2,
-    lineXrayPort: 41445,
-    lineSocks5Port: null,
-    entry: {
-      ...baseEntry,
-      xrayTransport: "ws-tls",
-      xrayTlsDomain: "edge.example.com",
-      xrayWsPath: "/sub-ws",
-    },
+    linePort: 41445,
+    entry: wstlsEntry,
     xray: { uuid: "11111111-2222-3333-4444-555555555555" },
   };
 }
@@ -78,8 +81,7 @@ function socks5Ctx(): DeviceContext {
     remark: null,
     protocol: "socks5",
     lineId: 1,
-    lineXrayPort: null,
-    lineSocks5Port: 41444,
+    linePort: 41444,
     entry: baseEntry,
     socks5: { username: "user", password: "p@ss" },
   };
@@ -115,7 +117,7 @@ describe("buildClashProxy — wireguard", () => {
   });
 });
 
-describe("buildClashProxy — xray reality", () => {
+describe("buildClashProxy — xray-reality", () => {
   it("emits a vless reality proxy on tcp with udp + xudp", () => {
     const p = buildClashProxy(xrayRealityCtx())!;
     expect(p.type).toBe("vless");
@@ -131,24 +133,41 @@ describe("buildClashProxy — xray reality", () => {
 
   it("returns null when reality public key missing", () => {
     const ctx = xrayRealityCtx();
-    ctx.entry = { ...ctx.entry, realityPublicKey: null };
+    ctx.entry = { ...ctx.entry, xrayReality: { publicKey: "", shortId: "abcd", dest: "", serverName: "www.microsoft.com" } };
+    expect(buildClashProxy(ctx)).toBeNull();
+  });
+
+  it("returns null when linePort is null", () => {
+    const ctx = xrayRealityCtx();
+    ctx.linePort = null;
     expect(buildClashProxy(ctx)).toBeNull();
   });
 });
 
-describe("buildClashProxy — xray ws-tls", () => {
+describe("buildClashProxy — xray-wstls", () => {
   it("emits a vless ws-tls proxy with ws-opts host header", () => {
-    const p = buildClashProxy(xrayWsCtx())!;
+    const p = buildClashProxy(xrayWsTlsCtx())!;
     expect(p.type).toBe("vless");
     expect(p.network).toBe("ws");
     expect(p.tls).toBe(true);
     expect(p.server).toBe("edge.example.com");
     expect(p["ws-opts"]).toEqual({ path: "/sub-ws", headers: { Host: "edge.example.com" } });
   });
+
+  it("uses linePort for port", () => {
+    const p = buildClashProxy(xrayWsTlsCtx())!;
+    expect(p.port).toBe(41445);
+  });
+
+  it("returns null when linePort is null", () => {
+    const ctx = xrayWsTlsCtx();
+    ctx.linePort = null;
+    expect(buildClashProxy(ctx)).toBeNull();
+  });
 });
 
 describe("buildClashProxy — socks5", () => {
-  it("emits a socks5 proxy on the line socks5 port", () => {
+  it("emits a socks5 proxy on the line port", () => {
     const p = buildClashProxy(socks5Ctx())!;
     expect(p.type).toBe("socks5");
     expect(p.port).toBe(41444);
@@ -176,7 +195,7 @@ describe("buildClashProxies", () => {
 
   it("skips devices that produce null and reports skipped count", () => {
     const broken = xrayRealityCtx();
-    broken.entry = { ...broken.entry, realityPublicKey: null };
+    broken.entry = { ...broken.entry, xrayReality: { publicKey: "", shortId: "abcd", dest: "", serverName: "www.microsoft.com" } };
     const { proxies, skipped } = buildClashProxies([wgCtx(), broken]);
     expect(proxies).toHaveLength(1);
     expect(skipped).toBe(1);

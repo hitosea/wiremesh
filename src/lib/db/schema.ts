@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, primaryKey, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
 const timestamps = {
@@ -38,14 +38,7 @@ export const nodes = sqliteTable("nodes", {
   wgPrivateKey: text("wg_private_key").notNull(),
   wgPublicKey: text("wg_public_key").notNull(),
   wgAddress: text("wg_address").notNull(),
-  xrayProtocol: text("xray_protocol"),
-  xrayTransport: text("xray_transport"),
-  xrayPort: integer("xray_port"),
-  xrayConfig: text("xray_config"),
-  xrayWsPath: text("xray_ws_path"),
-  xrayTlsDomain: text("xray_tls_domain"),
-  xrayTlsCert: text("xray_tls_cert"),
-  xrayTlsKey: text("xray_tls_key"),
+  xrayBasePort: integer("xray_base_port"),
   externalInterface: text("external_interface").notNull().default("eth0"),
   status: text("status").notNull().default("offline"),
   errorMessage: text("error_message"),
@@ -77,8 +70,6 @@ export const lines = sqliteTable("lines", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   status: text("status").notNull().default("active"),
-  xrayPort: integer("xray_port"),
-  socks5Port: integer("socks5_port"),
   remark: text("remark"),
   ...timestamps,
 });
@@ -185,7 +176,9 @@ export const subscriptionGroupDevices = sqliteTable("subscription_group_devices"
   createdAt: text("created_at")
     .notNull()
     .default(sql`(datetime('now'))`),
-});
+}, (t) => ({
+  groupDeviceUnique: uniqueIndex("subscription_group_devices_group_device_unique").on(t.groupId, t.deviceId),
+}));
 
 // ===== audit_logs =====
 export const auditLogs = sqliteTable("audit_logs", {
@@ -197,3 +190,24 @@ export const auditLogs = sqliteTable("audit_logs", {
   detail: text("detail"),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
 });
+
+// ===== node_protocols =====
+export const nodeProtocols = sqliteTable("node_protocols", {
+  nodeId: integer("node_id").notNull().references(() => nodes.id, { onDelete: "cascade" }),
+  protocol: text("protocol").notNull(),
+  config: text("config").notNull().default("{}"),
+  ...timestamps,
+}, (t) => ({
+  pk: primaryKey({ columns: [t.nodeId, t.protocol] }),
+}));
+
+// ===== line_protocols =====
+export const lineProtocols = sqliteTable("line_protocols", {
+  lineId: integer("line_id").notNull().references(() => lines.id, { onDelete: "cascade" }),
+  protocol: text("protocol").notNull(),
+  port: integer("port"),
+  config: text("config").notNull().default("{}"),
+  ...timestamps,
+}, (t) => ({
+  pk: primaryKey({ columns: [t.lineId, t.protocol] }),
+}));

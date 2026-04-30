@@ -1,12 +1,12 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { nodes, lineNodes, lineTunnels, devices, lineBranches, branchFilters, filters, settings, lines } from "@/lib/db/schema";
+import { nodes, lineNodes, lineTunnels, devices, lineBranches, branchFilters, filters, settings, nodeProtocols, lineProtocols } from "@/lib/db/schema";
 import { eq, or, and, count, inArray, ne } from "drizzle-orm";
 import { decrypt } from "@/lib/crypto";
 import { authenticateAgent } from "@/lib/agent-auth";
-import { getXrayDefaultPort } from "@/lib/proxy-port";
 import { BRANCH_MARK_START, XRAY_MARK_START, SOCKS5_MARK_START } from "@/lib/routing-constants";
 import { isPrivateIp } from "@/lib/ip-utils";
+import { isXrayProtocol, transportToDeviceProtocol, type XrayTransport } from "@/lib/protocols";
 
 function getNodeHostInfo(nodeId: number): { host: string; ip: string } | null {
   const n = db.select({ ip: nodes.ip, domain: nodes.domain }).from(nodes).where(eq(nodes.id, nodeId)).get();
@@ -15,6 +15,32 @@ function getNodeHostInfo(nodeId: number): { host: string; ip: string } | null {
 }
 
 export const dynamic = "force-dynamic";
+
+// ---- Types for the new Xray wire shape (mirrors agent/api/config_types.go XrayInbound) ----
+type LineRouting = {
+  mark: number;
+  tunnel: string;
+  branches: { mark: number; tunnel: string; is_default: boolean; domain_rules: string[] }[];
+};
+
+type XrayInboundJson = {
+  lineId: number;
+  transport: "reality" | "ws-tls";
+  protocol: "vless";
+  port: number;
+  realityPrivateKey?: string;
+  realityShortId?: string;
+  realityDest?: string;
+  realityServerNames?: string[];
+  wsPath?: string;
+  tlsDomain?: string;
+  tlsCert?: string;
+  tlsKey?: string;
+  uuids: string[];
+  mark: number;
+  tunnel: string;
+  branches: LineRouting["branches"];
+};
 
 export async function GET(request: NextRequest) {
   const node = authenticateAgent(request);
@@ -295,24 +321,6 @@ export async function GET(request: NextRequest) {
   }
 
   // ---- Xray config ----
-  // Build per-line Xray routes: each line gets its own outbound with fwmark
-  let xrayConfig: {
-    enabled: boolean;
-    protocol: string;
-    port: number;
-    transport: string;
-    realityPrivateKey?: string;
-    realityShortId?: string;
-    realityDest?: string;
-    realityServerNames?: string[];
-    wsPath?: string;
-    tlsDomain?: string;
-    tlsCert?: string;
-    tlsKey?: string;
-    routes: { lineId: number; uuids: string[]; port: number; tunnel: string; mark: number; branches: { mark: number; tunnel: string; is_default: boolean; domain_rules: string[] }[] }[];
-    dnsProxy?: string;
-  } | null = null;
-
   // Precompute branch marks — single source of truth for both routing and Xray configs.
   // Use BRANCH_MARK_START + branchId for stable assignment that survives line additions.
   const branchMarkMap = new Map<number, number>(); // branchId → mark
@@ -322,144 +330,119 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const xrayDefaultPort = getXrayDefaultPort();
+  // Helper: compute the routing (mark, default tunnel, branches) for one entry line.
+  // Pure function — safe to call once per (line, transport) pair or memoize if needed.
+  function computeLineRouting(lineId: number): LineRouting {
+    const isSingleNode = singleNodeLineIds.has(lineId);
+    const tunnel = isSingleNode ? extIface : (lineToDownstreamIface.get(lineId) ?? "");
 
-  // Batch-fetch persisted proxy ports for all entry lines
-  const linePortRows = entryLineIds.length > 0
-    ? db.select({ id: lines.id, xrayPort: lines.xrayPort, socks5Port: lines.socks5Port })
-        .from(lines).where(inArray(lines.id, entryLineIds)).all()
-    : [];
-  const linePortMap = new Map(linePortRows.map((r) => [r.id, r]));
+    const branches: LineRouting["branches"] = [];
+    for (const branch of lineBranchCache.get(lineId) ?? []) {
+      // Direct-exit branches (no exit nodes) have no tunnel interface — they
+      // route locally via extIface on the entry node. Treat them like
+      // single-node lines for routing purposes so the branch still gets an
+      // OUTPUT remap rule.
+      const branchHasTunnel = branchToDownstreamIface.has(branch.id);
+      const tunnelIfaceName = isSingleNode
+        ? extIface
+        : (branchHasTunnel ? branchToDownstreamIface.get(branch.id)! : extIface);
+      if (!tunnelIfaceName) continue;
 
-  if (node.xrayConfig || node.xrayTransport === "ws-tls") {
-    const xrayTransport = node.xrayTransport === "ws-tls" ? "ws-tls" : "reality";
+      const branchMark = branchMarkMap.get(branch.id) ?? 0;
 
-    let realitySettings: {
-      realityPrivateKey?: string;
-      realityPublicKey?: string;
-      realityShortId?: string;
-      realityDest?: string;
-      realityServerName?: string;
-    } = {};
-    if (node.xrayConfig) {
-      try {
-        realitySettings = JSON.parse(node.xrayConfig);
-      } catch (e) {
-        console.warn(`[agent/config] Failed to parse xrayConfig for node ${nodeId}:`, e);
-      }
-    }
-
-    let realityPrivateKey = "";
-    if (realitySettings.realityPrivateKey) {
-      try {
-        realityPrivateKey = decrypt(realitySettings.realityPrivateKey);
-      } catch {
-        realityPrivateKey = "";
-      }
-    }
-
-    // Build per-line routes — each line gets a dedicated Xray inbound port
-    const xrayBasePort = node.xrayPort ?? xrayDefaultPort;
-    const xrayRoutes: {
-      lineId: number; uuids: string[]; port: number; tunnel: string; mark: number;
-      branches: { mark: number; tunnel: string; is_default: boolean; domain_rules: string[] }[];
-    }[] = [];
-    for (const lineId of entryLineIds) {
-      const xrayDevices = db
-        .select({ xrayUuid: devices.xrayUuid })
-        .from(devices)
-        .where(eq(devices.lineId, lineId))
-        .all()
-        .filter((d) => d.xrayUuid);
-
-      const uuids = xrayDevices
-        .map((d) => d.xrayUuid!)
-        .filter((uuid) => uuid);
-
-      if (uuids.length === 0) continue;
-
-      // Find the downstream tunnel for this line (default branch)
-      const isSingleNode = singleNodeLineIds.has(lineId);
-      const tunnel = isSingleNode ? extIface : lineToDownstreamIface.get(lineId);
-      if (!tunnel) continue;
-
-      // Build branch info for this line's Xray routing
-      const xrayBranches: { mark: number; tunnel: string; is_default: boolean; domain_rules: string[] }[] = [];
-
-      for (const branch of lineBranchCache.get(lineId) ?? []) {
-        // Direct-exit branches (no exit nodes) have no tunnel interface — they
-        // route locally via extIface on the entry node. Treat them like
-        // single-node lines for Xray's purposes so the branch still gets an
-        // OUTPUT remap rule.
-        const branchHasTunnel = branchToDownstreamIface.has(branch.id);
-        const tunnelIfaceName = isSingleNode
-          ? extIface
-          : (branchHasTunnel ? branchToDownstreamIface.get(branch.id)! : extIface);
-        if (!tunnelIfaceName) continue;
-
-        const branchMark = branchMarkMap.get(branch.id) ?? 0;
-
-        const domainRules: string[] = [];
-        if (!branch.isDefault) {
-          const bfRows = db.select({ filterId: branchFilters.filterId }).from(branchFilters).where(eq(branchFilters.branchId, branch.id)).all();
-          for (const bf of bfRows) {
-            const filter = db.select().from(filters).where(and(eq(filters.id, bf.filterId), eq(filters.isEnabled, true))).get();
-            if (filter?.domainRules) {
-              domainRules.push(...filter.domainRules.split("\n").map((l: string) => l.trim()).filter((l: string) => l.length > 0 && !l.startsWith("#")));
-            }
+      const domainRules: string[] = [];
+      if (!branch.isDefault) {
+        const bfRows = db.select({ filterId: branchFilters.filterId }).from(branchFilters).where(eq(branchFilters.branchId, branch.id)).all();
+        for (const bf of bfRows) {
+          const filter = db.select().from(filters).where(and(eq(filters.id, bf.filterId), eq(filters.isEnabled, true))).get();
+          if (filter?.domainRules) {
+            domainRules.push(...filter.domainRules.split("\n").map((l: string) => l.trim()).filter((l: string) => l.length > 0 && !l.startsWith("#")));
           }
         }
-
-        xrayBranches.push({ mark: branchMark, tunnel: tunnelIfaceName, is_default: branch.isDefault, domain_rules: domainRules });
       }
 
-      xrayRoutes.push({
-        lineId,
-        uuids,
-        port: linePortMap.get(lineId)?.xrayPort ?? xrayBasePort,
-        tunnel,
-        mark: XRAY_MARK_START + lineId,
-        branches: xrayBranches,
-      });
+      branches.push({ mark: branchMark, tunnel: tunnelIfaceName, is_default: branch.isDefault, domain_rules: domainRules });
     }
 
-    // Always point Xray at the agent DNS proxy on entry nodes. The proxy
-    // handles DoT forwarding over the tunnel (bypassing GFW), and also
-    // populates ipsets from resolved domains for multi-branch split routing.
-    const xrayDnsProxy = node.wgAddress ? node.wgAddress.split("/")[0] : "";
+    return { mark: XRAY_MARK_START + lineId, tunnel, branches };
+  }
 
-    if (xrayTransport === "ws-tls") {
-      let tlsKey = "";
-      if (node.xrayTlsKey) {
-        try { tlsKey = decrypt(node.xrayTlsKey); } catch { tlsKey = ""; }
+  // Query node_protocols to discover which Xray transports are enabled on this node
+  const npRows = db.select().from(nodeProtocols)
+    .where(eq(nodeProtocols.nodeId, nodeId))
+    .all();
+
+  const xrayTransports: XrayTransport[] = npRows
+    .filter(r => isXrayProtocol(r.protocol))
+    .map(r => r.protocol === "xray-reality" ? "reality" as const : "ws-tls" as const);
+
+  // Always point Xray at the agent DNS proxy on entry nodes.
+  const xrayDnsProxy = node.wgAddress ? node.wgAddress.split("/")[0] : "";
+
+  const xrayInbounds: XrayInboundJson[] = [];
+
+  for (const transport of xrayTransports) {
+    const dp = transportToDeviceProtocol(transport);
+    const npRow = npRows.find(r => r.protocol === dp)!;
+    let cfg: Record<string, string> = {};
+    try {
+      cfg = JSON.parse(npRow.config);
+    } catch (e) {
+      console.warn(`[agent/config] Failed to parse nodeProtocol config for node ${nodeId} protocol ${dp}:`, e);
+    }
+
+    for (const lineId of entryLineIds) {
+      const lp = db.select().from(lineProtocols)
+        .where(and(eq(lineProtocols.lineId, lineId), eq(lineProtocols.protocol, dp)))
+        .get();
+      if (!lp || lp.port == null) continue;
+
+      const uuidRows = db.select({ uuid: devices.xrayUuid }).from(devices)
+        .where(and(eq(devices.lineId, lineId), eq(devices.protocol, dp)))
+        .all();
+      const uuids = uuidRows.map(r => r.uuid).filter((u): u is string => !!u);
+      if (uuids.length === 0) continue;
+
+      const routing = computeLineRouting(lineId);
+      if (!routing.tunnel) continue;
+
+      const base: XrayInboundJson = {
+        lineId, transport, protocol: "vless", port: lp.port,
+        uuids,
+        mark: routing.mark, tunnel: routing.tunnel, branches: routing.branches,
+      };
+
+      if (transport === "reality") {
+        let realityPrivateKey = "";
+        if (cfg.realityPrivateKey) {
+          try { realityPrivateKey = decrypt(cfg.realityPrivateKey); } catch { realityPrivateKey = ""; }
+        }
+        xrayInbounds.push({
+          ...base,
+          realityPrivateKey,
+          realityShortId: cfg.realityShortId ?? "",
+          realityDest: cfg.realityDest ?? "www.microsoft.com:443",
+          realityServerNames: [cfg.realityServerName ?? "www.microsoft.com"],
+        });
+      } else {
+        let tlsKey = "";
+        if (cfg.tlsKey) {
+          try { tlsKey = decrypt(cfg.tlsKey); } catch { tlsKey = ""; }
+        }
+        xrayInbounds.push({
+          ...base,
+          wsPath: cfg.wsPath ?? "/default",
+          tlsDomain: cfg.tlsDomain ?? "",
+          tlsCert: cfg.tlsCert ?? "",
+          tlsKey,
+        });
       }
-      xrayConfig = {
-        enabled: true,
-        protocol: "vless",
-        port: xrayBasePort,
-        transport: "ws-tls",
-        wsPath: node.xrayWsPath ?? "/default",
-        tlsDomain: node.xrayTlsDomain ?? "",
-        tlsCert: node.xrayTlsCert ?? "",
-        tlsKey,
-        routes: xrayRoutes,
-        dnsProxy: xrayDnsProxy,
-      };
-    } else {
-      xrayConfig = {
-        enabled: true,
-        protocol: "vless",
-        port: xrayBasePort,
-        transport: "reality",
-        realityPrivateKey,
-        realityShortId: realitySettings.realityShortId ?? "",
-        realityDest: realitySettings.realityDest ?? "www.microsoft.com:443",
-        realityServerNames: [realitySettings.realityServerName ?? "www.microsoft.com"],
-        routes: xrayRoutes,
-        dnsProxy: xrayDnsProxy,
-      };
     }
   }
+
+  const xrayConfig = xrayTransports.length > 0 && xrayInbounds.length > 0
+    ? { enabled: true, inbounds: xrayInbounds, dnsProxy: xrayDnsProxy }
+    : { enabled: false, inbounds: [] as XrayInboundJson[], dnsProxy: "" };
 
   // ---- SOCKS5 config ----
   let socks5Config: {
@@ -468,9 +451,13 @@ export async function GET(request: NextRequest) {
 
   if (entryLineIds.length > 0) {
     const socks5Routes: { lineId: number; port: number; mark: number; tunnel: string; users: { username: string; password: string }[] }[] = [];
-    const proxyBasePort = node.xrayPort ?? xrayDefaultPort;
 
     for (const lineId of entryLineIds) {
+      const lp = db.select().from(lineProtocols)
+        .where(and(eq(lineProtocols.lineId, lineId), eq(lineProtocols.protocol, "socks5")))
+        .get();
+      if (!lp || lp.port == null) continue;
+
       const socks5Devices = db
         .select({ socks5Username: devices.socks5Username, socks5Password: devices.socks5Password })
         .from(devices)
@@ -492,11 +479,9 @@ export async function GET(request: NextRequest) {
       const tunnel = isSingleNode ? extIface : (lineToDownstreamIface.get(lineId) ?? "");
       if (!tunnel) continue;
 
-      const port = linePortMap.get(lineId)?.socks5Port ?? proxyBasePort;
-
       socks5Routes.push({
         lineId,
-        port,
+        port: lp.port,
         mark: SOCKS5_MARK_START + lineId,
         tunnel,
         users,

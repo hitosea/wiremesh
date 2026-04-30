@@ -9,18 +9,19 @@ import (
 
 func TestGenerateConfig_StatsAndAPI(t *testing.T) {
 	cfg := &api.XrayConfig{
-		Enabled:            true,
-		Protocol:           "vless",
-		RealityPrivateKey:  "test-private-key",
-		RealityShortId:     "abcd1234",
-		RealityDest:        "www.example.com:443",
-		RealityServerNames: []string{"www.example.com"},
-		Routes: []api.XrayLineRoute{
+		Enabled: true,
+		Inbounds: []api.XrayInbound{
 			{
-				LineID: 1,
-				UUIDs:  []string{"uuid-aaa", "uuid-bbb"},
-				Port:   41443,
-				Mark:   100,
+				LineID:             1,
+				Transport:          "reality",
+				Protocol:           "vless",
+				Port:               41443,
+				RealityPrivateKey:  "test-private-key",
+				RealityShortId:     "abcd1234",
+				RealityDest:        "www.example.com:443",
+				RealityServerNames: []string{"www.example.com"},
+				UUIDs:              []string{"uuid-aaa", "uuid-bbb"},
+				Mark:               100,
 			},
 		},
 	}
@@ -99,18 +100,19 @@ func TestGenerateConfig_StatsAndAPI(t *testing.T) {
 
 func TestGenerateConfig_ClientEmailAndLevel(t *testing.T) {
 	cfg := &api.XrayConfig{
-		Enabled:            true,
-		Protocol:           "vless",
-		RealityPrivateKey:  "test-key",
-		RealityShortId:     "abcd",
-		RealityDest:        "www.example.com:443",
-		RealityServerNames: []string{"www.example.com"},
-		Routes: []api.XrayLineRoute{
+		Enabled: true,
+		Inbounds: []api.XrayInbound{
 			{
-				LineID: 1,
-				UUIDs:  []string{"uuid-aaa"},
-				Port:   41443,
-				Mark:   100,
+				LineID:             1,
+				Transport:          "reality",
+				Protocol:           "vless",
+				Port:               41443,
+				RealityPrivateKey:  "test-key",
+				RealityShortId:     "abcd",
+				RealityDest:        "www.example.com:443",
+				RealityServerNames: []string{"www.example.com"},
+				UUIDs:              []string{"uuid-aaa"},
+				Mark:               100,
 			},
 		},
 	}
@@ -143,4 +145,156 @@ func TestGenerateConfig_ClientEmailAndLevel(t *testing.T) {
 			t.Errorf("Expected client level 0, got %v", client["level"])
 		}
 	}
+}
+
+func TestGenerateConfig_RealityInbound(t *testing.T) {
+	cfg := &api.XrayConfig{
+		Enabled: true,
+		Inbounds: []api.XrayInbound{{
+			LineID:             1,
+			Transport:          "reality",
+			Protocol:           "vless",
+			Port:               41443,
+			RealityPrivateKey:  "priv",
+			RealityShortId:     "abcd",
+			RealityDest:        "www.x.com:443",
+			RealityServerNames: []string{"www.x.com"},
+			UUIDs:              []string{"u1", "u2"},
+			Mark:               100,
+		}},
+	}
+	data, err := GenerateConfig(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var r map[string]interface{}
+	_ = json.Unmarshal(data, &r)
+	inb := findInboundByTag(r, "in-line-1-reality")
+	if inb == nil {
+		t.Fatal("missing reality inbound")
+	}
+	ss := inb["streamSettings"].(map[string]interface{})
+	if ss["security"] != "reality" {
+		t.Errorf("want security=reality, got %v", ss["security"])
+	}
+}
+
+func TestGenerateConfig_WsTlsInbound(t *testing.T) {
+	cfg := &api.XrayConfig{
+		Enabled: true,
+		Inbounds: []api.XrayInbound{{
+			LineID:    1,
+			Transport: "ws-tls",
+			Protocol:  "vless",
+			Port:      41444,
+			WsPath:    "/abc",
+			TlsDomain: "node.example.com",
+			UUIDs:     []string{"u3"},
+			Mark:      101,
+		}},
+	}
+	data, err := GenerateConfig(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var r map[string]interface{}
+	_ = json.Unmarshal(data, &r)
+	inb := findInboundByTag(r, "in-line-1-ws-tls")
+	if inb == nil {
+		t.Fatal("missing ws-tls inbound")
+	}
+	ss := inb["streamSettings"].(map[string]interface{})
+	if ss["network"] != "ws" || ss["security"] != "tls" {
+		t.Errorf("want ws/tls, got %v/%v", ss["network"], ss["security"])
+	}
+}
+
+func TestGenerateConfig_BothTransportsForOneLine(t *testing.T) {
+	cfg := &api.XrayConfig{
+		Enabled: true,
+		Inbounds: []api.XrayInbound{
+			{LineID: 1, Transport: "reality", Protocol: "vless", Port: 41443,
+				RealityPrivateKey: "k", RealityShortId: "id", RealityDest: "x:443",
+				RealityServerNames: []string{"x"}, UUIDs: []string{"u1"}, Mark: 100},
+			{LineID: 1, Transport: "ws-tls", Protocol: "vless", Port: 41444,
+				WsPath: "/p", TlsDomain: "x", UUIDs: []string{"u2"}, Mark: 100},
+		},
+	}
+	data, err := GenerateConfig(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var r map[string]interface{}
+	_ = json.Unmarshal(data, &r)
+	if findInboundByTag(r, "in-line-1-reality") == nil {
+		t.Error("missing reality")
+	}
+	if findInboundByTag(r, "in-line-1-ws-tls") == nil {
+		t.Error("missing ws-tls")
+	}
+}
+
+func TestGenerateConfig_DualTransportTagUniqueness(t *testing.T) {
+	cfg := &api.XrayConfig{
+		Enabled: true,
+		Inbounds: []api.XrayInbound{
+			{LineID: 1, Transport: "reality", Protocol: "vless", Port: 41443,
+				RealityPrivateKey: "k", RealityShortId: "id", RealityDest: "x:443",
+				RealityServerNames: []string{"x"}, UUIDs: []string{"u1"}, Mark: 100},
+			{LineID: 1, Transport: "ws-tls", Protocol: "vless", Port: 41444,
+				WsPath: "/p", TlsDomain: "x.com", UUIDs: []string{"u2"}, Mark: 100},
+		},
+	}
+	data, err := GenerateConfig(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var r map[string]interface{}
+	_ = json.Unmarshal(data, &r)
+
+	// Inbound tags must be distinct
+	inbounds := r["inbounds"].([]interface{})
+	seen := make(map[string]bool)
+	for _, ib := range inbounds {
+		tag := ib.(map[string]interface{})["tag"].(string)
+		if seen[tag] {
+			t.Errorf("duplicate inbound tag: %s", tag)
+		}
+		seen[tag] = true
+	}
+
+	// Outbound tags must be distinct
+	outbounds := r["outbounds"].([]interface{})
+	seenOut := make(map[string]bool)
+	for _, ob := range outbounds {
+		tag := ob.(map[string]interface{})["tag"].(string)
+		if seenOut[tag] {
+			t.Errorf("duplicate outbound tag: %s", tag)
+		}
+		seenOut[tag] = true
+	}
+
+	// Should see in-line-1-reality, in-line-1-ws-tls, out-line-1-reality, out-line-1-ws-tls, plus api/direct
+	expectedInbound := []string{"in-line-1-reality", "in-line-1-ws-tls"}
+	for _, tag := range expectedInbound {
+		if !seen[tag] {
+			t.Errorf("missing inbound tag: %s", tag)
+		}
+	}
+	expectedOutbound := []string{"out-line-1-reality", "out-line-1-ws-tls"}
+	for _, tag := range expectedOutbound {
+		if !seenOut[tag] {
+			t.Errorf("missing outbound tag: %s", tag)
+		}
+	}
+}
+
+func findInboundByTag(r map[string]interface{}, tag string) map[string]interface{} {
+	for _, ib := range r["inbounds"].([]interface{}) {
+		m := ib.(map[string]interface{})
+		if m["tag"] == tag {
+			return m
+		}
+	}
+	return nil
 }

@@ -1,0 +1,1 @@
+ALTER TABLE `nodes` ADD `xray_base_port` integer;

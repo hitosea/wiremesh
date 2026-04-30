@@ -1,23 +1,23 @@
 import { NextRequest } from "next/server";
-import { v4 as uuidv4 } from "uuid";
 import { db } from "@/lib/db";
-import { devices, settings, nodes, lineNodes, lines } from "@/lib/db/schema";
-import { success, created, error, paginated } from "@/lib/api-response";
+import { devices, settings, nodes } from "@/lib/db/schema";
+import { created, error, paginated } from "@/lib/api-response";
 import { parsePaginationParams, paginationOffset } from "@/lib/pagination";
 import { eq, or, like, count, and, gt, lte, isNull, SQL } from "drizzle-orm";
 import { encrypt, generateRandomString } from "@/lib/crypto";
 import { generateKeyPair } from "@/lib/wireguard";
 import { allocateDeviceIp } from "@/lib/ip-allocator";
-import { allocateProxyPort, getXrayDefaultPort } from "@/lib/proxy-port";
 import { writeAuditLog } from "@/lib/audit-log";
 import { computeDeviceStatus } from "@/lib/device-status";
 import { notifyLineNodes } from "@/lib/line-notify";
-
-function getEntryNodeId(lineId: number): number | null {
-  const entry = db.select({ nodeId: lineNodes.nodeId }).from(lineNodes)
-    .where(and(eq(lineNodes.lineId, lineId), eq(lineNodes.role, "entry"))).get();
-  return entry?.nodeId ?? null;
-}
+import { DEVICE_PROTOCOLS, isXrayProtocol } from "@/lib/protocols";
+import {
+  ensureLineProtocol,
+  isProtocolSupportedByEntryNode,
+  enableNodeProtocol,
+  getEntryNodeIdForLine,
+  getStartPortForLine,
+} from "@/lib/db/protocols";
 
 export async function GET(request: NextRequest) {
   const params = parsePaginationParams(request.nextUrl.searchParams);
@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
       wgAddress: devices.wgAddress,
       xrayUuid: devices.xrayUuid,
       xrayConfig: devices.xrayConfig,
+      socks5Username: devices.socks5Username,
       lineId: devices.lineId,
       status: devices.status,
       lastHandshake: devices.lastHandshake,
@@ -94,7 +95,7 @@ export async function POST(request: NextRequest) {
   if (!name) {
     return error("VALIDATION_ERROR", "validation.nameRequired");
   }
-  if (!protocol || !["wireguard", "xray", "socks5"].includes(protocol)) {
+  if (!protocol || !DEVICE_PROTOCOLS.includes(protocol)) {
     return error("VALIDATION_ERROR", "validation.protocolInvalid");
   }
 
@@ -135,57 +136,77 @@ export async function POST(request: NextRequest) {
     const subnet = settingsMap["wg_default_subnet"] ?? "10.210.0.0/24";
     const startPos = parseInt(settingsMap["wg_device_ip_start"] ?? "100");
     wgAddress = allocateDeviceIp(usedAddresses, subnet, startPos);
-  } else if (protocol === "xray") {
+  } else if (isXrayProtocol(protocol)) {
     // xray: generate UUID
-    xrayUuid = uuidv4();
+    xrayUuid = crypto.randomUUID();
   } else if (protocol === "socks5") {
     socks5Username = generateRandomString(8);
     socks5Password = encrypt(generateRandomString(16));
   }
 
-  const result = db
-    .insert(devices)
-    .values({
-      name,
-      protocol,
-      wgPublicKey,
-      wgPrivateKey,
-      wgAddress,
-      xrayUuid,
-      socks5Username,
-      socks5Password,
-      lineId: lineId ?? null,
-      remark: remark ?? null,
-    })
-    .returning({
-      id: devices.id,
-      name: devices.name,
-      protocol: devices.protocol,
-      wgPublicKey: devices.wgPublicKey,
-      wgAddress: devices.wgAddress,
-      xrayUuid: devices.xrayUuid,
-      socks5Username: devices.socks5Username,
-      lineId: devices.lineId,
-      status: devices.status,
-      remark: devices.remark,
-      createdAt: devices.createdAt,
-      updatedAt: devices.updatedAt,
-    })
-    .get();
-
-  const entryNodeId = result.lineId ? getEntryNodeId(result.lineId) : null;
-
-  // Allocate proxy port for the line if this is the first xray/socks5 device
-  if (result.lineId && entryNodeId !== null && (protocol === "xray" || protocol === "socks5")) {
-    const portField = protocol === "xray" ? "xrayPort" : "socks5Port";
-    const line = db.select({ xrayPort: lines.xrayPort, socks5Port: lines.socks5Port }).from(lines).where(eq(lines.id, result.lineId)).get();
-    if (line && line[portField] === null) {
-      const nodeRow = db.select({ xrayPort: nodes.xrayPort }).from(nodes).where(eq(nodes.id, entryNodeId)).get();
-      const basePort = nodeRow?.xrayPort ?? getXrayDefaultPort();
-      const port = allocateProxyPort(entryNodeId, basePort);
-      db.update(lines).set({ [portField]: port }).where(eq(lines.id, result.lineId)).run();
+  // Validate line and protocol compatibility BEFORE entering the transaction
+  // so validation errors are returned as 4xx (not swallowed as 500s)
+  let entryNodeIdForLine: number | null = null;
+  if (lineId) {
+    entryNodeIdForLine = getEntryNodeIdForLine(db, lineId);
+    if (!entryNodeIdForLine) {
+      return error("VALIDATION_ERROR", "validation.lineHasNoEntryNode");
     }
+    if (isXrayProtocol(protocol)) {
+      // Xray transports must be explicitly enabled on the node
+      if (!isProtocolSupportedByEntryNode(db, entryNodeIdForLine, protocol)) {
+        return error("CONFLICT", "validation.deviceProtocolNotSupported");
+      }
+    }
+    // WireGuard / SOCKS5: lazy-create node_protocols row — handled inside transaction
   }
+
+  const result = db.transaction((tx) => {
+    const inserted = tx
+      .insert(devices)
+      .values({
+        name,
+        protocol,
+        wgPublicKey,
+        wgPrivateKey,
+        wgAddress,
+        xrayUuid,
+        socks5Username,
+        socks5Password,
+        lineId: lineId ?? null,
+        remark: remark ?? null,
+      })
+      .returning({
+        id: devices.id,
+        name: devices.name,
+        protocol: devices.protocol,
+        wgPublicKey: devices.wgPublicKey,
+        wgAddress: devices.wgAddress,
+        xrayUuid: devices.xrayUuid,
+        socks5Username: devices.socks5Username,
+        lineId: devices.lineId,
+        status: devices.status,
+        remark: devices.remark,
+        createdAt: devices.createdAt,
+        updatedAt: devices.updatedAt,
+      })
+      .get();
+
+    if (lineId && entryNodeIdForLine) {
+      if (!isXrayProtocol(protocol)) {
+        // WireGuard / SOCKS5: lazy-create node_protocols row on first device
+        if (!isProtocolSupportedByEntryNode(tx, entryNodeIdForLine, protocol)) {
+          enableNodeProtocol(tx, entryNodeIdForLine, protocol, {});
+        }
+      }
+
+      // lazy-allocate per-line port (WireGuard returns null and only marks the row)
+      const startPort = getStartPortForLine(tx, lineId);
+      ensureLineProtocol(tx, lineId, protocol, { startPort });
+    }
+
+    return inserted;
+  });
 
   writeAuditLog({
     action: "create",

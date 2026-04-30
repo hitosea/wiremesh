@@ -1,12 +1,17 @@
 import { db } from "@/lib/db";
-import { lineTunnels, lineNodes, lines } from "@/lib/db/schema";
+import { lineTunnels, lineNodes, lineProtocols } from "@/lib/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
+import type { DeviceProtocol } from "@/lib/protocols";
+
+export type PortGroup = {
+  protocol: DeviceProtocol;
+  ports: { lineId: number; port: number }[];
+};
 
 export type NodePorts = {
   wg: number;
-  xray: number[];
   tunnels: number[];
-  socks5: number[];
+  groups: PortGroup[];
 };
 
 /**
@@ -28,7 +33,7 @@ export function getNodePorts(nodeId: number, wgPort: number): NodePorts {
   for (const r of fromRows) tunnelPorts.add(r.port);
   for (const r of toRows) tunnelPorts.add(r.port);
 
-  // Entry lines for this node — read persisted proxy ports
+  // Entry lines for this node
   const entryLineIds = db
     .select({ lineId: lineNodes.lineId })
     .from(lineNodes)
@@ -36,25 +41,37 @@ export function getNodePorts(nodeId: number, wgPort: number): NodePorts {
     .all()
     .map((r) => r.lineId);
 
-  const xrayPorts: number[] = [];
-  const socks5Ports: number[] = [];
-
+  // Build per-protocol port groups from line_protocols
+  const byProtocol = new Map<string, { lineId: number; port: number }[]>();
   if (entryLineIds.length > 0) {
-    const lineRows = db
-      .select({ id: lines.id, xrayPort: lines.xrayPort, socks5Port: lines.socks5Port })
-      .from(lines)
-      .where(inArray(lines.id, entryLineIds))
+    const protocolRows = db
+      .select({
+        protocol: lineProtocols.protocol,
+        lineId: lineProtocols.lineId,
+        port: lineProtocols.port,
+      })
+      .from(lineProtocols)
+      .where(inArray(lineProtocols.lineId, entryLineIds))
       .all();
-    for (const row of lineRows) {
-      if (row.xrayPort !== null) xrayPorts.push(row.xrayPort);
-      if (row.socks5Port !== null) socks5Ports.push(row.socks5Port);
+
+    for (const r of protocolRows) {
+      if (r.port == null) continue; // wireguard rows have null ports
+      const list = byProtocol.get(r.protocol) ?? [];
+      list.push({ lineId: r.lineId, port: r.port });
+      byProtocol.set(r.protocol, list);
     }
   }
 
+  const groups: PortGroup[] = Array.from(byProtocol.entries()).map(
+    ([protocol, ports]) => ({
+      protocol: protocol as DeviceProtocol,
+      ports: ports.sort((a, b) => a.port - b.port),
+    })
+  );
+
   return {
     wg: wgPort,
-    xray: xrayPorts.sort((a, b) => a - b),
     tunnels: [...tunnelPorts].sort((a, b) => a - b),
-    socks5: socks5Ports.sort((a, b) => a - b),
+    groups,
   };
 }

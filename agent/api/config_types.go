@@ -62,39 +62,44 @@ type DeviceRoute struct {
 	Type        string `json:"type"`        // "entry" = source-based routing, "exit" = destination-based routing
 }
 
+// XrayConfig is delivered per-node by the platform.
 type XrayConfig struct {
-	Enabled            bool              `json:"enabled"`
-	Protocol           string            `json:"protocol"`
-	Port               int               `json:"port"`
-	RealityPrivateKey  string            `json:"realityPrivateKey"`
-	RealityShortId     string            `json:"realityShortId"`
-	RealityDest        string            `json:"realityDest"`
-	RealityServerNames []string          `json:"realityServerNames"`
-	Transport          string            `json:"transport,omitempty"`  // "reality" or "ws-tls"
-	WsPath             string            `json:"wsPath,omitempty"`
-	TlsDomain          string            `json:"tlsDomain,omitempty"`
-	TlsCert            string            `json:"tlsCert,omitempty"`
-	TlsKey             string            `json:"tlsKey,omitempty"`
-	Routes             []XrayLineRoute   `json:"routes"`
-	DNSProxy           string            `json:"dnsProxy,omitempty"` // agent DNS proxy IP, e.g. "10.210.0.1"
+	Enabled  bool          `json:"enabled"`
+	Inbounds []XrayInbound `json:"inbounds"`
+	DNSProxy string        `json:"dnsProxy,omitempty"`
 }
 
-// XrayLineRoute maps UUIDs on a specific line to a dedicated inbound+outbound pair.
-type XrayLineRoute struct {
-	LineID   int              `json:"lineId"`
+// XrayInbound describes one (line, transport) listener.
+type XrayInbound struct {
+	LineID    int    `json:"lineId"`
+	Transport string `json:"transport"` // "reality" | "ws-tls"
+	Protocol  string `json:"protocol"`  // "vless"
+	Port      int    `json:"port"`
+
+	// reality fields
+	RealityPrivateKey  string   `json:"realityPrivateKey,omitempty"`
+	RealityShortId     string   `json:"realityShortId,omitempty"`
+	RealityDest        string   `json:"realityDest,omitempty"`
+	RealityServerNames []string `json:"realityServerNames,omitempty"`
+
+	// ws-tls fields
+	WsPath    string `json:"wsPath,omitempty"`
+	TlsDomain string `json:"tlsDomain,omitempty"`
+	TlsCert   string `json:"tlsCert,omitempty"`
+	TlsKey    string `json:"tlsKey,omitempty"`
+
+	// routing
 	UUIDs    []string         `json:"uuids"`
-	Port     int              `json:"port"`      // dedicated Xray inbound port for this line
-	Tunnel   string           `json:"tunnel"`    // default branch tunnel
-	Mark     int              `json:"mark"`      // fwmark for this line's outbound
-	Branches []XrayBranch     `json:"branches"`  // per-branch routing for split tunneling
+	Mark     int              `json:"mark"`
+	Tunnel   string           `json:"tunnel"`
+	Branches []XrayLineBranch `json:"branches"`
 }
 
-// XrayBranch defines a branch outbound for Xray domain-based routing.
-type XrayBranch struct {
-	Mark        int      `json:"mark"`         // branch fwmark (e.g. 30001)
-	Tunnel      string   `json:"tunnel"`       // tunnel interface name
+type XrayLineBranch struct {
+	Mark        int      `json:"mark"`
+	Tunnel      string   `json:"tunnel"`
 	IsDefault   bool     `json:"is_default"`
-	DomainRules []string `json:"domain_rules"` // domains routed to this branch
+	DomainRules []string `json:"domain_rules"`
 }
 
 // RoutingConfig contains the routing rules for entry nodes

@@ -23,8 +23,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@/components/ui/tabs";
 import { DEFAULT_REALITY_DEST } from "@/lib/reality-dest";
-import { xrayPortHintParams } from "@/lib/port-hint";
 
 export default function NewNodePage() {
   const router = useRouter();
@@ -38,20 +43,55 @@ export default function NewNodePage() {
   const [ip, setIp] = useState("");
   const [domain, setDomain] = useState("");
   const [port, setPort] = useState("");
+  const [xrayBasePort, setXrayBasePort] = useState("");
   const [remark, setRemark] = useState("");
   const [externalInterface, setExternalInterface] = useState("eth0");
-  const [xrayPort, setXrayPort] = useState("");
+
+  // Transport state
+  const [realityEnabled, setRealityEnabled] = useState(true);
+  const [wsTlsEnabled, setWsTlsEnabled] = useState(false);
+  const [activeTab, setActiveTab] = useState<"xray-reality" | "xray-wstls">("xray-reality");
+
+  // Reality fields
   const [realityDest, setRealityDest] = useState(DEFAULT_REALITY_DEST);
-  const [xrayTransport, setXrayTransport] = useState<"reality" | "ws-tls">("reality");
+
+  // WS+TLS fields
   const [tlsDomain, setTlsDomain] = useState("");
   const [tlsCertMode, setTlsCertMode] = useState<"auto" | "manual">("auto");
   const [tlsCert, setTlsCert] = useState("");
   const [tlsKey, setTlsKey] = useState("");
+
   const [defaults, setDefaults] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetch("/api/settings").then(r => r.json()).then(j => setDefaults(j.data ?? {})).catch(() => {});
   }, []);
+
+  // Only one transport can be disabled if it's not the last one
+  const canRemoveReality = wsTlsEnabled;
+  const canRemoveWsTls = realityEnabled;
+
+  function addReality() {
+    setRealityEnabled(true);
+    setActiveTab("xray-reality");
+  }
+
+  function addWsTls() {
+    setWsTlsEnabled(true);
+    setActiveTab("xray-wstls");
+  }
+
+  function removeReality() {
+    if (!canRemoveReality) return;
+    setRealityEnabled(false);
+    setActiveTab("xray-wstls");
+  }
+
+  function removeWsTls() {
+    if (!canRemoveWsTls) return;
+    setWsTlsEnabled(false);
+    setActiveTab("xray-reality");
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,21 +111,21 @@ export default function NewNodePage() {
         ip: ip.trim(),
         domain: domain.trim() || null,
         port: port ? parseInt(port) : undefined,
+        xrayBasePort: xrayBasePort ? parseInt(xrayBasePort, 10) : undefined,
         remark: remark.trim() || null,
         externalInterface: externalInterface.trim() || "eth0",
-        xrayPort: xrayPort ? parseInt(xrayPort) : null,
-        xrayTransport,
+        protocols: {
+          xrayReality: realityEnabled ? { realityDest: realityDest || undefined } : undefined,
+          xrayWsTls: wsTlsEnabled
+            ? {
+                tlsDomain: tlsDomain.trim(),
+                certMode: tlsCertMode,
+                tlsCert: tlsCertMode === "manual" ? tlsCert : undefined,
+                tlsKey: tlsCertMode === "manual" ? tlsKey : undefined,
+              }
+            : undefined,
+        },
       };
-
-      if (xrayTransport === "reality") {
-        body.realityDest = realityDest || undefined;
-      } else {
-        body.xrayTlsDomain = tlsDomain.trim();
-        if (tlsCertMode === "manual") {
-          body.xrayTlsCert = tlsCert;
-          body.xrayTlsKey = tlsKey;
-        }
-      }
 
       const res = await fetch("/api/nodes", {
         method: "POST",
@@ -197,114 +237,173 @@ export default function NewNodePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="xrayPort">{t("xrayStartPort")}</Label>
+              <Label htmlFor="xrayBasePort">{t("xrayStartPort")}</Label>
               <Input
-                id="xrayPort"
+                id="xrayBasePort"
                 type="number"
-                value={xrayPort}
-                onChange={(e) => setXrayPort(e.target.value)}
-                placeholder={defaults.xray_default_port || "41443"}
+                value={xrayBasePort}
+                onChange={(e) => setXrayBasePort(e.target.value)}
+                placeholder={defaults?.xray_default_port || "41443"}
               />
-              <p className="text-xs text-muted-foreground">
-                {t("xrayPortHint", xrayPortHintParams(xrayPort, defaults.xray_default_port))}
-              </p>
+              <p className="text-xs text-muted-foreground">{t("xrayPortHint")}</p>
             </div>
-
-            <div className="space-y-2">
-              <Label>{ts("xrayTransport")}</Label>
-              <Select
-                value={xrayTransport}
-                onValueChange={(v: string) =>
-                  setXrayTransport(v as "reality" | "ws-tls")
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="reality">{ts("xrayTransportReality")}</SelectItem>
-                  <SelectItem value="ws-tls">{ts("xrayTransportWsTls")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {xrayTransport === "reality" && (
-              <div className="space-y-2">
-                <Label htmlFor="realityDest">{t("realityTarget")}</Label>
-                <Input
-                  id="realityDest"
-                  value={realityDest}
-                  onChange={(e) => setRealityDest(e.target.value)}
-                  placeholder="www.microsoft.com:443"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {t("realityTargetHint")}
-                </p>
-              </div>
-            )}
-
-            {xrayTransport === "ws-tls" && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="tlsDomain">{ts("tlsDomain")}</Label>
-                  <Input
-                    id="tlsDomain"
-                    value={tlsDomain}
-                    onChange={(e) => setTlsDomain(e.target.value)}
-                    placeholder="vpn.example.com"
-                  />
-                  <p className="text-xs text-muted-foreground">{ts("tlsDomainHint")}</p>
-                </div>
-                <div className="space-y-2">
-                  <Label>{ts("tlsCertMode")}</Label>
-                  <Select
-                    value={tlsCertMode}
-                    onValueChange={(v: string) =>
-                      setTlsCertMode(v as "auto" | "manual")
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="auto">{ts("tlsCertModeAuto")}</SelectItem>
-                      <SelectItem value="manual">{ts("tlsCertModeManual")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {tlsCertMode === "auto" && (
-                    <p className="text-xs text-muted-foreground">{ts("tlsCertAutoHint")}</p>
+            <Tabs
+              value={activeTab}
+              onValueChange={(v) => setActiveTab(v as "xray-reality" | "xray-wstls")}
+            >
+              <div className="flex items-center gap-2 flex-wrap">
+                <TabsList>
+                  {realityEnabled && (
+                    <TabsTrigger value="xray-reality" className="flex items-center gap-1">
+                      {ts("xrayTransportReality")}
+                      {canRemoveReality && (
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onPointerDown={(e) => { e.stopPropagation(); }}
+                          onClick={(e) => { e.stopPropagation(); removeReality(); }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              removeReality();
+                            }
+                          }}
+                          className="ml-1 rounded-full hover:bg-destructive/20 hover:text-destructive p-0.5 leading-none cursor-pointer inline-flex items-center"
+                          aria-label="remove Reality"
+                        >
+                          ✕
+                        </span>
+                      )}
+                    </TabsTrigger>
                   )}
-                </div>
-                {tlsCertMode === "manual" && (
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor="tlsCert">{ts("tlsCert")}</Label>
-                      <Textarea
-                        id="tlsCert"
-                        value={tlsCert}
-                        onChange={(e) => setTlsCert(e.target.value)}
-                        placeholder="-----BEGIN CERTIFICATE-----"
-                        rows={4}
-                        className="font-mono text-xs max-h-60 overflow-auto"
-                      />
-                      <p className="text-xs text-muted-foreground">{ts("tlsCertHint")}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="tlsKey">{ts("tlsKey")}</Label>
-                      <Textarea
-                        id="tlsKey"
-                        value={tlsKey}
-                        onChange={(e) => setTlsKey(e.target.value)}
-                        placeholder="-----BEGIN PRIVATE KEY-----"
-                        rows={4}
-                        className="font-mono text-xs max-h-60 overflow-auto"
-                      />
-                      <p className="text-xs text-muted-foreground">{ts("tlsKeyHint")}</p>
-                    </div>
-                  </>
+                  {wsTlsEnabled && (
+                    <TabsTrigger value="xray-wstls" className="flex items-center gap-1">
+                      {ts("xrayTransportWsTls")}
+                      {canRemoveWsTls && (
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onPointerDown={(e) => { e.stopPropagation(); }}
+                          onClick={(e) => { e.stopPropagation(); removeWsTls(); }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              removeWsTls();
+                            }
+                          }}
+                          className="ml-1 rounded-full hover:bg-destructive/20 hover:text-destructive p-0.5 leading-none cursor-pointer inline-flex items-center"
+                          aria-label="remove WS+TLS"
+                        >
+                          ✕
+                        </span>
+                      )}
+                    </TabsTrigger>
+                  )}
+                </TabsList>
+                {!realityEnabled && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addReality}
+                  >
+                    + {ts("addReality")}
+                  </Button>
                 )}
-              </>
-            )}
+                {!wsTlsEnabled && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addWsTls}
+                  >
+                    + {ts("addWsTls")}
+                  </Button>
+                )}
+              </div>
+
+              {realityEnabled && (
+                <TabsContent value="xray-reality" className="space-y-2 pt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="realityDest">{t("realityTarget")}</Label>
+                    <Input
+                      id="realityDest"
+                      value={realityDest}
+                      onChange={(e) => setRealityDest(e.target.value)}
+                      placeholder="www.microsoft.com:443"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {t("realityTargetHint")}
+                    </p>
+                  </div>
+                </TabsContent>
+              )}
+
+              {wsTlsEnabled && (
+                <TabsContent value="xray-wstls" className="space-y-4 pt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="tlsDomain">{ts("tlsDomain")}</Label>
+                    <Input
+                      id="tlsDomain"
+                      value={tlsDomain}
+                      onChange={(e) => setTlsDomain(e.target.value)}
+                      placeholder="vpn.example.com"
+                    />
+                    <p className="text-xs text-muted-foreground">{ts("tlsDomainHint")}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{ts("tlsCertMode")}</Label>
+                    <Select
+                      value={tlsCertMode}
+                      onValueChange={(v: string) =>
+                        setTlsCertMode(v as "auto" | "manual")
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">{ts("tlsCertModeAuto")}</SelectItem>
+                        <SelectItem value="manual">{ts("tlsCertModeManual")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {tlsCertMode === "auto" && (
+                      <p className="text-xs text-muted-foreground">{ts("tlsCertAutoHint")}</p>
+                    )}
+                  </div>
+                  {tlsCertMode === "manual" && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="tlsCert">{ts("tlsCert")}</Label>
+                        <Textarea
+                          id="tlsCert"
+                          value={tlsCert}
+                          onChange={(e) => setTlsCert(e.target.value)}
+                          placeholder="-----BEGIN CERTIFICATE-----"
+                          rows={4}
+                          className="font-mono text-xs max-h-60 overflow-auto"
+                        />
+                        <p className="text-xs text-muted-foreground">{ts("tlsCertHint")}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="tlsKey">{ts("tlsKey")}</Label>
+                        <Textarea
+                          id="tlsKey"
+                          value={tlsKey}
+                          onChange={(e) => setTlsKey(e.target.value)}
+                          placeholder="-----BEGIN PRIVATE KEY-----"
+                          rows={4}
+                          className="font-mono text-xs max-h-60 overflow-auto"
+                        />
+                        <p className="text-xs text-muted-foreground">{ts("tlsKeyHint")}</p>
+                      </div>
+                    </>
+                  )}
+                </TabsContent>
+              )}
+            </Tabs>
           </CardContent>
         </Card>
 

@@ -81,7 +81,7 @@ case "$PROTO" in
                 $BLOCK
             "
         ;;
-    xray)
+    xray|xray-reality|xray-wstls)
         echo "$CONFIG_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['config'])" > "$WORK/xray.json"
         BLOCK=$(build_curl_block "--proxy socks5h://127.0.0.1:1080")
         docker run --rm --name "$CONTAINER" \

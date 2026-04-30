@@ -5,23 +5,44 @@ import type { DeviceContext, EntryNodeContext } from "@/lib/subscription/types";
 const baseEntry: EntryNodeContext = {
   id: 1, name: "edge", ip: "203.0.113.10", domain: null,
   wgPort: 41820, wgPublicKey: "ENTRYWGPUB", wgAddress: "10.210.0.1",
-  xrayPort: 41443, xrayTransport: "reality", xrayTlsDomain: null, xrayWsPath: null,
-  realityPublicKey: "REALPUB", realityShortId: "abcd", realityServerName: "www.microsoft.com",
+};
+
+const realityEntry: EntryNodeContext = {
+  ...baseEntry,
+  xrayReality: {
+    publicKey: "REALPUB",
+    shortId: "abcd",
+    dest: "www.microsoft.com:443",
+    serverName: "www.microsoft.com",
+  },
+};
+
+const wstlsEntry: EntryNodeContext = {
+  ...baseEntry,
+  xrayWsTls: {
+    wsPath: "/ws",
+    tlsDomain: "edge.example.com",
+  },
 };
 
 const wg: DeviceContext = {
   id: 1, name: "phone", remark: null, protocol: "wireguard", lineId: 1,
-  lineXrayPort: 41443, lineSocks5Port: 41444, entry: baseEntry,
+  linePort: null, entry: baseEntry,
   wg: { privateKey: "PRIV", publicKey: "PUB", address: "10.210.0.100/32", addressIp: "10.210.0.100" },
 };
-const xray: DeviceContext = {
-  id: 2, name: "laptop", remark: null, protocol: "xray", lineId: 1,
-  lineXrayPort: 41443, lineSocks5Port: null, entry: baseEntry,
+const xrayReality: DeviceContext = {
+  id: 2, name: "laptop", remark: null, protocol: "xray-reality", lineId: 1,
+  linePort: 41443, entry: realityEntry,
   xray: { uuid: "uuid-1234" },
+};
+const xrayWsTls: DeviceContext = {
+  id: 5, name: "tablet", remark: null, protocol: "xray-wstls", lineId: 2,
+  linePort: 41445, entry: wstlsEntry,
+  xray: { uuid: "uuid-wstls" },
 };
 const sock: DeviceContext = {
   id: 3, name: "router", remark: null, protocol: "socks5", lineId: 1,
-  lineXrayPort: null, lineSocks5Port: 41444, entry: baseEntry,
+  linePort: 41444, entry: baseEntry,
   socks5: { username: "user", password: "p@ss" },
 };
 
@@ -32,9 +53,16 @@ describe("buildV2RayUri", () => {
     expect(uri).toContain("publicKey=");
     expect(uri).toContain("privateKey=");
   });
-  it("emits vless:// for Xray devices", () => {
-    const uri = buildV2RayUri(xray)!;
+  it("emits vless:// for xray-reality devices", () => {
+    const uri = buildV2RayUri(xrayReality)!;
     expect(uri.startsWith("vless://uuid-1234@")).toBe(true);
+    expect(uri).toContain("security=reality");
+  });
+  it("emits vless:// for xray-wstls devices", () => {
+    const uri = buildV2RayUri(xrayWsTls)!;
+    expect(uri.startsWith("vless://uuid-wstls@")).toBe(true);
+    expect(uri).toContain("security=tls");
+    expect(uri).toContain("type=ws");
   });
   it("emits socks5:// for SOCKS5 devices", () => {
     const uri = buildV2RayUri(sock)!;
@@ -43,19 +71,20 @@ describe("buildV2RayUri", () => {
 });
 
 describe("buildV2RaySubscription", () => {
-  it("includes all three protocols (no devices skipped)", () => {
-    const { body, skipped } = buildV2RaySubscription([wg, xray, sock]);
+  it("includes all four protocols (no devices skipped)", () => {
+    const { body, skipped } = buildV2RaySubscription([wg, xrayReality, xrayWsTls, sock]);
     expect(skipped).toBe(0);
     const decoded = Buffer.from(body, "base64").toString("utf8");
     const lines = decoded.split("\r\n");
-    expect(lines).toHaveLength(3);
+    expect(lines).toHaveLength(4);
     expect(lines[0].startsWith("wg://")).toBe(true);
     expect(lines[1].startsWith("vless://")).toBe(true);
-    expect(lines[2].startsWith("socks5://")).toBe(true);
+    expect(lines[2].startsWith("vless://")).toBe(true);
+    expect(lines[3].startsWith("socks5://")).toBe(true);
   });
 
   it("base64-encodes the joined URI list", () => {
-    const { body } = buildV2RaySubscription([xray, sock]);
+    const { body } = buildV2RaySubscription([xrayReality, sock]);
     expect(body).toMatch(/^[A-Za-z0-9+/=]+$/);
     const decoded = Buffer.from(body, "base64").toString("utf8");
     expect(decoded).toContain("vless://");

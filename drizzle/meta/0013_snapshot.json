@@ -1,8 +1,8 @@
 {
-  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "prevId": "8c90d0bc-1129-4a50-8f29-7c550838efee",
   "version": "6",
   "dialect": "sqlite",
+  "id": "a0e1b1d5-8880-4c5e-bed5-9bb667ec996f",
+  "prevId": "3efe0a98-04ac-420c-a782-317348ce891c",
   "tables": {
     "audit_logs": {
       "name": "audit_logs",
@@ -60,6 +60,64 @@
       },
       "indexes": {},
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "branch_filters": {
+      "name": "branch_filters",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "branch_id": {
+          "name": "branch_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "filter_id": {
+          "name": "filter_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "branch_filters_branch_id_line_branches_id_fk": {
+          "name": "branch_filters_branch_id_line_branches_id_fk",
+          "tableFrom": "branch_filters",
+          "tableTo": "line_branches",
+          "columnsFrom": [
+            "branch_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "branch_filters_filter_id_filters_id_fk": {
+          "name": "branch_filters_filter_id_filters_id_fk",
+          "tableFrom": "branch_filters",
+          "tableTo": "filters",
+          "columnsFrom": [
+            "filter_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -175,8 +233,16 @@
           "autoincrement": false,
           "default": 0
         },
-        "tags": {
-          "name": "tags",
+        "connection_count": {
+          "name": "connection_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "active_ips": {
+          "name": "active_ips",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -211,15 +277,15 @@
         "devices_line_id_lines_id_fk": {
           "name": "devices_line_id_lines_id_fk",
           "tableFrom": "devices",
+          "tableTo": "lines",
           "columnsFrom": [
             "line_id"
           ],
-          "tableTo": "lines",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -266,35 +332,12 @@
           "autoincrement": false,
           "default": true
         },
-        "tags": {
-          "name": "tags",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "remark": {
           "name": "remark",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(datetime('now'))"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(datetime('now'))"
         },
         "domain_rules": {
           "name": "domain_rules",
@@ -316,10 +359,123 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "source_sync_status": {
+          "name": "source_sync_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "source_last_error": {
+          "name": "source_last_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "source_last_ip_count": {
+          "name": "source_last_ip_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "source_last_domain_count": {
+          "name": "source_last_domain_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(datetime('now'))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(datetime('now'))"
         }
       },
       "indexes": {},
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "line_branches": {
+      "name": "line_branches",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "line_id": {
+          "name": "line_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "is_default": {
+          "name": "is_default",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(datetime('now'))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(datetime('now'))"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "line_branches_line_id_lines_id_fk": {
+          "name": "line_branches_line_id_lines_id_fk",
+          "tableFrom": "line_branches",
+          "tableTo": "lines",
+          "columnsFrom": [
+            "line_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -348,6 +504,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "branch_id": {
+          "name": "branch_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "hop_order": {
           "name": "hop_order",
           "type": "integer",
@@ -361,13 +524,6 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
-        },
-        "branch_id": {
-          "name": "branch_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         }
       },
       "indexes": {},
@@ -375,44 +531,121 @@
         "line_nodes_line_id_lines_id_fk": {
           "name": "line_nodes_line_id_lines_id_fk",
           "tableFrom": "line_nodes",
+          "tableTo": "lines",
           "columnsFrom": [
             "line_id"
           ],
-          "tableTo": "lines",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "line_nodes_node_id_nodes_id_fk": {
           "name": "line_nodes_node_id_nodes_id_fk",
           "tableFrom": "line_nodes",
+          "tableTo": "nodes",
           "columnsFrom": [
             "node_id"
           ],
-          "tableTo": "nodes",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "line_nodes_branch_id_line_branches_id_fk": {
           "name": "line_nodes_branch_id_line_branches_id_fk",
           "tableFrom": "line_nodes",
+          "tableTo": "line_branches",
           "columnsFrom": [
             "branch_id"
           ],
-          "tableTo": "line_branches",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "line_protocols": {
+      "name": "line_protocols",
+      "columns": {
+        "line_id": {
+          "name": "line_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "protocol": {
+          "name": "protocol",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "port": {
+          "name": "port",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "config": {
+          "name": "config",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'{}'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(datetime('now'))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(datetime('now'))"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "line_protocols_line_id_lines_id_fk": {
+          "name": "line_protocols_line_id_lines_id_fk",
+          "tableFrom": "line_protocols",
+          "tableTo": "lines",
+          "columnsFrom": [
+            "line_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "line_protocols_line_id_protocol_pk": {
+          "columns": [
+            "line_id",
+            "protocol"
+          ],
+          "name": "line_protocols_line_id_protocol_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -523,54 +756,54 @@
         "line_tunnels_line_id_lines_id_fk": {
           "name": "line_tunnels_line_id_lines_id_fk",
           "tableFrom": "line_tunnels",
+          "tableTo": "lines",
           "columnsFrom": [
             "line_id"
           ],
-          "tableTo": "lines",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "line_tunnels_from_node_id_nodes_id_fk": {
           "name": "line_tunnels_from_node_id_nodes_id_fk",
           "tableFrom": "line_tunnels",
+          "tableTo": "nodes",
           "columnsFrom": [
             "from_node_id"
           ],
-          "tableTo": "nodes",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "line_tunnels_to_node_id_nodes_id_fk": {
           "name": "line_tunnels_to_node_id_nodes_id_fk",
           "tableFrom": "line_tunnels",
+          "tableTo": "nodes",
           "columnsFrom": [
             "to_node_id"
           ],
-          "tableTo": "nodes",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "line_tunnels_branch_id_line_branches_id_fk": {
           "name": "line_tunnels_branch_id_line_branches_id_fk",
           "tableFrom": "line_tunnels",
+          "tableTo": "line_branches",
           "columnsFrom": [
             "branch_id"
           ],
-          "tableTo": "line_branches",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -602,13 +835,6 @@
           "autoincrement": false,
           "default": "'active'"
         },
-        "tags": {
-          "name": "tags",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "remark": {
           "name": "remark",
           "type": "text",
@@ -636,6 +862,76 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "node_protocols": {
+      "name": "node_protocols",
+      "columns": {
+        "node_id": {
+          "name": "node_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "protocol": {
+          "name": "protocol",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "config": {
+          "name": "config",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'{}'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(datetime('now'))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(datetime('now'))"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "node_protocols_node_id_nodes_id_fk": {
+          "name": "node_protocols_node_id_nodes_id_fk",
+          "tableFrom": "node_protocols",
+          "tableTo": "nodes",
+          "columnsFrom": [
+            "node_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "node_protocols_node_id_protocol_pk": {
+          "columns": [
+            "node_id",
+            "protocol"
+          ],
+          "name": "node_protocols_node_id_protocol_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -686,6 +982,22 @@
           "autoincrement": false,
           "default": 0
         },
+        "forward_upload_bytes": {
+          "name": "forward_upload_bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "forward_download_bytes": {
+          "name": "forward_download_bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
         "checked_at": {
           "name": "checked_at",
           "type": "text",
@@ -700,15 +1012,15 @@
         "node_status_node_id_nodes_id_fk": {
           "name": "node_status_node_id_nodes_id_fk",
           "tableFrom": "node_status",
+          "tableTo": "nodes",
           "columnsFrom": [
             "node_id"
           ],
-          "tableTo": "nodes",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -782,42 +1094,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "xray_enabled": {
-          "name": "xray_enabled",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "xray_protocol": {
-          "name": "xray_protocol",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "xray_transport": {
-          "name": "xray_transport",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "xray_port": {
-          "name": "xray_port",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "xray_config": {
-          "name": "xray_config",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "external_interface": {
           "name": "external_interface",
           "type": "text",
@@ -841,12 +1117,49 @@
           "notNull": false,
           "autoincrement": false
         },
-        "tags": {
-          "name": "tags",
+        "agent_version": {
+          "name": "agent_version",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "xray_version": {
+          "name": "xray_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "upgrade_triggered_at": {
+          "name": "upgrade_triggered_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "xray_upgrade_triggered_at": {
+          "name": "xray_upgrade_triggered_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "pending_delete": {
+          "name": "pending_delete",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "tunnel_port_blacklist": {
+          "name": "tunnel_port_blacklist",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
         },
         "remark": {
           "name": "remark",
@@ -918,6 +1231,143 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "subscription_group_devices": {
+      "name": "subscription_group_devices",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "group_id": {
+          "name": "group_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(datetime('now'))"
+        }
+      },
+      "indexes": {
+        "subscription_group_devices_group_device_unique": {
+          "name": "subscription_group_devices_group_device_unique",
+          "columns": [
+            "group_id",
+            "device_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "subscription_group_devices_group_id_subscription_groups_id_fk": {
+          "name": "subscription_group_devices_group_id_subscription_groups_id_fk",
+          "tableFrom": "subscription_group_devices",
+          "tableTo": "subscription_groups",
+          "columnsFrom": [
+            "group_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "subscription_group_devices_device_id_devices_id_fk": {
+          "name": "subscription_group_devices_device_id_devices_id_fk",
+          "tableFrom": "subscription_group_devices",
+          "tableTo": "devices",
+          "columnsFrom": [
+            "device_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "subscription_groups": {
+      "name": "subscription_groups",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "token": {
+          "name": "token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "remark": {
+          "name": "remark",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(datetime('now'))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(datetime('now'))"
+        }
+      },
+      "indexes": {
+        "subscription_groups_token_unique": {
+          "name": "subscription_groups_token_unique",
+          "columns": [
+            "token"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "users": {
       "name": "users",
       "columns": {
@@ -972,141 +1422,14 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
-    },
-    "line_branches": {
-      "name": "line_branches",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "line_id": {
-          "name": "line_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "is_default": {
-          "name": "is_default",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(datetime('now'))"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(datetime('now'))"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "line_branches_line_id_lines_id_fk": {
-          "name": "line_branches_line_id_lines_id_fk",
-          "tableFrom": "line_branches",
-          "columnsFrom": [
-            "line_id"
-          ],
-          "tableTo": "lines",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "branch_filters": {
-      "name": "branch_filters",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "branch_id": {
-          "name": "branch_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "filter_id": {
-          "name": "filter_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "branch_filters_branch_id_line_branches_id_fk": {
-          "name": "branch_filters_branch_id_line_branches_id_fk",
-          "tableFrom": "branch_filters",
-          "columnsFrom": [
-            "branch_id"
-          ],
-          "tableTo": "line_branches",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
-        },
-        "branch_filters_filter_id_filters_id_fk": {
-          "name": "branch_filters_filter_id_filters_id_fk",
-          "tableFrom": "branch_filters",
-          "columnsFrom": [
-            "filter_id"
-          ],
-          "tableTo": "filters",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
     }
   },
   "views": {},
   "enums": {},
   "_meta": {
-    "columns": {},
     "schemas": {},
-    "tables": {}
+    "tables": {},
+    "columns": {}
   },
   "internal": {
     "indexes": {}

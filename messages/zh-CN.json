@@ -152,7 +152,15 @@
     "upgradeConfirmMessage": "当前版本：{current}，最新版本：{latest}。确认升级？",
     "confirmDeleteNode": "此操作将远程卸载节点上的所有 WireMesh 组件，确认删除？",
     "deleteOfflinePending": "节点当前离线，将在下次上线时自动卸载。",
-    "xrayTransport": "传输方式",
+    "xrayProtocols": {
+      "title": "传输方式",
+      "addReality": "添加 Reality",
+      "addWsTls": "添加 WebSocket+TLS",
+      "removeTooltip": "移除该传输",
+      "lastTransportTooltip": "至少需保留一种传输方式",
+      "realityTabLabel": "Reality",
+      "wsTlsTabLabel": "WebSocket+TLS"
+    },
     "xrayTransportReality": "REALITY",
     "xrayTransportWsTls": "WebSocket + TLS",
     "tlsDomain": "TLS 域名",
@@ -166,7 +174,9 @@
     "tlsKey": "TLS 私钥",
     "tlsKeyHint": "粘贴 PEM 格式私钥内容",
     "wsPath": "WebSocket 路径",
-    "wsPathHint": "系统自动生成，不可编辑"
+    "wsPathHint": "系统自动生成，不可编辑",
+    "addReality": "添加 Reality",
+    "addWsTls": "添加 WebSocket+TLS"
   },
   "nodeNew": {
     "title": "新增节点",
@@ -186,7 +196,7 @@
     "notesPlaceholder": "备注信息",
     "xraySettings": "Xray / SOCKS5 设置",
     "xrayStartPort": "代理起始端口",
-    "xrayPortHint": "每条线路自动分配独立端口（如 {port0}、{port1}、{port2}...），Xray 和 SOCKS5 共享同一端口池，请确保防火墙放行对应端口",
+    "xrayPortHint": "留空则使用系统默认；填入则覆盖此节点的端口起点",
     "externalInterface": "外网网卡",
     "externalInterfaceHint": "节点的外网网卡名称，默认 eth0，常见如 ens3、bond0 等",
     "realityTarget": "Reality 目标网站",
@@ -203,7 +213,10 @@
     "tunnelPortBlacklist": "隧道端口黑名单",
     "tunnelPortBlacklistHint": "在此添加的端口将被隧道端口分配器跳过",
     "addPort": "添加端口",
-    "invalidPort": "端口必须是 1-65535 之间的整数"
+    "invalidPort": "端口必须是 1-65535 之间的整数",
+    "xrayTransportInUseTitle": "传输方式被占用",
+    "xrayTransportInUseDescription": "以下设备正在使用「{transport}」传输方式，请先解绑或迁移这些设备：",
+    "inLine": "线路 {id}"
   },
   "nodeScript": {
     "loadNodeFailed": "获取节点信息失败",
@@ -236,6 +249,8 @@
     "protocol": {
       "wireguard": "WireGuard",
       "xray": "Xray",
+      "xrayReality": "VLESS REALITY",
+      "xrayWsTls": "VLESS WebSocket+TLS",
       "socks5": "SOCKS5"
     },
     "loadFailed": "加载设备列表失败",
@@ -274,6 +289,10 @@
     "deviceNamePlaceholder": "例如：我的笔记本",
     "protocolType": "协议类型",
     "selectProtocol": "选择协议",
+    "protocol": {
+      "xrayReality": "Xray Reality",
+      "xrayWsTls": "Xray WebSocket+TLS"
+    },
     "line": "所属线路",
     "loadingLines": "加载线路...",
     "noLines": "暂无线路，请先",
@@ -760,7 +779,11 @@
       "passwordMinLength": "密码至少需要 6 位字符",
       "nameRequired": "name 为必填项",
       "nameAndIpRequired": "name 和 ip 为必填项",
-      "protocolInvalid": "protocol 必须为 wireguard 或 xray",
+      "protocolInvalid": "protocol 必须为 wireguard / xray-reality / xray-wstls / socks5",
+      "xrayTransportInUse": "节点存在依赖该传输的设备，无法移除",
+      "xrayTransportRequired": "节点至少需保留一种 Xray 传输方式",
+      "deviceProtocolNotSupported": "所选线路的入口节点未启用该协议",
+      "lineHasNoEntryNode": "该线路缺少入口节点",
       "usernameAndPasswordRequired": "用户名和密码不能为空",
       "currentAndNewPasswordRequired": "当前密码和新密码不能为空",
       "newPasswordMinLength": "新密码至少需要 6 位字符",

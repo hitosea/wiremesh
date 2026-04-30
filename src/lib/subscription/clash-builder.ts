@@ -26,33 +26,10 @@ export function buildClashProxy(ctx: DeviceContext): ClashProxy | null {
     };
   }
 
-  if (ctx.protocol === "xray" && ctx.xray) {
-    const port = ctx.lineXrayPort ?? ctx.entry.xrayPort;
+  if (ctx.protocol === "xray-reality" && ctx.xray) {
+    const port = ctx.linePort;
     if (!port) return null;
-    const transport = ctx.entry.xrayTransport ?? "reality";
-    if (transport === "ws-tls") {
-      const sni = ctx.entry.xrayTlsDomain ?? server;
-      const path = ctx.entry.xrayWsPath ?? "/default";
-      return {
-        name,
-        type: "vless",
-        server: sni,
-        port,
-        uuid: ctx.xray.uuid,
-        tls: true,
-        network: "ws",
-        udp: true,
-        "packet-encoding": "xudp",
-        servername: sni,
-        "client-fingerprint": "chrome",
-        "ws-opts": {
-          path,
-          headers: { Host: sni },
-        },
-      };
-    }
-    // reality
-    if (!ctx.entry.realityPublicKey) return null;
+    if (!ctx.entry.xrayReality?.publicKey) return null;
     return {
       name,
       type: "vless",
@@ -64,17 +41,41 @@ export function buildClashProxy(ctx: DeviceContext): ClashProxy | null {
       udp: true,
       "packet-encoding": "xudp",
       flow: "xtls-rprx-vision",
-      servername: ctx.entry.realityServerName ?? "www.microsoft.com",
+      servername: ctx.entry.xrayReality.serverName ?? "www.microsoft.com",
       "client-fingerprint": "chrome",
       "reality-opts": {
-        "public-key": ctx.entry.realityPublicKey,
-        ...(ctx.entry.realityShortId ? { "short-id": ctx.entry.realityShortId } : {}),
+        "public-key": ctx.entry.xrayReality.publicKey,
+        ...(ctx.entry.xrayReality.shortId ? { "short-id": ctx.entry.xrayReality.shortId } : {}),
+      },
+    };
+  }
+
+  if (ctx.protocol === "xray-wstls" && ctx.xray) {
+    const port = ctx.linePort;
+    if (!port) return null;
+    const sni = ctx.entry.xrayWsTls?.tlsDomain ?? server;
+    const path = ctx.entry.xrayWsTls?.wsPath ?? "/default";
+    return {
+      name,
+      type: "vless",
+      server: sni,
+      port,
+      uuid: ctx.xray.uuid,
+      tls: true,
+      network: "ws",
+      udp: true,
+      "packet-encoding": "xudp",
+      servername: sni,
+      "client-fingerprint": "chrome",
+      "ws-opts": {
+        path,
+        headers: { Host: sni },
       },
     };
   }
 
   if (ctx.protocol === "socks5" && ctx.socks5) {
-    const port = ctx.lineSocks5Port ?? ctx.entry.xrayPort;
+    const port = ctx.linePort;
     if (!port) return null;
     return {
       name,

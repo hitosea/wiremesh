@@ -1,6 +1,6 @@
 {
-  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "prevId": "8c90d0bc-1129-4a50-8f29-7c550838efee",
+  "id": "3efe0a98-04ac-420c-a782-317348ce891c",
+  "prevId": "fc1a4441-6250-448c-b178-7968dda97977",
   "version": "6",
   "dialect": "sqlite",
   "tables": {
@@ -175,8 +175,16 @@
           "autoincrement": false,
           "default": 0
         },
-        "tags": {
-          "name": "tags",
+        "connection_count": {
+          "name": "connection_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "active_ips": {
+          "name": "active_ips",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -266,15 +274,29 @@
           "autoincrement": false,
           "default": true
         },
-        "tags": {
-          "name": "tags",
+        "remark": {
+          "name": "remark",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "remark": {
-          "name": "remark",
+        "domain_rules": {
+          "name": "domain_rules",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "source_url": {
+          "name": "source_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "source_updated_at": {
+          "name": "source_updated_at",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -296,23 +318,30 @@
           "autoincrement": false,
           "default": "(datetime('now'))"
         },
-        "domain_rules": {
-          "name": "domain_rules",
+        "source_sync_status": {
+          "name": "source_sync_status",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "source_url": {
-          "name": "source_url",
+        "source_last_error": {
+          "name": "source_last_error",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "source_updated_at": {
-          "name": "source_updated_at",
-          "type": "text",
+        "source_last_ip_count": {
+          "name": "source_last_ip_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "source_last_domain_count": {
+          "name": "source_last_domain_count",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -602,9 +631,16 @@
           "autoincrement": false,
           "default": "'active'"
         },
-        "tags": {
-          "name": "tags",
-          "type": "text",
+        "xray_port": {
+          "name": "xray_port",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "socks5_port": {
+          "name": "socks5_port",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -680,6 +716,22 @@
         },
         "download_bytes": {
           "name": "download_bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "forward_upload_bytes": {
+          "name": "forward_upload_bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "forward_download_bytes": {
+          "name": "forward_download_bytes",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -782,14 +834,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "xray_enabled": {
-          "name": "xray_enabled",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
         "xray_protocol": {
           "name": "xray_protocol",
           "type": "text",
@@ -818,6 +862,34 @@
           "notNull": false,
           "autoincrement": false
         },
+        "xray_ws_path": {
+          "name": "xray_ws_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "xray_tls_domain": {
+          "name": "xray_tls_domain",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "xray_tls_cert": {
+          "name": "xray_tls_cert",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "xray_tls_key": {
+          "name": "xray_tls_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "external_interface": {
           "name": "external_interface",
           "type": "text",
@@ -841,12 +913,41 @@
           "notNull": false,
           "autoincrement": false
         },
-        "tags": {
-          "name": "tags",
+        "agent_version": {
+          "name": "agent_version",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "xray_version": {
+          "name": "xray_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "upgrade_triggered_at": {
+          "name": "upgrade_triggered_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "xray_upgrade_triggered_at": {
+          "name": "xray_upgrade_triggered_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "pending_delete": {
+          "name": "pending_delete",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         },
         "remark": {
           "name": "remark",
@@ -870,6 +971,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": "(datetime('now'))"
+        },
+        "tunnel_port_blacklist": {
+          "name": "tunnel_port_blacklist",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
         }
       },
       "indexes": {
@@ -1094,6 +1203,143 @@
           ],
           "onUpdate": "no action",
           "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "subscription_groups": {
+      "name": "subscription_groups",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "token": {
+          "name": "token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "remark": {
+          "name": "remark",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(datetime('now'))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(datetime('now'))"
+        }
+      },
+      "indexes": {
+        "subscription_groups_token_unique": {
+          "name": "subscription_groups_token_unique",
+          "columns": [
+            "token"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "subscription_group_devices": {
+      "name": "subscription_group_devices",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "group_id": {
+          "name": "group_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(datetime('now'))"
+        }
+      },
+      "indexes": {
+        "subscription_group_devices_group_device_unique": {
+          "name": "subscription_group_devices_group_device_unique",
+          "columns": [
+            "group_id",
+            "device_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "subscription_group_devices_group_id_subscription_groups_id_fk": {
+          "name": "subscription_group_devices_group_id_subscription_groups_id_fk",
+          "tableFrom": "subscription_group_devices",
+          "tableTo": "subscription_groups",
+          "columnsFrom": [
+            "group_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "subscription_group_devices_device_id_devices_id_fk": {
+          "name": "subscription_group_devices_device_id_devices_id_fk",
+          "tableFrom": "subscription_group_devices",
+          "tableTo": "devices",
+          "columnsFrom": [
+            "device_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
 import { translateError } from "@/lib/translate-error";
 import { useTranslations } from "next-intl";
@@ -22,12 +23,23 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { StatusDot } from "@/components/status-dot";
 import { PageHeader } from "@/components/page-header";
 import { NodeStatusChart } from "@/components/node-status-chart";
-import { xrayPortHintParams } from "@/lib/port-hint";
 import { parseTunnelPortBlacklist } from "@/lib/ip-allocator";
 import { NodePortsDetail } from "@/components/node-ports-detail";
+import type { DeviceProtocol } from "@/lib/protocols";
 import { useAdminSSE } from "@/components/admin-sse-provider";
 import { useSetBreadcrumbLabel } from "@/components/breadcrumb-context";
 import { Loader2 } from "lucide-react";
@@ -38,17 +50,10 @@ type NodeDetail = {
   ip: string;
   domain: string | null;
   port: number;
+  xrayBasePort: number | null;
   agentToken: string;
   wgPublicKey: string;
   wgAddress: string;
-  xrayProtocol: string | null;
-  xrayTransport: string | null;
-  xrayPort: number | null;
-  xrayConfig: string | null;
-  xrayWsPath: string | null;
-  xrayTlsDomain: string | null;
-  xrayTlsCert: string | null;
-  xrayTlsKey: string | null;
   status: string;
   errorMessage: string | null;
   externalInterface: string;
@@ -58,12 +63,63 @@ type NodeDetail = {
   tunnelPortBlacklist: string;
   ports: {
     wg: number;
-    xray: number[];
     tunnels: number[];
-    socks5: number[];
+    groups: { protocol: DeviceProtocol; ports: { lineId: number; port: number }[] }[];
   };
+  protocols: {
+    xrayReality: {
+      realityDest: string;
+      realityPublicKey: string;
+      realityShortId: string;
+    } | null;
+    xrayWsTls: {
+      tlsDomain: string;
+      certMode: "auto" | "manual";
+      wsPath: string;
+      hasCert: boolean;
+    } | null;
+  } | null;
 };
 
+type BlockingDevice = { id: number; name: string; lineId: number };
+
+function BlockingDevicesDialog({
+  open,
+  transport,
+  devices,
+  onClose,
+  t,
+}: {
+  open: boolean;
+  transport: string | null;
+  devices: BlockingDevice[];
+  onClose: () => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogTitle>{t("xrayTransportInUseTitle")}</DialogTitle>
+        <p className="text-sm text-muted-foreground mb-2">
+          {t("xrayTransportInUseDescription", { transport: transport ?? "" })}
+        </p>
+        <ul className="space-y-1 text-sm">
+          {devices.map((d) => (
+            <li key={d.id}>
+              <Link href={`/devices/${d.id}`} className="underline hover:no-underline">
+                {d.name}
+              </Link>
+              <span className="text-muted-foreground">
+                {" "}
+                ({t("inLine", { id: d.lineId })})
+              </span>
+            </li>
+          ))}
+        </ul>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function NodeDetailPage() {
   const router = useRouter();
@@ -85,25 +141,43 @@ export default function NodeDetailPage() {
   const [ip, setIp] = useState("");
   const [domain, setDomain] = useState("");
   const [port, setPort] = useState("");
+  const [xrayBasePort, setXrayBasePort] = useState("");
   const [remark, setRemark] = useState("");
   const [externalInterface, setExternalInterface] = useState("eth0");
-  const [xrayPort, setXrayPort] = useState("");
+  const [defaults, setDefaults] = useState<Record<string, string>>({});
+
+  // Transport state
+  const [realityEnabled, setRealityEnabled] = useState(false);
+  const [wsTlsEnabled, setWsTlsEnabled] = useState(false);
+  const [activeTab, setActiveTab] = useState<"xray-reality" | "xray-wstls">("xray-reality");
+
+  // Reality fields
   const [realityDest, setRealityDest] = useState("");
   const [realityPublicKey, setRealityPublicKey] = useState("");
   const [realityShortId, setRealityShortId] = useState("");
-  const [defaults, setDefaults] = useState<Record<string, string>>({});
-  const [xrayTransport, setXrayTransport] = useState("reality");
+
+  // WS+TLS fields
   const [tlsDomain, setTlsDomain] = useState("");
   const [tlsCertMode, setTlsCertMode] = useState<"auto" | "manual">("auto");
   const [tlsCert, setTlsCert] = useState("");
   const [tlsKey, setTlsKey] = useState("");
   const [wsPath, setWsPath] = useState("");
+
+  // Tunnel port blacklist
   const [blacklistInput, setBlacklistInput] = useState("");
   const [addingPort, setAddingPort] = useState(false);
   const [removingPort, setRemovingPort] = useState<number | null>(null);
   const blacklistBusy = addingPort || removingPort !== null;
 
+  // Blocking devices dialog state
+  const [blockingDevices, setBlockingDevices] = useState<BlockingDevice[]>([]);
+  const [blockingTransport, setBlockingTransport] = useState<"xray-reality" | "xray-wstls" | null>(null);
+
   const blacklistPorts: number[] = node ? parseTunnelPortBlacklist(node.tunnelPortBlacklist) : [];
+
+  // Only one transport can be removed if it's not the last one
+  const canRemoveReality = wsTlsEnabled;
+  const canRemoveWsTls = realityEnabled;
 
   const saveBlacklist = async (newPorts: number[]): Promise<boolean> => {
     if (!node) return false;
@@ -163,32 +237,31 @@ export default function NodeDetailPage() {
         setIp(n.ip ?? "");
         setDomain(n.domain ?? "");
         setPort(n.port ? String(n.port) : "");
+        setXrayBasePort(n.xrayBasePort != null ? String(n.xrayBasePort) : "");
         setRemark(n.remark ?? "");
         setExternalInterface(n.externalInterface ?? "eth0");
-        setXrayPort(n.xrayPort ? String(n.xrayPort) : "");
-        if (n.xrayConfig) {
-          try {
-            const cfg = JSON.parse(n.xrayConfig);
-            setRealityDest(cfg.realityDest ?? "");
-            setRealityPublicKey(cfg.realityPublicKey ?? "");
-            setRealityShortId(cfg.realityShortId ?? "");
-          } catch {}
+
+        const p = n.protocols ?? { xrayReality: null, xrayWsTls: null };
+        setRealityEnabled(!!p.xrayReality);
+        setWsTlsEnabled(!!p.xrayWsTls);
+        setActiveTab(p.xrayReality ? "xray-reality" : "xray-wstls");
+
+        if (p.xrayReality) {
+          setRealityDest(p.xrayReality.realityDest ?? "");
+          setRealityPublicKey(p.xrayReality.realityPublicKey ?? "");
+          setRealityShortId(p.xrayReality.realityShortId ?? "");
         }
-        setXrayTransport(n.xrayTransport === "ws-tls" ? "ws-tls" : "reality");
-        setTlsDomain(n.xrayTlsDomain || "");
-        setWsPath(n.xrayWsPath || "");
-        if (n.xrayTlsCert) {
-          setTlsCertMode("manual");
-          setTlsCert(n.xrayTlsCert);
-        }
-        if (n.xrayTlsKey) {
-          setTlsKey(n.xrayTlsKey);
+        if (p.xrayWsTls) {
+          setTlsDomain(p.xrayWsTls.tlsDomain ?? "");
+          setTlsCertMode(p.xrayWsTls.certMode ?? "auto");
+          setWsPath(p.xrayWsTls.wsPath ?? "");
+          // Server does not return cert/key content; hasCert just indicates they exist
         }
       })
       .catch(() => toast.error(ts("loadNodeFailed")))
       .finally(() => setLoading(false));
     fetch("/api/settings").then(r => r.json()).then(j => setDefaults(j.data ?? {})).catch(() => {});
-  }, [nodeId, router]);
+  }, [nodeId, router, ts]);
 
   // SSE real-time updates for this node
   useAdminSSE("node_status", (update) => {
@@ -196,6 +269,55 @@ export default function NodeDetailPage() {
       setNode((prev) => prev ? { ...prev, ...update, id: prev.id } as NodeDetail : prev);
     }
   });
+
+  async function removeTransport(which: "xray-reality" | "xray-wstls") {
+    const body = {
+      protocols: {
+        xrayReality: which === "xray-reality" ? null : undefined,
+        xrayWsTls: which === "xray-wstls" ? null : undefined,
+      },
+    };
+    const res = await fetch(`/api/nodes/${nodeId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (res.ok) {
+      if (which === "xray-reality") {
+        setRealityEnabled(false);
+        setRealityDest("");
+        setRealityPublicKey("");
+        setRealityShortId("");
+      }
+      if (which === "xray-wstls") {
+        setWsTlsEnabled(false);
+        setTlsDomain("");
+        setWsPath("");
+      }
+      if (activeTab === which) {
+        setActiveTab(which === "xray-reality" ? "xray-wstls" : "xray-reality");
+      }
+      toast.success(tc("save"));
+      return;
+    }
+    const err = await res.json();
+    if (err.error?.code === "CONFLICT" && err.error?.message === "validation.xrayTransportInUse") {
+      setBlockingDevices(err.details?.devices ?? []);
+      setBlockingTransport(which);
+    } else {
+      toast.error(translateError(err.error, te, tc("saveFailed")));
+    }
+  }
+
+  function addReality() {
+    setRealityEnabled(true);
+    setActiveTab("xray-reality");
+  }
+
+  function addWsTls() {
+    setWsTlsEnabled(true);
+    setActiveTab("xray-wstls");
+  }
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -209,19 +331,23 @@ export default function NodeDetailPage() {
         ip: ip.trim(),
         domain: domain.trim() || null,
         port: port ? parseInt(port) : undefined,
+        xrayBasePort: xrayBasePort ? parseInt(xrayBasePort, 10) : null,
         remark: remark.trim() || null,
         externalInterface: externalInterface.trim() || "eth0",
-        xrayPort: xrayPort ? parseInt(xrayPort) : null,
-        realityDest: realityDest || undefined,
+        protocols: {
+          xrayReality: realityEnabled
+            ? { realityDest: realityDest }
+            : null,
+          xrayWsTls: wsTlsEnabled
+            ? {
+                tlsDomain: tlsDomain.trim(),
+                certMode: tlsCertMode,
+                tlsCert: tlsCertMode === "manual" ? tlsCert : undefined,
+                tlsKey: tlsCertMode === "manual" ? tlsKey : undefined,
+              }
+            : null,
+        },
       };
-      body.xrayTransport = xrayTransport;
-      if (xrayTransport === "ws-tls") {
-        body.xrayTlsDomain = tlsDomain;
-        if (tlsCertMode === "manual") {
-          body.xrayTlsCert = tlsCert;
-          body.xrayTlsKey = tlsKey;
-        }
-      }
 
       const res = await fetch(`/api/nodes/${nodeId}`, {
         method: "PUT",
@@ -422,122 +548,189 @@ export default function NodeDetailPage() {
           <div className="border-t pt-4 space-y-4">
             <h3 className="text-sm font-medium">{tn("xraySettings")}</h3>
             <div className="space-y-2">
-              <Label htmlFor="xrayPort">{tn("xrayStartPort")}</Label>
+              <Label htmlFor="xrayBasePort">{tn("xrayStartPort")}</Label>
               <Input
-                id="xrayPort"
+                id="xrayBasePort"
                 type="number"
-                value={xrayPort}
-                onChange={(e) => setXrayPort(e.target.value)}
-                placeholder={defaults.xray_default_port || "41443"}
+                value={xrayBasePort}
+                onChange={(e) => setXrayBasePort(e.target.value)}
+                placeholder={defaults?.xray_default_port || "41443"}
               />
-              <p className="text-xs text-muted-foreground">
-                {tn("xrayPortHint", xrayPortHintParams(xrayPort, defaults.xray_default_port))}
-              </p>
+              <p className="text-xs text-muted-foreground">{tn("xrayPortHint")}</p>
             </div>
-            <div className="space-y-2">
-              <Label>{ts("xrayTransport")}</Label>
-              <Select value={xrayTransport} onValueChange={setXrayTransport}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="reality">{ts("xrayTransportReality")}</SelectItem>
-                  <SelectItem value="ws-tls">{ts("xrayTransportWsTls")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {xrayTransport === "reality" && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="realityDest">{tn("realityTarget")}</Label>
-                  <Input
-                    id="realityDest"
-                    value={realityDest}
-                    onChange={(e) => setRealityDest(e.target.value)}
-                    placeholder="www.microsoft.com:443"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {tn("realityTargetHint")}
-                  </p>
-                </div>
-                {realityPublicKey && (
-                  <>
-                    <div className="space-y-2">
-                      <Label>Reality Public Key</Label>
-                      <code className="block text-xs bg-muted px-3 py-2 rounded break-all">
-                        {realityPublicKey}
-                      </code>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Reality Short ID</Label>
-                      <code className="block text-xs bg-muted px-3 py-2 rounded break-all">
-                        {realityShortId}
-                      </code>
-                    </div>
-                  </>
-                )}
-              </>
-            )}
-            {xrayTransport === "ws-tls" && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="tlsDomain">{ts("tlsDomain")}</Label>
-                  <Input
-                    id="tlsDomain"
-                    value={tlsDomain}
-                    onChange={(e) => setTlsDomain(e.target.value)}
-                    placeholder="vpn.example.com"
-                  />
-                  <p className="text-xs text-muted-foreground">{ts("tlsDomainHint")}</p>
-                </div>
-                <div className="space-y-2">
-                  <Label>{ts("tlsCertMode")}</Label>
-                  <Select value={tlsCertMode} onValueChange={(v: string) => setTlsCertMode(v as "auto" | "manual")}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="auto">{ts("tlsCertModeAuto")}</SelectItem>
-                      <SelectItem value="manual">{ts("tlsCertModeManual")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {tlsCertMode === "auto" && (
-                    <p className="text-xs text-muted-foreground">{ts("tlsCertAutoHint")}</p>
+            <Tabs
+              value={activeTab}
+              onValueChange={(v) => setActiveTab(v as "xray-reality" | "xray-wstls")}
+            >
+              <div className="flex items-center gap-2 flex-wrap">
+                <TabsList>
+                  {realityEnabled && (
+                    <TabsTrigger value="xray-reality" className="flex items-center gap-1">
+                      {ts("xrayTransportReality")}
+                      {canRemoveReality && (
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onPointerDown={(e) => { e.stopPropagation(); }}
+                          onClick={(e) => { e.stopPropagation(); removeTransport("xray-reality"); }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              removeTransport("xray-reality");
+                            }
+                          }}
+                          className="ml-1 rounded-full hover:bg-destructive/20 hover:text-destructive p-0.5 leading-none cursor-pointer inline-flex items-center"
+                          aria-label="remove Reality"
+                        >
+                          ✕
+                        </span>
+                      )}
+                    </TabsTrigger>
                   )}
-                </div>
-                {tlsCertMode === "manual" && (
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor="tlsCert">{ts("tlsCert")}</Label>
-                      <Textarea
-                        id="tlsCert"
-                        value={tlsCert}
-                        onChange={(e) => setTlsCert(e.target.value)}
-                        placeholder="-----BEGIN CERTIFICATE-----"
-                        rows={4}
-                        className="font-mono text-xs max-h-60 overflow-auto"
-                      />
-                      <p className="text-xs text-muted-foreground">{ts("tlsCertHint")}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="tlsKey">{ts("tlsKey")}</Label>
-                      <Textarea
-                        id="tlsKey"
-                        value={tlsKey}
-                        onChange={(e) => setTlsKey(e.target.value)}
-                        placeholder="-----BEGIN PRIVATE KEY-----"
-                        rows={4}
-                        className="font-mono text-xs max-h-60 overflow-auto"
-                      />
-                      <p className="text-xs text-muted-foreground">{ts("tlsKeyHint")}</p>
-                    </div>
-                  </>
+                  {wsTlsEnabled && (
+                    <TabsTrigger value="xray-wstls" className="flex items-center gap-1">
+                      {ts("xrayTransportWsTls")}
+                      {canRemoveWsTls && (
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onPointerDown={(e) => { e.stopPropagation(); }}
+                          onClick={(e) => { e.stopPropagation(); removeTransport("xray-wstls"); }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              removeTransport("xray-wstls");
+                            }
+                          }}
+                          className="ml-1 rounded-full hover:bg-destructive/20 hover:text-destructive p-0.5 leading-none cursor-pointer inline-flex items-center"
+                          aria-label="remove WS+TLS"
+                        >
+                          ✕
+                        </span>
+                      )}
+                    </TabsTrigger>
+                  )}
+                </TabsList>
+                {!realityEnabled && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addReality}
+                  >
+                    + {ts("addReality")}
+                  </Button>
                 )}
-                {wsPath && (
+                {!wsTlsEnabled && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addWsTls}
+                  >
+                    + {ts("addWsTls")}
+                  </Button>
+                )}
+              </div>
+
+              {realityEnabled && (
+                <TabsContent value="xray-reality" className="space-y-4 pt-4">
                   <div className="space-y-2">
-                    <Label>{ts("wsPath")}</Label>
-                    <code className="block text-xs bg-muted px-3 py-2 rounded">{wsPath}</code>
-                    <p className="text-xs text-muted-foreground">{ts("wsPathHint")}</p>
+                    <Label htmlFor="realityDest">{tn("realityTarget")}</Label>
+                    <Input
+                      id="realityDest"
+                      value={realityDest}
+                      onChange={(e) => setRealityDest(e.target.value)}
+                      placeholder="www.microsoft.com:443"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {tn("realityTargetHint")}
+                    </p>
                   </div>
-                )}
-              </>
-            )}
+                  {realityPublicKey && (
+                    <>
+                      <div className="space-y-2">
+                        <Label>Reality Public Key</Label>
+                        <code className="block text-xs bg-muted px-3 py-2 rounded break-all">
+                          {realityPublicKey}
+                        </code>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Reality Short ID</Label>
+                        <code className="block text-xs bg-muted px-3 py-2 rounded break-all">
+                          {realityShortId}
+                        </code>
+                      </div>
+                    </>
+                  )}
+                </TabsContent>
+              )}
+
+              {wsTlsEnabled && (
+                <TabsContent value="xray-wstls" className="space-y-4 pt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="tlsDomain">{ts("tlsDomain")}</Label>
+                    <Input
+                      id="tlsDomain"
+                      value={tlsDomain}
+                      onChange={(e) => setTlsDomain(e.target.value)}
+                      placeholder="vpn.example.com"
+                    />
+                    <p className="text-xs text-muted-foreground">{ts("tlsDomainHint")}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{ts("tlsCertMode")}</Label>
+                    <Select value={tlsCertMode} onValueChange={(v: string) => setTlsCertMode(v as "auto" | "manual")}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">{ts("tlsCertModeAuto")}</SelectItem>
+                        <SelectItem value="manual">{ts("tlsCertModeManual")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {tlsCertMode === "auto" && (
+                      <p className="text-xs text-muted-foreground">{ts("tlsCertAutoHint")}</p>
+                    )}
+                  </div>
+                  {tlsCertMode === "manual" && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="tlsCert">{ts("tlsCert")}</Label>
+                        <Textarea
+                          id="tlsCert"
+                          value={tlsCert}
+                          onChange={(e) => setTlsCert(e.target.value)}
+                          placeholder="-----BEGIN CERTIFICATE-----"
+                          rows={4}
+                          className="font-mono text-xs max-h-60 overflow-auto"
+                        />
+                        <p className="text-xs text-muted-foreground">{ts("tlsCertHint")}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="tlsKey">{ts("tlsKey")}</Label>
+                        <Textarea
+                          id="tlsKey"
+                          value={tlsKey}
+                          onChange={(e) => setTlsKey(e.target.value)}
+                          placeholder="-----BEGIN PRIVATE KEY-----"
+                          rows={4}
+                          className="font-mono text-xs max-h-60 overflow-auto"
+                        />
+                        <p className="text-xs text-muted-foreground">{ts("tlsKeyHint")}</p>
+                      </div>
+                    </>
+                  )}
+                  {wsPath && (
+                    <div className="space-y-2">
+                      <Label>{ts("wsPath")}</Label>
+                      <code className="block text-xs bg-muted px-3 py-2 rounded">{wsPath}</code>
+                      <p className="text-xs text-muted-foreground">{ts("wsPathHint")}</p>
+                    </div>
+                  )}
+                </TabsContent>
+              )}
+            </Tabs>
           </div>
 
           <div className="space-y-2">
@@ -562,6 +755,14 @@ export default function NodeDetailPage() {
       </div>
 
       <NodeStatusChart nodeId={nodeId} />
+
+      <BlockingDevicesDialog
+        open={blockingTransport !== null}
+        transport={blockingTransport}
+        devices={blockingDevices}
+        onClose={() => setBlockingTransport(null)}
+        t={t}
+      />
       </>)}
     </div>
   );

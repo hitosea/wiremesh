@@ -33,10 +33,31 @@ Admin credentials are always `admin / admin123` (re-initialised every Phase 1).
 ```
 
 ### Transport Mode Assignment
-- **Server A**: WebSocket + TLS (`xrayTransport: "ws-tls"`, `xrayTlsDomain: "$A_DOMAIN"`)
-  After node creation, call `PUT /api/nodes/{A_ID}` with `{"xrayTransport":"ws-tls","xrayTlsDomain":"$A_DOMAIN"}`. ACME auto-cert will provision a Let's Encrypt certificate on first Agent config sync (requires port 80 accessible on A).
-- **Server B**: REALITY (default, no extra config needed)
-- This tests both transports coexisting: lines with A as entry use WS+TLS, lines with B as entry use REALITY
+
+After the multi-transport refactor, transports are configured via the `protocols` envelope on `POST /api/nodes` (creation) or `PUT /api/nodes/{id}` (later). Each Xray-bearing node must pass at least one of `xrayReality` / `xrayWsTls`; both can coexist on the same node if needed.
+
+- **Server A**: WebSocket + TLS **AND** REALITY (dual-transport, exercises the same-node-both-transports code path on every run — not optional).
+  Pass on creation:
+  ```json
+  { "name": "WireMesh-A", "ip": "$A_IP", "domain": "$A_DOMAIN",
+    "protocols": { "xrayWsTls": { "tlsDomain": "$A_DOMAIN", "certMode": "auto" },
+                   "xrayReality": { "realityDest": "www.microsoft.com:443" } } }
+  ```
+  ACME auto-cert provisions a Let's Encrypt certificate on first Agent config sync (requires port 80 accessible on A). The Reality inbound is generated lazily by Phase 4's `DualXray-A-Reality` device.
+- **Server B**: REALITY only.
+  ```json
+  { "name": "WireMesh-B", "ip": "$B_IP",
+    "protocols": { "xrayReality": { "realityDest": "www.microsoft.com:443" } } }
+  ```
+  Reality keypair, shortId, and serverName are auto-generated server-side.
+- **Servers C, D**: REALITY only. The API rejects nodes with no transport (`POST /api/nodes` returns `400 validation.xrayTransportRequired` if `protocols` is omitted or both transports are null) — this is intentional, since any node may later be promoted to entry and the keypair must be seeded up-front.
+  ```json
+  { "name": "WireMesh-C", "ip": "$C_IP",
+    "protocols": { "xrayReality": { "realityDest": "www.microsoft.com:443" } } }
+  ```
+  C and D are exit-only in this test plan, so no `in-line-*-reality` inbound is generated on them — but their `node_protocols` row is seeded so an admin can promote them to entry with a single line edit, no node update needed.
+- **Negative regression probe (run once per Phase 4)**: assert `POST /api/nodes` with `protocols` omitted returns 400, and `PUT /api/nodes/{id}` with both `xrayReality:null` and `xrayWsTls:null` also returns 400.
+- The Phase 6 verification on A must show **two** inbounds for the Split line (`in-line-1-ws-tls` and `in-line-1-reality`) on different ports — this is the canonical proof that the dual-transport-on-one-node code path works end-to-end.
 
 ## Helper Scripts (under `.claude/skills/e2e-test/lib/`)
 
@@ -119,8 +140,8 @@ Test Docker image is built once via `lib/build-image.sh` (content-hashed tag —
 - Log the chosen ports for debugging if later phases fail
 
 ### 4. Platform Data
-- 4 nodes — IPs come from `$A_IP/$B_IP/$C_IP/$D_IP`. Server A also gets `domain: $A_DOMAIN`.
-- After creating A, set it to WS+TLS: `PUT /api/nodes/{A_ID}` with `{"xrayTransport":"ws-tls","xrayTlsDomain":"$A_DOMAIN"}` (see Transport Mode Assignment above)
+- 4 nodes — IPs come from `$A_IP/$B_IP/$C_IP/$D_IP`. Server A also gets `domain: $A_DOMAIN`. Pass `protocols` on the POST per the **Transport Mode Assignment** section above (A → ws-tls, B → reality, C/D → no Xray).
+- (Optional per-node Xray base port override: include top-level `xrayBasePort: 50000` in any node POST/PUT to override the system `xray_default_port` start for that node's lines. Empty / omitted falls back to the system default.)
 - 5 filters:
   - `icanhazip group` (domainRules: `icanhazip.com`) — bound to Split branch-3 (→ D). The Expected Results "icanhazip.com" column is the third tested URL for non-Smart devices; `ifconfig.me` itself is intentionally **un**filtered so it falls through to the default branch.
   - `ip.me group` (domainRules: `ip.me`)
@@ -128,7 +149,8 @@ Test Docker image is built once via `lib/build-image.sh` (content-hashed tag —
   - `overseas services` (domainRules)
   - `China` (sourceUrl: `https://raw.githubusercontent.com/gaoyifan/china-operator-ip/ip-lists/china.txt`, mode: whitelist) — NEW, external IP list covering three major Chinese carriers (~4000+ CIDRs)
 - 7 lines: split-routing (A→B/C/D), direct (A→B), relay (A→B→C), reverse (B→A), single-node (B only, nodeIds=[] for entry=exit), **split-direct (A→B/C/[] — third branch has nodeIds=[] for branch-level direct-exit)**, **shared-relay (A→B→C / A→B→D / A→B — same node B is relay in two branches AND exit in a third, exercising per-branch role resolution)**
-- 16 devices: see Expected Results table (WG + Xray + SOCKS5)
+- 17 devices: see Expected Results table (WG + Xray + SOCKS5). The four-value `protocol` enum is `wireguard | xray-reality | xray-wstls | socks5`. **An Xray device's `protocol` MUST match a transport enabled on its line's entry node** — otherwise POST returns `409 deviceProtocolNotSupported`. In this test plan: lines whose entry is A default to `xray-wstls`, lines whose entry is B use `xray-reality`. WG and SOCKS5 are entry-node-agnostic (lazy-enabled on first device bind).
+- **Dual-transport coverage device**: `DualXray-A-Reality` is an `xray-reality` device on the **Split** line (entry A). Because A is configured with both transports, this device forces the platform to allocate a separate `in-line-1-reality` inbound on a port distinct from the existing `in-line-1-ws-tls`. Phase 6 asserts both inbounds are present.
 
 #### Split-Direct Line Configuration
 Exercises features not covered by other lines: per-branch direct-exit (entry acts as exit for one branch while other branches tunnel out), external `sourceUrl` IP lists, and multi-filter-per-branch union semantics. Also exercises the dual-ipset model (`wm-branch-N-cidr` + `wm-branch-N-dns`) by binding both a `sourceUrl` filter and a `domainRules` filter to the same branch.
@@ -180,15 +202,37 @@ Any match = SOCKS5 listener race regression (`agent/socks5/server.go` lost `SO_R
 
 (Both checks should return zero matches.)
 
+#### Xray Inbound Verification (multi-transport aware)
+After the multi-transport refactor, every (line, transport) on an entry node produces its own inbound, tagged `in-line-{lineId}-{transport}` (`reality` or `ws-tls`). On a node that runs both transports for the same line, expect TWO inbounds on different ports.
+
+```bash
+ssh root@A "cat /etc/wiremesh/xray/config.json | jq '.inbounds[] | {tag, port, network: .streamSettings.network, security: .streamSettings.security}'"
+```
+
 #### WS+TLS Verification (Server A)
-- Check Xray config uses `"network": "ws"` and `"security": "tls"` (not `"tcp"` / `"reality"`)
-- Check TLS cert files exist: `/etc/wiremesh/xray/$A_DOMAIN.crt` and `.key`
+- Inbound tag matches `in-line-{lineId}-ws-tls`
+- `streamSettings.network == "ws"` and `streamSettings.security == "tls"` (NOT `tcp`/`reality`)
+- TLS cert files exist: `/etc/wiremesh/xray/$A_DOMAIN.crt` and `.key`
 - If ACME auto-cert was triggered, check agent logs for `[acme]` entries
-- If cert files are missing (ACME failed because port 80 is blocked), the agent log will show the error. In that case, manually upload a cert via `PUT /api/nodes/{id}` with `xrayTlsCert` and `xrayTlsKey` fields, wait for agent sync, then re-verify.
-- Verify Xray is listening on the configured port with TLS by testing: `curl -s --connect-timeout 5 https://$A_DOMAIN:{xray_port}/ -k` (should get a response or TLS handshake, not connection refused)
+- If cert files are missing (ACME failed because port 80 is blocked), the agent log will show the error. In that case, manually upload a cert via `PUT /api/nodes/{A_ID}` with the new envelope:
+  ```json
+  { "protocols": { "xrayWsTls": { "tlsDomain": "$A_DOMAIN", "certMode": "manual",
+                                   "tlsCert": "<PEM body>", "tlsKey": "<PEM body>" } } }
+  ```
+  Wait for agent sync, then re-verify.
+- Verify Xray is listening on the configured port with TLS by testing: `curl -s --connect-timeout 5 https://$A_DOMAIN:{xray_port}/ -k` (should get a response or TLS handshake, not connection refused). The `xray_port` for this transport comes from the `line_protocols` row for `(lineId, "xray-wstls")`.
 
 #### REALITY Verification (Server B)
-- Check Xray config uses `"network": "tcp"` and `"security": "reality"` (unchanged behavior)
+- Inbound tag matches `in-line-{lineId}-reality`
+- `streamSettings.network == "tcp"` and `streamSettings.security == "reality"` (unchanged behavior)
+- `realitySettings.privateKey`, `serverNames`, `shortIds` populated from `node_protocols.config` JSON
+
+#### Per-(line, protocol) port allocation
+Ports are now per-protocol per-line, allocated lazily on first device of that protocol joining the line. Verify in DB:
+```bash
+sqlite3 data/wiremesh.db "SELECT lp.line_id, lp.protocol, lp.port FROM line_protocols lp ORDER BY lp.line_id, lp.protocol;"
+```
+On a line with both Reality and WS+TLS Xray devices, expect two distinct rows (`xray-reality` and `xray-wstls`) on different ports. SOCKS5 lives at `(lineId, "socks5")`. WireGuard rows have port=NULL (all WG devices share the entry node's `wm-wg0:wg_default_port`).
 
 #### Split-Direct Verification (Server A)
 Verifies the dual-ipset routing model and the per-branch direct-exit plumbing. Run on Server A (entry for this line):
@@ -255,9 +299,11 @@ All containers run on the **local dev machine** (not on remote servers — conta
 <id>	iPhone-WG	wireguard	<direct_id>	ifconfig.me=B,ip.me=B,icanhazip.com=B
 … (rows 3-16 follow the Expected Results table; Smart-WG / Smart-Xray use the 4-column form)
 <id>	Smart-WG	wireguard	<splitdirect_id>	ifconfig.me=B,ip.sb=C,ip.me=A,pconline=A
-<id>	Smart-Xray	xray	<splitdirect_id>	ifconfig.me=B,ip.sb=C,ip.me=A,pconline=A
+<id>	Smart-Xray	xray-wstls	<splitdirect_id>	ifconfig.me=B,ip.sb=C,ip.me=A,pconline=A
 <id>	SharedRelay-WG	wireguard	<sharedrelay_id>	ifconfig.me=C,ip.me=B,icanhazip.com=D
 ```
+
+The `protocol` column (3rd) is the device protocol enum value: `wireguard | xray-reality | xray-wstls | socks5`. Pick `xray-reality` for devices on lines whose entry is B (Reality), `xray-wstls` for entry-A lines (WS+TLS).
 
 **Run all 16 in parallel** (default `-j 8`, ~20 seconds wall-clock):
 ```bash
@@ -283,24 +329,25 @@ The runner already handles the previously-painful edge cases — this list is fo
 
 ## Expected Results
 
-| Device | Protocol | Line | ifconfig.me | ip.sb | ip.me | icanhazip.com | pconline |
-|--------|----------|------|-------------|-------|-------|---------------|----------|
-| MacBook-WG | WG | Split | B | — | C | D | — |
-| iPhone-WG | WG | Direct | B | — | B | B | — |
-| iPad-WG | WG | Relay | C | — | C | C | — |
-| Windows-Xray | Xray | Split | B | — | C | D | — |
-| Android-Xray | Xray | Direct | B | — | B | B | — |
-| Tablet-Xray | Xray | Relay | C | — | C | C | — |
-| Linux-WG | WG | Reverse | A | — | A | A | — |
-| TV-Xray | Xray | Reverse | A | — | A | A | — |
-| Router-SOCKS5 | SOCKS5 | Reverse | A | — | A | A | — |
-| Phone-SOCKS5 | SOCKS5 | Direct | B | — | B | B | — |
-| Laptop-WG | WG | Single-B | B | — | B | B | — |
-| Desktop-SOCKS5 | SOCKS5 | Single-B | B | — | B | B | — |
-| Camera-SOCKS5 | SOCKS5 | Relay | C | — | C | C | — |
-| Smart-WG | WG | Split-Direct | B | C | **A** | — | **A** |
-| Smart-Xray | Xray | Split-Direct | B | C | **A** | — | **A** |
-| SharedRelay-WG | WG | SharedRelay | C | — | **B** | **D** | — |
+| Device | Protocol | Line | Entry | ifconfig.me | ip.sb | ip.me | icanhazip.com | pconline |
+|--------|----------|------|-------|-------------|-------|-------|---------------|----------|
+| MacBook-WG | wireguard | Split | A | B | — | C | D | — |
+| iPhone-WG | wireguard | Direct | A | B | — | B | B | — |
+| iPad-WG | wireguard | Relay | A | C | — | C | C | — |
+| Windows-Xray | xray-wstls | Split | A | B | — | C | D | — |
+| Android-Xray | xray-wstls | Direct | A | B | — | B | B | — |
+| Tablet-Xray | xray-wstls | Relay | A | C | — | C | C | — |
+| Linux-WG | wireguard | Reverse | B | A | — | A | A | — |
+| TV-Xray | xray-reality | Reverse | B | A | — | A | A | — |
+| Router-SOCKS5 | socks5 | Reverse | B | A | — | A | A | — |
+| Phone-SOCKS5 | socks5 | Direct | A | B | — | B | B | — |
+| Laptop-WG | wireguard | Single-B | B | B | — | B | B | — |
+| Desktop-SOCKS5 | socks5 | Single-B | B | B | — | B | B | — |
+| Camera-SOCKS5 | socks5 | Relay | A | C | — | C | C | — |
+| Smart-WG | wireguard | Split-Direct | A | B | C | **A** | — | **A** |
+| Smart-Xray | xray-wstls | Split-Direct | A | B | C | **A** | — | **A** |
+| SharedRelay-WG | wireguard | SharedRelay | A | C | — | **B** | **D** | — |
+| DualXray-A-Reality | xray-reality | Split | A | B | — | C | D | — |
 
 A=47.84.135.129, B=47.236.3.88, C=47.245.89.95, D=47.84.231.26
 
@@ -343,12 +390,13 @@ Distinct from single-node lines: in Split-Direct only **one branch** (branch 3) 
   <smart_wg_id>	Smart-WG	wireguard	<splitdirect_id>	ifconfig.me=B,ip.sb=C,ip.me=A,pconline=A
   <sharedrelay_id>	SharedRelay-WG	wireguard	<sharedrelay_id>	ifconfig.me=C,ip.me=B,icanhazip.com=D
   <new_ad_wg>	New-AD-WG	wireguard	<direct_ad_id>	ifconfig.me=D,ip.me=D,icanhazip.com=D
-  <new_ad_xray>	New-AD-Xray	xray	<direct_ad_id>	ifconfig.me=D,ip.me=D,icanhazip.com=D
+  <new_ad_xray>	New-AD-Xray	xray-wstls	<direct_ad_id>	ifconfig.me=D,ip.me=D,icanhazip.com=D
   <new_ad_socks>	New-AD-SOCKS5	socks5	<direct_ad_id>	ifconfig.me=D,ip.me=D,icanhazip.com=D
   <new_ab2_wg>	New-AB2-WG	wireguard	<direct_ab2_id>	ifconfig.me=B,ip.me=B,icanhazip.com=B
-  <new_ab2_xray>	New-AB2-Xray	xray	<direct_ab2_id>	ifconfig.me=B,ip.me=B,icanhazip.com=B
+  <new_ab2_xray>	New-AB2-Xray	xray-wstls	<direct_ab2_id>	ifconfig.me=B,ip.me=B,icanhazip.com=B
   <new_ab2_socks>	New-AB2-SOCKS5	socks5	<direct_ab2_id>	ifconfig.me=B,ip.me=B,icanhazip.com=B
   ```
+  (Both new lines have entry A → use `xray-wstls` for the Xray devices.)
   Then run `lib/batch-test.sh /tmp/wm-matrix-8b.tsv`. The seven sampled rows cover every line topology (split / direct / relay / reverse / single-node / split-direct / shared-relay) and the six new rows cover the new lines completely. If a regression is line-shaped, one of these seven will catch it.
 
 ### 8c. Delete a Line
@@ -484,12 +532,12 @@ Verify the log entries from 8d.1–8d.5 each include both `nodes=[...]` and `fil
 
 | Device | Protocol | Line | Expected Exit IP |
 |--------|----------|------|-----------------|
-| New-AD-Xray | Xray | Direct-AD | D (47.84.231.26) |
-| New-AD-WG | WG | Direct-AD | D (47.84.231.26) |
-| New-AD-SOCKS5 | SOCKS5 | Direct-AD | D (47.84.231.26) |
-| New-AB2-Xray | Xray | Direct-AB2 | B (47.236.3.88) |
-| New-AB2-WG | WG | Direct-AB2 | B (47.236.3.88) |
-| New-AB2-SOCKS5 | SOCKS5 | Direct-AB2 | B (47.236.3.88) |
+| New-AD-Xray | xray-wstls | Direct-AD | D (47.84.231.26) |
+| New-AD-WG | wireguard | Direct-AD | D (47.84.231.26) |
+| New-AD-SOCKS5 | socks5 | Direct-AD | D (47.84.231.26) |
+| New-AB2-Xray | xray-wstls | Direct-AB2 | B (47.236.3.88) |
+| New-AB2-WG | wireguard | Direct-AB2 | B (47.236.3.88) |
+| New-AB2-SOCKS5 | socks5 | Direct-AB2 | B (47.236.3.88) |
 
 ### Stability Checks
 - Original 16 devices: SOCKS5 proxy URLs must be identical before and after adding lines

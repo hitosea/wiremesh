@@ -20,23 +20,22 @@ func GenerateConfig(cfg *api.XrayConfig) ([]byte, error) {
 	var outbounds []map[string]interface{}
 	var routingRules []map[string]interface{}
 
-	for _, route := range cfg.Routes {
-		if len(route.UUIDs) == 0 || route.Port == 0 {
+	for _, inb := range cfg.Inbounds {
+		if len(inb.UUIDs) == 0 {
 			continue
 		}
+		inboundTag := fmt.Sprintf("in-line-%d-%s", inb.LineID, inb.Transport)
+		outboundTag := fmt.Sprintf("out-line-%d-%s", inb.LineID, inb.Transport)
 
-		inboundTag := fmt.Sprintf("in-line-%d", route.LineID)
-		outboundTag := fmt.Sprintf("out-line-%d", route.LineID)
-
-		// Collect clients for this line
+		// Collect clients for this inbound
 		var clients []map[string]interface{}
-		for _, uuid := range route.UUIDs {
+		for _, uuid := range inb.UUIDs {
 			client := map[string]interface{}{
 				"id":    uuid,
 				"email": uuid,
 				"level": 0,
 			}
-			if cfg.Transport != "ws-tls" {
+			if inb.Transport == "reality" {
 				client["flow"] = "xtls-rprx-vision"
 			}
 			clients = append(clients, client)
@@ -44,21 +43,21 @@ func GenerateConfig(cfg *api.XrayConfig) ([]byte, error) {
 
 		// Build streamSettings based on transport type
 		var streamSettings map[string]interface{}
-		if cfg.Transport == "ws-tls" {
+		if inb.Transport == "ws-tls" {
 			streamSettings = map[string]interface{}{
 				"network":  "ws",
 				"security": "tls",
 				"wsSettings": map[string]interface{}{
-					"path": cfg.WsPath,
+					"path": inb.WsPath,
 				},
 				"tlsSettings": map[string]interface{}{
 					"certificates": []map[string]interface{}{
 						{
-							"certificateFile": fmt.Sprintf("/etc/wiremesh/xray/%s.crt", cfg.TlsDomain),
-							"keyFile":         fmt.Sprintf("/etc/wiremesh/xray/%s.key", cfg.TlsDomain),
+							"certificateFile": fmt.Sprintf("/etc/wiremesh/xray/%s.crt", inb.TlsDomain),
+							"keyFile":         fmt.Sprintf("/etc/wiremesh/xray/%s.key", inb.TlsDomain),
 						},
 					},
-					"serverName": cfg.TlsDomain,
+					"serverName": inb.TlsDomain,
 				},
 			}
 		} else {
@@ -67,21 +66,21 @@ func GenerateConfig(cfg *api.XrayConfig) ([]byte, error) {
 				"security": "reality",
 				"realitySettings": map[string]interface{}{
 					"show":        false,
-					"dest":        cfg.RealityDest,
+					"dest":        inb.RealityDest,
 					"xver":        0,
-					"serverNames": cfg.RealityServerNames,
-					"privateKey":  cfg.RealityPrivateKey,
-					"shortIds":    []string{cfg.RealityShortId},
+					"serverNames": inb.RealityServerNames,
+					"privateKey":  inb.RealityPrivateKey,
+					"shortIds":    []string{inb.RealityShortId},
 				},
 			}
 		}
 
-		// Inbound: VLESS on this line's port, with sniffing
+		// Inbound
 		inbounds = append(inbounds, map[string]interface{}{
 			"tag":      inboundTag,
 			"listen":   "0.0.0.0",
-			"port":     route.Port,
-			"protocol": cfg.Protocol,
+			"port":     inb.Port,
+			"protocol": inb.Protocol,
 			"settings": map[string]interface{}{
 				"clients":    clients,
 				"decryption": "none",
@@ -93,7 +92,7 @@ func GenerateConfig(cfg *api.XrayConfig) ([]byte, error) {
 			"streamSettings": streamSettings,
 		})
 
-		// Outbound: freedom with line-specific fwmark + UseIP for DNS resolution
+		// Outbound
 		outbounds = append(outbounds, map[string]interface{}{
 			"protocol": "freedom",
 			"tag":      outboundTag,
@@ -102,12 +101,12 @@ func GenerateConfig(cfg *api.XrayConfig) ([]byte, error) {
 			},
 			"streamSettings": map[string]interface{}{
 				"sockopt": map[string]interface{}{
-					"mark": route.Mark,
+					"mark": inb.Mark,
 				},
 			},
 		})
 
-		// Routing: inbound tag → outbound tag
+		// Routing rule
 		routingRules = append(routingRules, map[string]interface{}{
 			"type":        "field",
 			"inboundTag":  []string{inboundTag},

@@ -1,16 +1,25 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import type { DeviceProtocol } from "@/lib/protocols";
+
+type PortGroup = { protocol: DeviceProtocol; ports: { lineId: number; port: number }[] };
 
 type NodePorts = {
   wg: number;
-  xray: number[];
   tunnels: number[];
-  socks5: number[];
+  groups: PortGroup[];
 };
 
-export function NodePortsDetail({ ports, xrayTransport }: { ports: NodePorts; xrayTransport?: string | null }) {
+function protocolToKey(p: string): string {
+  if (p === "xray-reality") return "xrayReality";
+  if (p === "xray-wstls") return "xrayWsTls";
+  return p;
+}
+
+export function NodePortsDetail({ ports }: { ports: NodePorts }) {
   const t = useTranslations("nodes");
+  const td = useTranslations("devices.protocol");
 
   return (
     <div className="space-y-3 text-sm">
@@ -20,33 +29,21 @@ export function NodePortsDetail({ ports, xrayTransport }: { ports: NodePorts; xr
           <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{ports.wg}</span>
         </div>
       </div>
-      {ports.xray.length > 0 && (
-        <div>
-          <span className="text-muted-foreground text-xs">
-            {xrayTransport === "ws-tls" ? t("xrayTransportWsTls") : t("portsXray")}
-          </span>
+      {ports.groups.map(g => (
+        <div key={g.protocol}>
+          <span className="text-muted-foreground text-xs">{td(protocolToKey(g.protocol))}</span>
           <div className="flex flex-wrap gap-1.5 mt-1">
-            {ports.xray.map((p) => (
-              <span key={p} className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{p}</span>
+            {g.ports.map(p => (
+              <span key={`${g.protocol}-${p.lineId}`} className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{p.port}</span>
             ))}
           </div>
         </div>
-      )}
+      ))}
       {ports.tunnels.length > 0 && (
         <div>
           <span className="text-muted-foreground text-xs">{t("portsTunnel")}</span>
           <div className="flex flex-wrap gap-1.5 mt-1">
             {ports.tunnels.map((p) => (
-              <span key={p} className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{p}</span>
-            ))}
-          </div>
-        </div>
-      )}
-      {ports.socks5.length > 0 && (
-        <div>
-          <span className="text-muted-foreground text-xs">{t("portsSocks5")}</span>
-          <div className="flex flex-wrap gap-1.5 mt-1">
-            {ports.socks5.map((p) => (
               <span key={p} className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{p}</span>
             ))}
           </div>

@@ -1,10 +1,9 @@
 import { NextRequest } from "next/server";
-import { randomBytes } from "crypto";
+import { randomBytes } from "node:crypto";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "@/lib/db";
-import { nodes, settings, lineTunnels, lineNodes, lines } from "@/lib/db/schema";
-import { success, created, error, paginated } from "@/lib/api-response";
-import { DEFAULT_PROXY_PORT } from "@/lib/proxy-port";
+import { nodes, settings, lineTunnels, lineNodes, lineProtocols } from "@/lib/db/schema";
+import { created, error, paginated } from "@/lib/api-response";
 import packageJson from "../../../../package.json";
 import { parsePaginationParams, paginationOffset } from "@/lib/pagination";
 import { eq, or, like, count, and, inArray, SQL } from "drizzle-orm";
@@ -15,6 +14,7 @@ import { generateRealityKeypair, generateShortId } from "@/lib/reality";
 import { normalizeRealityDest } from "@/lib/reality-dest";
 import { writeAuditLog } from "@/lib/audit-log";
 import { sseManager } from "@/lib/sse-manager";
+import { enableNodeProtocol, getNodeProtocols } from "@/lib/db/protocols";
 
 export async function GET(request: NextRequest) {
   const params = parsePaginationParams(request.nextUrl.searchParams);
@@ -42,10 +42,7 @@ export async function GET(request: NextRequest) {
       port: nodes.port,
       wgPublicKey: nodes.wgPublicKey,
       wgAddress: nodes.wgAddress,
-      xrayProtocol: nodes.xrayProtocol,
-      xrayTransport: nodes.xrayTransport,
-      xrayPort: nodes.xrayPort,
-      xrayConfig: nodes.xrayConfig,
+      xrayBasePort: nodes.xrayBasePort,
       status: nodes.status,
       errorMessage: nodes.errorMessage,
       remark: nodes.remark,
@@ -112,34 +109,50 @@ export async function GET(request: NextRequest) {
   // Find all entry line IDs for batch proxy port query
   const allEntryLineIds = [...new Set(entryLineRows.map((r) => r.lineId))];
 
-  // Batch query proxy ports from lines
-  const linePortRows = allEntryLineIds.length > 0
-    ? db.select({ id: lines.id, xrayPort: lines.xrayPort, socks5Port: lines.socks5Port })
-        .from(lines).where(inArray(lines.id, allEntryLineIds)).all()
+  // Batch query proxy ports from line_protocols
+  const lineProtocolRows = allEntryLineIds.length > 0
+    ? db.select({ lineId: lineProtocols.lineId, protocol: lineProtocols.protocol, port: lineProtocols.port })
+        .from(lineProtocols)
+        .where(inArray(lineProtocols.lineId, allEntryLineIds))
+        .all()
     : [];
-  const linePortMap = new Map(linePortRows.map((r) => [r.id, r]));
+
+  // Map lineId -> { protocol, port }[] for per-protocol port groups
+  const linePortMap = new Map<number, { protocol: string; port: number }[]>();
+  for (const row of lineProtocolRows) {
+    if (row.port === null || row.port === undefined) continue; // wireguard rows have null ports
+    const list = linePortMap.get(row.lineId) ?? [];
+    list.push({ protocol: row.protocol, port: row.port });
+    linePortMap.set(row.lineId, list);
+  }
 
   // Build ports for each node
   const rowsWithPorts = rows.map((row) => {
     const tunnels = [...(tunnelPortMap.get(row.id) ?? [])].sort((a, b) => a - b);
     const nodeEntryLines = entryLineMap.get(row.id) ?? [];
 
-    // Read persisted proxy ports from lines table
-    const xrayPorts: number[] = [];
-    const socks5Ports: number[] = [];
+    // Aggregate per-protocol port lists across all entry lines for this node
+    const byProtocol = new Map<string, { lineId: number; port: number }[]>();
     for (const lid of nodeEntryLines.sort((a, b) => a - b)) {
-      const lp = linePortMap.get(lid);
-      if (lp?.xrayPort !== null && lp?.xrayPort !== undefined) xrayPorts.push(lp.xrayPort);
-      if (lp?.socks5Port !== null && lp?.socks5Port !== undefined) socks5Ports.push(lp.socks5Port);
+      const entries = linePortMap.get(lid) ?? [];
+      for (const { protocol, port } of entries) {
+        const list = byProtocol.get(protocol) ?? [];
+        list.push({ lineId: lid, port });
+        byProtocol.set(protocol, list);
+      }
     }
+
+    const groups = Array.from(byProtocol.entries()).map(([protocol, ports]) => ({
+      protocol,
+      ports: ports.sort((a, b) => a.port - b.port),
+    }));
 
     return {
       ...row,
       ports: {
         wg: row.port,
-        xray: xrayPorts,
         tunnels,
-        socks5: socks5Ports,
+        groups,
       },
     };
   });
@@ -154,28 +167,35 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const {
-    name,
-    ip,
-    domain,
-    port,
-    xrayPort,
-    externalInterface,
-    remark,
-    xrayTransport,
-    xrayTlsDomain,
-    xrayTlsCert,
-    xrayTlsKey,
-  } = body;
+    name, ip, domain, port,
+    externalInterface, remark,
+    protocols,
+  } = body as {
+    name: string; ip: string; domain?: string; port?: number;
+    externalInterface?: string; remark?: string;
+    protocols?: {
+      xrayReality?: { realityDest?: string };
+      xrayWsTls?: { tlsDomain: string; certMode: "auto" | "manual"; tlsCert?: string; tlsKey?: string };
+    };
+  };
+
+  const xrayBasePort = body.xrayBasePort != null && body.xrayBasePort !== ""
+    ? parseInt(String(body.xrayBasePort), 10)
+    : null;
+  if (xrayBasePort != null && (!Number.isFinite(xrayBasePort) || xrayBasePort < 1 || xrayBasePort > 65535)) {
+    return error("VALIDATION_ERROR", "validation.xrayBasePortInvalid");
+  }
 
   if (!name || !ip) {
     return error("VALIDATION_ERROR", "validation.nameAndIpRequired");
   }
 
-  const transport: "reality" | "ws-tls" =
-    xrayTransport === "ws-tls" ? "ws-tls" : "reality";
-  const normalizedTlsDomain = String(xrayTlsDomain ?? "").trim();
-
-  if (transport === "ws-tls" && !normalizedTlsDomain) {
+  const reality = protocols?.xrayReality;
+  const wsTls = protocols?.xrayWsTls;
+  if (!reality && !wsTls) {
+    return error("VALIDATION_ERROR", "validation.xrayTransportRequired");
+  }
+  if (wsTls && !wsTls.tlsDomain?.trim()) {
     return error("VALIDATION_ERROR", "validation.wsTlsDomainRequired");
   }
 
@@ -217,63 +237,66 @@ export async function POST(request: NextRequest) {
   // Generate agent token
   const agentToken = uuidv4();
 
-  // Always generate Reality keypair
-  const realityKeys = generateRealityKeypair();
-  const shortId = generateShortId();
-  const { realityDest, realityServerName } = normalizeRealityDest(body.realityDest);
-  const resolvedXrayConfig = JSON.stringify({
-    realityPrivateKey: encrypt(realityKeys.privateKey),
-    realityPublicKey: realityKeys.publicKey,
-    realityShortId: shortId,
-    realityDest,
-    realityServerName,
+  // Insert node + protocol rows atomically so a failed protocol write never
+  // leaves an orphaned node row in the DB.
+  const result = db.transaction((tx) => {
+    const inserted = tx
+      .insert(nodes)
+      .values({
+        name,
+        ip,
+        domain: domain ?? null,
+        port: resolvedPort,
+        agentToken,
+        wgPrivateKey: encryptedPrivateKey,
+        wgPublicKey: publicKey,
+        wgAddress,
+        xrayBasePort: xrayBasePort ?? null,
+        externalInterface: externalInterface ?? "eth0",
+        remark: remark ?? null,
+      })
+      .returning({
+        id: nodes.id,
+        name: nodes.name,
+        ip: nodes.ip,
+        domain: nodes.domain,
+        port: nodes.port,
+        agentToken: nodes.agentToken,
+        wgPublicKey: nodes.wgPublicKey,
+        wgAddress: nodes.wgAddress,
+        externalInterface: nodes.externalInterface,
+        status: nodes.status,
+        remark: nodes.remark,
+        createdAt: nodes.createdAt,
+        updatedAt: nodes.updatedAt,
+      })
+      .get();
+
+    // Persist protocol configurations into node_protocols
+    if (reality) {
+      const kp = generateRealityKeypair();
+      const shortId = generateShortId();
+      const { realityDest, realityServerName } = normalizeRealityDest(reality.realityDest);
+      enableNodeProtocol(tx, inserted.id, "xray-reality", {
+        realityPrivateKey: encrypt(kp.privateKey),
+        realityPublicKey: kp.publicKey,
+        realityShortId: shortId,
+        realityDest,
+        realityServerName,
+      });
+    }
+    if (wsTls) {
+      enableNodeProtocol(tx, inserted.id, "xray-wstls", {
+        wsPath: "/" + randomBytes(4).toString("hex"),
+        tlsDomain: wsTls.tlsDomain.trim(),
+        certMode: wsTls.certMode,
+        tlsCert: wsTls.certMode === "manual" ? wsTls.tlsCert ?? null : null,
+        tlsKey: wsTls.certMode === "manual" && wsTls.tlsKey ? encrypt(wsTls.tlsKey) : null,
+      });
+    }
+
+    return inserted;
   });
-
-  const xrayWsPath = "/" + randomBytes(4).toString("hex");
-
-  const result = db
-    .insert(nodes)
-    .values({
-      name,
-      ip,
-      domain: domain ?? null,
-      port: resolvedPort,
-      agentToken,
-      wgPrivateKey: encryptedPrivateKey,
-      wgPublicKey: publicKey,
-      wgAddress,
-      xrayProtocol: "vless",
-      xrayTransport: transport,
-      xrayWsPath,
-      xrayTlsDomain: transport === "ws-tls" ? normalizedTlsDomain : null,
-      xrayTlsCert: transport === "ws-tls" && xrayTlsCert ? xrayTlsCert : null,
-      xrayTlsKey:
-        transport === "ws-tls" && xrayTlsKey ? encrypt(xrayTlsKey) : null,
-      xrayPort: xrayPort ?? parseInt(settingsMap["xray_default_port"] ?? String(DEFAULT_PROXY_PORT)),
-      xrayConfig: resolvedXrayConfig,
-      externalInterface: externalInterface ?? "eth0",
-      remark: remark ?? null,
-    })
-    .returning({
-      id: nodes.id,
-      name: nodes.name,
-      ip: nodes.ip,
-      domain: nodes.domain,
-      port: nodes.port,
-      agentToken: nodes.agentToken,
-      wgPublicKey: nodes.wgPublicKey,
-      wgAddress: nodes.wgAddress,
-      xrayProtocol: nodes.xrayProtocol,
-      xrayTransport: nodes.xrayTransport,
-      xrayPort: nodes.xrayPort,
-      xrayConfig: nodes.xrayConfig,
-      externalInterface: nodes.externalInterface,
-      status: nodes.status,
-      remark: nodes.remark,
-      createdAt: nodes.createdAt,
-      updatedAt: nodes.updatedAt,
-    })
-    .get();
 
   writeAuditLog({
     action: "create",
@@ -287,5 +310,30 @@ export async function POST(request: NextRequest) {
   // new node. The new node hasn't connected yet, so excluding it is fine.
   sseManager.notifyAllConfigUpdate(result.id);
 
-  return created(result);
+  // Build protocols response (omit private keys)
+  const npRows = getNodeProtocols(db, result.id);
+  const protocolsResp: { xrayReality: object | null; xrayWsTls: object | null } = {
+    xrayReality: null,
+    xrayWsTls: null,
+  };
+  for (const row of npRows) {
+    const cfg = JSON.parse(row.config);
+    if (row.protocol === "xray-reality") {
+      protocolsResp.xrayReality = {
+        realityDest: cfg.realityDest,
+        realityPublicKey: cfg.realityPublicKey,
+        realityShortId: cfg.realityShortId,
+        realityServerName: cfg.realityServerName,
+      };
+    } else if (row.protocol === "xray-wstls") {
+      protocolsResp.xrayWsTls = {
+        tlsDomain: cfg.tlsDomain,
+        certMode: cfg.certMode,
+        wsPath: cfg.wsPath,
+        hasCert: !!cfg.tlsCert,
+      };
+    }
+  }
+
+  return created({ ...result, protocols: protocolsResp });
 }

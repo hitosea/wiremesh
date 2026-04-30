@@ -152,7 +152,15 @@
     "upgradeConfirmMessage": "Current: {current}, Latest: {latest}. Confirm upgrade?",
     "confirmDeleteNode": "This will remotely uninstall all WireMesh components on the node. Are you sure?",
     "deleteOfflinePending": "Node is offline. It will be uninstalled when it comes back online.",
-    "xrayTransport": "Transport",
+    "xrayProtocols": {
+      "title": "Transports",
+      "addReality": "Add Reality",
+      "addWsTls": "Add WebSocket+TLS",
+      "removeTooltip": "Remove this transport",
+      "lastTransportTooltip": "At least one transport must remain",
+      "realityTabLabel": "Reality",
+      "wsTlsTabLabel": "WebSocket+TLS"
+    },
     "xrayTransportReality": "REALITY",
     "xrayTransportWsTls": "WebSocket + TLS",
     "tlsDomain": "TLS Domain",
@@ -166,7 +174,9 @@
     "tlsKey": "TLS Private Key",
     "tlsKeyHint": "Paste PEM format private key",
     "wsPath": "WebSocket Path",
-    "wsPathHint": "Auto-generated, read-only"
+    "wsPathHint": "Auto-generated, read-only",
+    "addReality": "Add Reality",
+    "addWsTls": "Add WebSocket+TLS"
   },
   "nodeNew": {
     "title": "Add Node",
@@ -186,7 +196,7 @@
     "notesPlaceholder": "Notes",
     "xraySettings": "Xray / SOCKS5 Settings",
     "xrayStartPort": "Proxy Base Port",
-    "xrayPortHint": "Each line gets a unique port (e.g., {port0}, {port1}, {port2}...). Xray and SOCKS5 share the same port pool. Ensure your firewall allows these ports.",
+    "xrayPortHint": "Leave empty to use the system default; set to override this node's port start",
     "externalInterface": "External Interface",
     "externalInterfaceHint": "Network interface for external traffic, default eth0 (e.g., ens3, bond0)",
     "realityTarget": "Reality Target",
@@ -203,7 +213,10 @@
     "tunnelPortBlacklist": "Tunnel port blacklist",
     "tunnelPortBlacklistHint": "Ports added here will be skipped by the tunnel port allocator.",
     "addPort": "Add port",
-    "invalidPort": "Port must be an integer between 1 and 65535"
+    "invalidPort": "Port must be an integer between 1 and 65535",
+    "xrayTransportInUseTitle": "Transport in use",
+    "xrayTransportInUseDescription": "The following devices are using the \"{transport}\" transport. Please unbind or migrate them first:",
+    "inLine": "line {id}"
   },
   "nodeScript": {
     "loadNodeFailed": "Failed to load node info",
@@ -236,6 +249,8 @@
     "protocol": {
       "wireguard": "WireGuard",
       "xray": "Xray",
+      "xrayReality": "VLESS REALITY",
+      "xrayWsTls": "VLESS WebSocket+TLS",
       "socks5": "SOCKS5"
     },
     "loadFailed": "Failed to load devices",
@@ -274,6 +289,10 @@
     "deviceNamePlaceholder": "e.g., My Laptop",
     "protocolType": "Protocol",
     "selectProtocol": "Select Protocol",
+    "protocol": {
+      "xrayReality": "Xray Reality",
+      "xrayWsTls": "Xray WebSocket+TLS"
+    },
     "line": "Line",
     "loadingLines": "Loading lines...",
     "noLines": "No lines yet, please",
@@ -760,7 +779,11 @@
       "passwordMinLength": "Password must be at least 6 characters",
       "nameRequired": "Name is required",
       "nameAndIpRequired": "Name and IP are required",
-      "protocolInvalid": "Protocol must be wireguard or xray",
+      "protocolInvalid": "Protocol must be one of wireguard / xray-reality / xray-wstls / socks5",
+      "xrayTransportInUse": "Devices depend on this transport; remove them first",
+      "xrayTransportRequired": "Node must keep at least one Xray transport",
+      "deviceProtocolNotSupported": "Entry node of selected line does not support this protocol",
+      "lineHasNoEntryNode": "Line has no entry node",
       "usernameAndPasswordRequired": "Username and password are required",
       "currentAndNewPasswordRequired": "Current and new password are required",
       "newPasswordMinLength": "New password must be at least 6 characters",

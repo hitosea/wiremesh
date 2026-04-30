@@ -1,16 +1,23 @@
 import { NextRequest } from "next/server";
-import { randomBytes } from "crypto";
+import { randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
-import { nodes } from "@/lib/db/schema";
+import { nodes, lineNodes, devices } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
 import { eq, ne, and } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
-import { encrypt, decrypt } from "@/lib/crypto";
+import { encrypt } from "@/lib/crypto";
 import { generateRealityKeypair, generateShortId } from "@/lib/reality";
 import { normalizeRealityDest } from "@/lib/reality-dest";
 import { sseManager } from "@/lib/sse-manager";
 import { getNodePorts } from "@/lib/node-ports";
 import { deleteSource as deleteLatencySource } from "@/lib/node-latency-matrix";
+import {
+  getNodeProtocols,
+  enableNodeProtocol,
+  setNodeProtocolConfig,
+  disableNodeProtocol,
+  releaseLineProtocol,
+} from "@/lib/db/protocols";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -26,17 +33,10 @@ export async function GET(request: NextRequest, { params }: Params) {
       ip: nodes.ip,
       domain: nodes.domain,
       port: nodes.port,
+      xrayBasePort: nodes.xrayBasePort,
       agentToken: nodes.agentToken,
       wgPublicKey: nodes.wgPublicKey,
       wgAddress: nodes.wgAddress,
-      xrayProtocol: nodes.xrayProtocol,
-      xrayTransport: nodes.xrayTransport,
-      xrayPort: nodes.xrayPort,
-      xrayConfig: nodes.xrayConfig,
-      xrayWsPath: nodes.xrayWsPath,
-      xrayTlsDomain: nodes.xrayTlsDomain,
-      xrayTlsCert: nodes.xrayTlsCert,
-      xrayTlsKey: nodes.xrayTlsKey,
       status: nodes.status,
       errorMessage: nodes.errorMessage,
       remark: nodes.remark,
@@ -54,17 +54,30 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   if (!node) return error("NOT_FOUND", "notFound.node");
 
-  let xrayTlsKey: string | null = null;
-  if (node.xrayTlsKey) {
-    try {
-      xrayTlsKey = decrypt(node.xrayTlsKey);
-    } catch (e) {
-      console.warn(`[nodes/${nodeId}] Failed to decrypt xrayTlsKey:`, e);
-    }
-  }
+  const npRows = getNodeProtocols(db, nodeId);
+  const np = Object.fromEntries(npRows.map(r => [r.protocol, JSON.parse(r.config)]));
+
+  const protocols = {
+    xrayReality: np["xray-reality"]
+      ? {
+          realityDest:       np["xray-reality"].realityDest,
+          realityPublicKey:  np["xray-reality"].realityPublicKey,
+          realityShortId:    np["xray-reality"].realityShortId,
+          realityServerName: np["xray-reality"].realityServerName,
+        }
+      : null,
+    xrayWsTls: np["xray-wstls"]
+      ? {
+          tlsDomain: np["xray-wstls"].tlsDomain,
+          certMode:  np["xray-wstls"].certMode,
+          wsPath:    np["xray-wstls"].wsPath,
+          hasCert:   !!np["xray-wstls"].tlsCert,
+        }
+      : null,
+  };
 
   const ports = getNodePorts(node.id, node.port);
-  return success({ ...node, xrayTlsKey, ports });
+  return success({ ...node, protocols, ports });
 }
 
 export async function PUT(request: NextRequest, { params }: Params) {
@@ -78,9 +91,6 @@ export async function PUT(request: NextRequest, { params }: Params) {
       name: nodes.name,
       ip: nodes.ip,
       domain: nodes.domain,
-      xrayWsPath: nodes.xrayWsPath,
-      xrayTlsDomain: nodes.xrayTlsDomain,
-      xrayTransport: nodes.xrayTransport,
     })
     .from(nodes)
     .where(eq(nodes.id, nodeId))
@@ -93,13 +103,24 @@ export async function PUT(request: NextRequest, { params }: Params) {
     ip,
     domain,
     port,
-    xrayProtocol,
-    xrayTransport,
-    xrayPort,
     externalInterface,
     remark,
     tunnelPortBlacklist,
   } = body;
+
+  // xrayBasePort: null = clear override; undefined = no change; number = set override
+  let xrayBasePort: number | null | undefined = undefined;
+  if (body.xrayBasePort !== undefined) {
+    if (body.xrayBasePort === null || body.xrayBasePort === "") {
+      xrayBasePort = null;
+    } else {
+      const parsed = parseInt(String(body.xrayBasePort), 10);
+      if (!Number.isFinite(parsed) || parsed < 1 || parsed > 65535) {
+        return error("VALIDATION_ERROR", "validation.xrayBasePortInvalid");
+      }
+      xrayBasePort = parsed;
+    }
+  }
 
   // Check IP uniqueness if changed (exclude soft-deleted nodes)
   if (ip) {
@@ -111,6 +132,77 @@ export async function PUT(request: NextRequest, { params }: Params) {
     if (ipConflict) return error("CONFLICT", "conflict.ipExists");
   }
 
+  // --- Protocol handling ---
+
+  const currentProtocols = getNodeProtocols(db, nodeId);
+  const hasReality = currentProtocols.some(p => p.protocol === "xray-reality");
+  const hasWsTls   = currentProtocols.some(p => p.protocol === "xray-wstls");
+
+  // Request body shape:
+  //   protocols?: {
+  //     xrayReality?: { realityDest?: string } | null,
+  //     xrayWsTls?:   { tlsDomain: string, certMode: "auto"|"manual", tlsCert?: string, tlsKey?: string } | null,
+  //   }
+  //
+  // Semantics: undefined = "no change"; null = "disable"; object = "enable or update".
+  const reqProtocols = body.protocols as
+    | { xrayReality?: { realityDest?: string } | null;
+        xrayWsTls?:   { tlsDomain: string; certMode: "auto" | "manual"; tlsCert?: string; tlsKey?: string } | null }
+    | undefined;
+
+  const reqReality = reqProtocols?.xrayReality;
+  const reqWsTls   = reqProtocols?.xrayWsTls;
+
+  // Validate "at least one Xray transport remains" (only when protocols are being changed)
+  if (reqProtocols !== undefined) {
+    const willHaveReality = reqReality === null ? false : (reqReality !== undefined ? true : hasReality);
+    const willHaveWsTls   = reqWsTls   === null ? false : (reqWsTls   !== undefined ? true : hasWsTls);
+    if (!willHaveReality && !willHaveWsTls) {
+      return error("VALIDATION_ERROR", "validation.xrayTransportRequired");
+    }
+  }
+
+  // Validate WS+TLS domain when enabling
+  if (reqWsTls && !hasWsTls && !reqWsTls.tlsDomain?.trim()) {
+    return error("VALIDATION_ERROR", "validation.wsTlsDomainRequired");
+  }
+
+  // Helper: find devices that depend on a transport on lines where this node is entry
+  function findBlockingDevices(deviceProtocol: "xray-reality" | "xray-wstls") {
+    return db.select({
+      id: devices.id, name: devices.name, lineId: devices.lineId,
+    }).from(devices)
+      .innerJoin(lineNodes, eq(lineNodes.lineId, devices.lineId))
+      .where(and(
+        eq(devices.protocol, deviceProtocol),
+        eq(lineNodes.nodeId, nodeId),
+        eq(lineNodes.role, "entry"),
+      ))
+      .all();
+  }
+
+  // Helper: list all line ids where this node is the entry
+  function entryLineIds() {
+    return db.select({ id: lineNodes.lineId }).from(lineNodes)
+      .where(and(eq(lineNodes.nodeId, nodeId), eq(lineNodes.role, "entry")))
+      .all();
+  }
+
+  // Cascade checks before entering transaction
+  if (reqReality === null && hasReality) {
+    const blockers = findBlockingDevices("xray-reality");
+    if (blockers.length > 0) {
+      return error("CONFLICT", "validation.xrayTransportInUse", { transport: "reality" }, { devices: blockers });
+    }
+  }
+  if (reqWsTls === null && hasWsTls) {
+    const blockers = findBlockingDevices("xray-wstls");
+    if (blockers.length > 0) {
+      return error("CONFLICT", "validation.xrayTransportInUse", { transport: "ws-tls" }, { devices: blockers });
+    }
+  }
+
+  // --- Build non-xray updateData ---
   const updateData: Partial<typeof nodes.$inferInsert> = {
     updatedAt: new Date().toISOString(),
   };
@@ -118,76 +210,12 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (ip !== undefined) updateData.ip = ip;
   if (domain !== undefined) updateData.domain = domain;
   if (port !== undefined) updateData.port = port;
-  if (xrayProtocol !== undefined) updateData.xrayProtocol = xrayProtocol;
-  if (xrayTransport !== undefined) updateData.xrayTransport = xrayTransport;
-  if (xrayPort !== undefined) updateData.xrayPort = xrayPort;
   if (externalInterface !== undefined) updateData.externalInterface = externalInterface;
   if (remark !== undefined) updateData.remark = remark;
   if (tunnelPortBlacklist !== undefined) updateData.tunnelPortBlacklist = tunnelPortBlacklist;
+  if (xrayBasePort !== undefined) updateData.xrayBasePort = xrayBasePort;
 
-  // Auto-generate Reality keys if missing (legacy data), or update dest if provided
-  {
-    const currentNode = db.select({ xrayConfig: nodes.xrayConfig }).from(nodes).where(eq(nodes.id, nodeId)).get();
-    let hasKeys = false;
-    if (currentNode?.xrayConfig) {
-      try {
-        const parsed = JSON.parse(currentNode.xrayConfig);
-        if (parsed.realityPublicKey) hasKeys = true;
-      } catch (e) {
-        console.warn(`[nodes/${nodeId}] Failed to parse xrayConfig:`, e);
-      }
-    }
-    if (!hasKeys) {
-      // Legacy node without Reality keys — auto-generate
-      const realityKeys = generateRealityKeypair();
-      const shortId = generateShortId();
-      const { realityDest, realityServerName } = normalizeRealityDest(body.realityDest);
-      updateData.xrayConfig = JSON.stringify({
-        realityPrivateKey: encrypt(realityKeys.privateKey),
-        realityPublicKey: realityKeys.publicKey,
-        realityShortId: shortId,
-        realityDest,
-        realityServerName,
-      });
-      updateData.xrayProtocol = "vless";
-      updateData.xrayTransport = "tcp";
-    } else if (body.realityDest !== undefined) {
-      // Update dest/serverName without regenerating keys
-      const parsed = JSON.parse(currentNode!.xrayConfig!);
-      const normalized = normalizeRealityDest(body.realityDest);
-      parsed.realityDest = normalized.realityDest;
-      parsed.realityServerName = normalized.realityServerName;
-      updateData.xrayConfig = JSON.stringify(parsed);
-    }
-  }
-
-  // Handle WS+TLS fields
-  if (body.xrayTransport !== undefined) {
-    updateData.xrayTransport = body.xrayTransport;
-  }
-  if (body.xrayTlsDomain !== undefined) {
-    updateData.xrayTlsDomain = body.xrayTlsDomain || null;
-  }
-  if (body.xrayTlsCert !== undefined) {
-    updateData.xrayTlsCert = body.xrayTlsCert || null;
-  }
-  if (body.xrayTlsKey !== undefined) {
-    updateData.xrayTlsKey = body.xrayTlsKey ? encrypt(body.xrayTlsKey) : null;
-  }
-
-  // Validate: ws-tls requires a domain
-  if (updateData.xrayTransport === "ws-tls") {
-    const domain = body.xrayTlsDomain ?? existing?.xrayTlsDomain;
-    if (!domain) {
-      return error("VALIDATION_ERROR", "validation.wsTlsDomainRequired");
-    }
-  }
-
-  // Auto-generate xrayWsPath when switching to ws-tls and node has none
-  if (updateData.xrayTransport === "ws-tls" && !existing?.xrayWsPath) {
-    updateData.xrayWsPath = "/" + randomBytes(4).toString("hex");
-  }
-
+  // --- Apply non-xray update ---
   const updated = db
     .update(nodes)
     .set(updateData)
@@ -201,10 +229,6 @@ export async function PUT(request: NextRequest, { params }: Params) {
       agentToken: nodes.agentToken,
       wgPublicKey: nodes.wgPublicKey,
       wgAddress: nodes.wgAddress,
-      xrayProtocol: nodes.xrayProtocol,
-      xrayTransport: nodes.xrayTransport,
-      xrayPort: nodes.xrayPort,
-      xrayConfig: nodes.xrayConfig,
       status: nodes.status,
       errorMessage: nodes.errorMessage,
       remark: nodes.remark,
@@ -212,6 +236,73 @@ export async function PUT(request: NextRequest, { params }: Params) {
       updatedAt: nodes.updatedAt,
     })
     .get();
+
+  // --- Protocol mutations (in transaction) ---
+  if (reqProtocols !== undefined) {
+    db.transaction((tx) => {
+      // Disable Reality
+      if (reqReality === null && hasReality) {
+        for (const { id: lid } of entryLineIds()) releaseLineProtocol(tx, lid, "xray-reality");
+        disableNodeProtocol(tx, nodeId, "xray-reality");
+      }
+
+      // Disable WS+TLS
+      if (reqWsTls === null && hasWsTls) {
+        for (const { id: lid } of entryLineIds()) releaseLineProtocol(tx, lid, "xray-wstls");
+        disableNodeProtocol(tx, nodeId, "xray-wstls");
+      }
+
+      // Enable Reality (was off, now on)
+      if (reqReality && !hasReality) {
+        const kp = generateRealityKeypair();
+        const shortId = generateShortId();
+        const { realityDest, realityServerName } = normalizeRealityDest(reqReality.realityDest);
+        enableNodeProtocol(tx, nodeId, "xray-reality", {
+          realityPrivateKey: encrypt(kp.privateKey),
+          realityPublicKey: kp.publicKey,
+          realityShortId: shortId,
+          realityDest,
+          realityServerName,
+        });
+      }
+
+      // Modify Reality (was on, still on)
+      if (reqReality && hasReality) {
+        const cur = JSON.parse(currentProtocols.find(p => p.protocol === "xray-reality")!.config);
+        if (reqReality.realityDest !== undefined && reqReality.realityDest !== cur.realityDest) {
+          const { realityDest, realityServerName } = normalizeRealityDest(reqReality.realityDest);
+          setNodeProtocolConfig(tx, nodeId, "xray-reality", {
+            ...cur, realityDest, realityServerName,
+          });
+        }
+      }
+
+      // Enable WS+TLS (was off, now on)
+      if (reqWsTls && !hasWsTls) {
+        enableNodeProtocol(tx, nodeId, "xray-wstls", {
+          wsPath: "/" + randomBytes(4).toString("hex"),
+          tlsDomain: reqWsTls.tlsDomain.trim(),
+          certMode: reqWsTls.certMode,
+          tlsCert: reqWsTls.certMode === "manual" ? (reqWsTls.tlsCert ?? null) : null,
+          tlsKey:  reqWsTls.certMode === "manual" && reqWsTls.tlsKey ? encrypt(reqWsTls.tlsKey) : null,
+        });
+      }
+
+      // Modify WS+TLS (was on, still on)
+      if (reqWsTls && hasWsTls) {
+        const cur = JSON.parse(currentProtocols.find(p => p.protocol === "xray-wstls")!.config);
+        setNodeProtocolConfig(tx, nodeId, "xray-wstls", {
+          ...cur,
+          tlsDomain: reqWsTls.tlsDomain.trim(),
+          certMode:  reqWsTls.certMode,
+          tlsCert:   reqWsTls.certMode === "manual" ? (reqWsTls.tlsCert ?? cur.tlsCert) : null,
+          tlsKey:    reqWsTls.certMode === "manual"
+                       ? (reqWsTls.tlsKey ? encrypt(reqWsTls.tlsKey) : cur.tlsKey)
+                       : null,
+        });
+      }
+    });
+  }
 
   writeAuditLog({
     action: "update",

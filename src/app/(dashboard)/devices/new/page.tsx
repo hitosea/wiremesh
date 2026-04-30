@@ -24,6 +24,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Link from "next/link";
+import { Loader2 } from "lucide-react";
+import type { DeviceProtocol } from "@/lib/protocols";
 
 type LineOption = { id: number; name: string };
 
@@ -35,7 +37,7 @@ export default function NewDevicePage() {
   const [submitting, setSubmitting] = useState(false);
 
   const [name, setName] = useState("");
-  const [protocol, setProtocol] = useState<"wireguard" | "xray" | "socks5">("wireguard");
+  const [protocol, setProtocol] = useState<DeviceProtocol>("wireguard");
   const [lineId, setLineId] = useState<string>("");
   const [remark, setRemark] = useState("");
 
@@ -43,12 +45,19 @@ export default function NewDevicePage() {
   const [linesLoading, setLinesLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/lines?page=1&pageSize=100")
+    setLinesLoading(true);
+    const url = `/api/lines?page=1&pageSize=100&supportsProtocol=${encodeURIComponent(protocol)}`;
+    fetch(url)
       .then((res) => res.json())
-      .then((json) => setLineOptions((json.data ?? []).map((l: LineOption) => ({ id: l.id, name: l.name }))))
+      .then((json) => {
+        const opts = (json.data ?? []).map((l: LineOption) => ({ id: l.id, name: l.name }));
+        setLineOptions(opts);
+        // Drop the current selection if the protocol change made it invalid.
+        setLineId((prev) => (prev && !opts.some((o: LineOption) => String(o.id) === prev) ? "" : prev));
+      })
       .catch(() => {})
       .finally(() => setLinesLoading(false));
-  }, []);
+  }, [protocol]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,40 +131,52 @@ export default function NewDevicePage() {
               </Label>
               <Select
                 value={protocol}
-                onValueChange={(v) => setProtocol(v as "wireguard" | "xray" | "socks5")}
+                onValueChange={(v) => setProtocol(v as DeviceProtocol)}
               >
                 <SelectTrigger id="protocol">
                   <SelectValue placeholder={t("selectProtocol")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="wireguard">WireGuard</SelectItem>
-                  <SelectItem value="xray">Xray</SelectItem>
+                  <SelectItem value="xray-reality">{t("protocol.xrayReality")}</SelectItem>
+                  <SelectItem value="xray-wstls">{t("protocol.xrayWsTls")}</SelectItem>
                   <SelectItem value="socks5">SOCKS5</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="lineId">{t("line")}</Label>
-              {linesLoading ? (
-                <p className="text-sm text-muted-foreground">{t("loadingLines")}</p>
-              ) : lineOptions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  {t("noLines")}<Link href="/lines/new" className="text-primary hover:underline">{t("createLine")}</Link>
+              <div className="flex">
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={lineId}
+                    onValueChange={setLineId}
+                    disabled={linesLoading || lineOptions.length === 0}
+                  >
+                    <SelectTrigger id="lineId" className="flex-1">
+                      <SelectValue
+                        placeholder={linesLoading ? t("loadingLines") : t("selectLine")}
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">{t("noLine")}</SelectItem>
+                      {lineOptions.map((l) => (
+                        <SelectItem key={l.id} value={String(l.id)}>
+                          {l.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {linesLoading && (
+                    <Loader2 className="size-4 animate-spin text-muted-foreground shrink-0" />
+                  )}
+                </div>
+              </div>
+              {!linesLoading && lineOptions.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {t("noLines")}
+                  <Link href="/lines/new" className="text-primary hover:underline">{t("createLine")}</Link>
                 </p>
-              ) : (
-                <Select value={lineId} onValueChange={setLineId}>
-                  <SelectTrigger id="lineId">
-                    <SelectValue placeholder={t("selectLine")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">{t("noLine")}</SelectItem>
-                    {lineOptions.map((l) => (
-                      <SelectItem key={l.id} value={String(l.id)}>
-                        {l.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               )}
             </div>
             <div className="space-y-2">

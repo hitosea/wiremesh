@@ -1,4 +1,5 @@
 import type { DeviceContext } from "./types";
+import { isXrayProtocol } from "@/lib/protocols";
 import {
   buildVlessUri,
   buildSocks5Uri,
@@ -16,7 +17,7 @@ import {
  */
 export function buildV2RayUri(ctx: DeviceContext): string | null {
   if (ctx.protocol === "wireguard") return buildWireguardShadowrocketUri(ctx);
-  if (ctx.protocol === "xray") return buildVlessUri(ctx);
+  if (isXrayProtocol(ctx.protocol)) return buildVlessUri(ctx);
   if (ctx.protocol === "socks5") return buildSocks5Uri(ctx);
   return null;
 }

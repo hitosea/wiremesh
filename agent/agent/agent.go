@@ -198,8 +198,8 @@ func (a *Agent) pullAndApplyConfigForce(force bool) error {
 	}
 
 	// 6. Sync Xray fwmark routing (each Sync cleans its own range, order-independent)
-	if cfgData.Xray != nil && len(cfgData.Xray.Routes) > 0 {
-		if err := wg.SyncXrayRouting(cfgData.Xray.Routes); err != nil {
+	if cfgData.Xray != nil && len(cfgData.Xray.Inbounds) > 0 {
+		if err := wg.SyncXrayRouting(cfgData.Xray.Inbounds); err != nil {
 			log.Printf("[agent] xray routing sync error: %v", err)
 		}
 	}
@@ -216,12 +216,12 @@ func (a *Agent) pullAndApplyConfigForce(force bool) error {
 		}
 	}
 
-	// 9. Sync branch routing (with Xray routes for OUTPUT chain split tunneling)
-	var xrayRoutes []api.XrayLineRoute
+	// 9. Sync branch routing (with Xray inbounds for OUTPUT chain split tunneling)
+	var xrayInbounds []api.XrayInbound
 	if cfgData.Xray != nil {
-		xrayRoutes = cfgData.Xray.Routes
+		xrayInbounds = cfgData.Xray.Inbounds
 	}
-	if err := a.routingManager.Sync(cfgData.Routing, xrayRoutes); err != nil {
+	if err := a.routingManager.Sync(cfgData.Routing, xrayInbounds); err != nil {
 		log.Printf("[agent] routing sync error: %v", err)
 	}
 
@@ -229,10 +229,10 @@ func (a *Agent) pullAndApplyConfigForce(force bool) error {
 	xrayStatus := "disabled"
 	if cfgData.Xray != nil && cfgData.Xray.Enabled {
 		clientCount := 0
-		for _, r := range cfgData.Xray.Routes {
-			clientCount += len(r.UUIDs)
+		for _, inb := range cfgData.Xray.Inbounds {
+			clientCount += len(inb.UUIDs)
 		}
-		xrayStatus = fmt.Sprintf("enabled (%d clients, %d lines)", clientCount, len(cfgData.Xray.Routes))
+		xrayStatus = fmt.Sprintf("enabled (%d clients, %d inbounds)", clientCount, len(cfgData.Xray.Inbounds))
 	}
 	socks5Status := "disabled"
 	if cfgData.Socks5 != nil && len(cfgData.Socks5.Routes) > 0 {

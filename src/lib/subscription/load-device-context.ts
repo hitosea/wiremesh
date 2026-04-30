@@ -1,8 +1,10 @@
 import { db } from "@/lib/db";
-import { devices, lineNodes, nodes, lines } from "@/lib/db/schema";
+import { devices, lineNodes, nodes } from "@/lib/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { decrypt } from "@/lib/crypto";
-import type { DeviceContext, EntryNodeContext, DeviceProtocol } from "./types";
+import { getNodeProtocol, getLineProtocolPort } from "@/lib/db/protocols";
+import type { DeviceProtocol } from "@/lib/protocols";
+import type { DeviceContext, EntryNodeContext } from "./types";
 
 type DeviceRow = typeof devices.$inferSelect;
 
@@ -20,11 +22,6 @@ function loadEntryNode(lineId: number): EntryNodeContext | null {
       port: nodes.port,
       wgPublicKey: nodes.wgPublicKey,
       wgAddress: nodes.wgAddress,
-      xrayPort: nodes.xrayPort,
-      xrayTransport: nodes.xrayTransport,
-      xrayTlsDomain: nodes.xrayTlsDomain,
-      xrayWsPath: nodes.xrayWsPath,
-      xrayConfig: nodes.xrayConfig,
     })
     .from(lineNodes)
     .innerJoin(nodes, eq(lineNodes.nodeId, nodes.id))
@@ -32,21 +29,6 @@ function loadEntryNode(lineId: number): EntryNodeContext | null {
     .get();
 
   if (!row) return null;
-
-  let realityPublicKey: string | null = null;
-  let realityShortId: string | null = null;
-  let realityServerName: string | null = null;
-  if (row.xrayConfig) {
-    try {
-      const parsed = JSON.parse(row.xrayConfig);
-      realityPublicKey = parsed.realityPublicKey ?? null;
-      realityShortId = parsed.realityShortId ?? null;
-      realityServerName = parsed.realityServerName ?? null;
-    } catch {
-      // ignore — entries without parseable xrayConfig will still produce
-      // wireguard / socks5 entries; xray entries will be skipped upstream
-    }
-  }
 
   return {
     id: row.id,
@@ -56,22 +38,7 @@ function loadEntryNode(lineId: number): EntryNodeContext | null {
     wgPort: row.port,
     wgPublicKey: row.wgPublicKey,
     wgAddress: stripCidr(row.wgAddress),
-    xrayPort: row.xrayPort,
-    xrayTransport: row.xrayTransport,
-    xrayTlsDomain: row.xrayTlsDomain,
-    xrayWsPath: row.xrayWsPath,
-    realityPublicKey,
-    realityShortId,
-    realityServerName,
   };
-}
-
-function loadLinePorts(lineId: number) {
-  return db
-    .select({ xrayPort: lines.xrayPort, socks5Port: lines.socks5Port })
-    .from(lines)
-    .where(eq(lines.id, lineId))
-    .get();
 }
 
 function buildDeviceContext(device: DeviceRow): DeviceContext | null {
@@ -79,7 +46,39 @@ function buildDeviceContext(device: DeviceRow): DeviceContext | null {
   const protocol = device.protocol as DeviceProtocol;
   const entry = loadEntryNode(device.lineId);
   if (!entry) return null;
-  const linePorts = loadLinePorts(device.lineId);
+
+  const linePort = getLineProtocolPort(db, device.lineId, protocol);
+
+  // Populate per-transport fields on entry
+  if (protocol === "xray-reality") {
+    const np = getNodeProtocol(db, entry.id, "xray-reality");
+    if (!np) return null;
+    const cfg = JSON.parse(np.config) as {
+      realityPublicKey?: string;
+      realityShortId?: string;
+      realityDest?: string;
+      realityServerName?: string;
+    };
+    entry.xrayReality = {
+      publicKey: cfg.realityPublicKey ?? "",
+      shortId: cfg.realityShortId ?? "",
+      dest: cfg.realityDest ?? "",
+      serverName: cfg.realityServerName ?? "www.microsoft.com",
+    };
+  }
+
+  if (protocol === "xray-wstls") {
+    const np = getNodeProtocol(db, entry.id, "xray-wstls");
+    if (!np) return null;
+    const cfg = JSON.parse(np.config) as {
+      wsPath?: string;
+      tlsDomain?: string;
+    };
+    entry.xrayWsTls = {
+      wsPath: cfg.wsPath ?? "/",
+      tlsDomain: cfg.tlsDomain ?? entry.domain ?? entry.ip,
+    };
+  }
 
   const ctx: DeviceContext = {
     id: device.id,
@@ -87,8 +86,7 @@ function buildDeviceContext(device: DeviceRow): DeviceContext | null {
     remark: device.remark ?? null,
     protocol,
     lineId: device.lineId,
-    lineXrayPort: linePorts?.xrayPort ?? null,
-    lineSocks5Port: linePorts?.socks5Port ?? null,
+    linePort,
     entry,
   };
 
@@ -106,7 +104,7 @@ function buildDeviceContext(device: DeviceRow): DeviceContext | null {
       address: device.wgAddress,
       addressIp: stripCidr(device.wgAddress),
     };
-  } else if (protocol === "xray") {
+  } else if (protocol === "xray-reality" || protocol === "xray-wstls") {
     if (!device.xrayUuid) return null;
     ctx.xray = { uuid: device.xrayUuid };
   } else if (protocol === "socks5") {

@@ -33,9 +33,9 @@ func NewManager(client *api.Client) *Manager {
 }
 
 // Sync applies the routing configuration from the management platform.
-// xrayRoutes, when non-empty, generates OUTPUT chain rules per-line
+// xrayInbounds, when non-empty, generates OUTPUT chain rules per-line
 // so Xray traffic gets branch-based split tunneling via iptables.
-func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes []api.XrayLineRoute) error {
+func (m *Manager) Sync(cfg *api.RoutingConfig, xrayInbounds []api.XrayInbound) error {
 	if cfg == nil || !cfg.Enabled {
 		m.Cleanup()
 		return nil
@@ -178,12 +178,12 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes []api.XrayLineRoute) e
 	}
 
 	// 2b. OUTPUT chain rules for Xray split tunneling
-	// Each Xray line has its own default mark. For lines with branch routing,
+	// Each Xray inbound has its own default mark. For lines with branch routing,
 	// OUTPUT rules remark the default mark to branch marks based on ipset matching.
 	// Each branch contributes one rule per ipset (cidr + dns), mirroring the
 	// PREROUTING model — so both static/external IPs and DNS-resolved IPs trigger
 	// the branch remark for Xray traffic.
-	if len(xrayRoutes) > 0 {
+	if len(xrayInbounds) > 0 {
 		// Determine which branch IDs exist in the routing config so we only
 		// emit rules for branches whose ipsets were created above.
 		branchExists := make(map[int]bool)
@@ -193,15 +193,20 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes []api.XrayLineRoute) e
 			}
 		}
 
-		for _, route := range xrayRoutes {
-			if len(route.Branches) <= 1 {
+		processedLines := make(map[int]bool)
+		for _, inb := range xrayInbounds {
+			if processedLines[inb.LineID] {
+				continue
+			}
+			processedLines[inb.LineID] = true
+			if len(inb.Branches) <= 1 {
 				continue // no split tunneling for single-branch lines
 			}
-			// Use route.Mark (per-line Xray mark, 31001+ range) for matching.
+			// Use inb.Mark (per-line Xray mark, 31001+ range) for matching.
 			// Xray sets sockopt.mark to this value. OUTPUT rules remark to branch marks
 			// when destination matches a filter ipset.
-			perLineMarkHex := markHex(route.Mark)
-			for _, branch := range route.Branches {
+			perLineMarkHex := markHex(inb.Mark)
+			for _, branch := range inb.Branches {
 				if branch.IsDefault {
 					continue
 				}
@@ -214,11 +219,11 @@ func (m *Manager) Sync(cfg *api.RoutingConfig, xrayRoutes []api.XrayLineRoute) e
 				branchMarkHex := markHex(branch.Mark)
 				addMangleRule(fmt.Sprintf(
 					"-A OUTPUT -m mark --mark %s -m set --match-set %s dst -j MARK --set-mark %s -m comment --comment wm-xray-line-%d-cidr",
-					perLineMarkHex, cidrSet, branchMarkHex, route.LineID,
+					perLineMarkHex, cidrSet, branchMarkHex, inb.LineID,
 				))
 				addMangleRule(fmt.Sprintf(
 					"-A OUTPUT -m mark --mark %s -m set --match-set %s dst -j MARK --set-mark %s -m comment --comment wm-xray-line-%d-dns",
-					perLineMarkHex, dnsSet, branchMarkHex, route.LineID,
+					perLineMarkHex, dnsSet, branchMarkHex, inb.LineID,
 				))
 			}
 		}

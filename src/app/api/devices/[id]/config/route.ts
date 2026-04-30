@@ -1,10 +1,11 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { devices, lineNodes, nodes, settings, lines } from "@/lib/db/schema";
+import { devices, lineNodes, nodes, settings } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
 import { eq, and } from "drizzle-orm";
 import { decrypt } from "@/lib/crypto";
-import { getXrayDefaultPort } from "@/lib/proxy-port";
+import { isXrayProtocol, deviceProtocolToTransport } from "@/lib/protocols";
+import { getNodeProtocol, getLineProtocolPort } from "@/lib/db/protocols";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -31,9 +32,6 @@ export async function GET(request: NextRequest, { params }: Params) {
       nodeDomain: nodes.domain,
       nodePort: nodes.port,
       nodeWgPublicKey: nodes.wgPublicKey,
-      nodeXrayProtocol: nodes.xrayProtocol,
-      nodeXrayTransport: nodes.xrayTransport,
-      nodeXrayPort: nodes.xrayPort,
     })
     .from(lineNodes)
     .innerJoin(nodes, eq(lineNodes.nodeId, nodes.id))
@@ -43,6 +41,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   if (!entryNodeRow) return error("NOT_FOUND", "notFound.entryNode");
 
   const protocol = device.protocol;
+  const lineId = device.lineId;
 
   if (protocol === "wireguard") {
     if (!device.wgPrivateKey || !device.wgAddress || !device.wgPublicKey) {
@@ -85,57 +84,38 @@ PersistentKeepalive = 25
     return success({ format: "wireguard", config, filename });
   }
 
-  if (protocol === "xray") {
+  if (isXrayProtocol(protocol)) {
     if (!device.xrayUuid) {
       return error("VALIDATION_ERROR", "validation.deviceXrayIncomplete");
     }
 
+    const transport = deviceProtocolToTransport(protocol)!; // "reality" | "ws-tls"
+
+    const npRow = getNodeProtocol(db, entryNodeRow.nodeId, protocol);
+    if (!npRow) return error("CONFLICT", "validation.deviceProtocolNotSupported");
+
+    let cfg: Record<string, unknown>;
+    try {
+      cfg = JSON.parse(npRow.config);
+    } catch (e) {
+      console.warn(`[devices/${deviceId}/config] Failed to parse node_protocols.config for ${protocol}:`, e);
+      cfg = {};
+    }
+
+    const xrayPort = getLineProtocolPort(db, lineId, protocol);
+    if (xrayPort == null) return error("INTERNAL_ERROR", "internal.missingProtocolPort");
+
     const endpoint = entryNodeRow.nodeDomain ?? entryNodeRow.nodeIp;
-    const lineRow = db.select({ xrayPort: lines.xrayPort }).from(lines).where(eq(lines.id, device.lineId!)).get();
-    const xrayPort = lineRow?.xrayPort ?? (entryNodeRow.nodeXrayPort ?? getXrayDefaultPort());
-
-    // Parse Reality settings from node's xrayConfig
-    let realityPublicKey = "";
-    let realityShortId = "";
-    let realityServerName = "www.microsoft.com";
-
-    const nodeXrayConfig = db
-      .select({ xrayConfig: nodes.xrayConfig })
-      .from(nodes)
-      .where(eq(nodes.id, entryNodeRow.nodeId))
-      .get();
-    if (nodeXrayConfig?.xrayConfig) {
-      try {
-        const parsed = JSON.parse(nodeXrayConfig.xrayConfig);
-        realityPublicKey = parsed.realityPublicKey ?? "";
-        realityShortId = parsed.realityShortId ?? "";
-        realityServerName = parsed.realityServerName ?? "www.microsoft.com";
-      } catch (e) {
-        console.warn(`[devices/${deviceId}/config] Failed to parse node xrayConfig:`, e);
-      }
-    }
-
-    // Fetch transport fields for entry node
-    const nodeTransport = db
-      .select({ xrayTransport: nodes.xrayTransport, xrayTlsDomain: nodes.xrayTlsDomain, xrayWsPath: nodes.xrayWsPath })
-      .from(nodes)
-      .where(eq(nodes.id, entryNodeRow.nodeId))
-      .get();
-    const isWsTls = nodeTransport?.xrayTransport === "ws-tls";
-
-    if (!isWsTls && !realityPublicKey) {
-      return error("VALIDATION_ERROR", "validation.realityIncomplete");
-    }
 
     const userConfig: Record<string, unknown> = { id: device.xrayUuid, encryption: "none" };
-    if (!isWsTls) { userConfig.flow = "xtls-rprx-vision"; }
+    if (transport !== "ws-tls") { userConfig.flow = "xtls-rprx-vision"; }
 
     let streamSettings: Record<string, unknown>;
     let shareLink: string;
 
-    if (isWsTls) {
-      const wsDomain = nodeTransport?.xrayTlsDomain ?? endpoint;
-      const wsPath = nodeTransport?.xrayWsPath ?? "/default";
+    if (transport === "ws-tls") {
+      const wsDomain = (cfg.tlsDomain as string | undefined) ?? endpoint;
+      const wsPath = (cfg.wsPath as string | undefined) ?? "/default";
       streamSettings = {
         network: "ws",
         security: "tls",
@@ -152,6 +132,14 @@ PersistentKeepalive = 25
       });
       shareLink = `vless://${device.xrayUuid}@${wsDomain}:${xrayPort}?${vlessParams.toString()}#${encodeURIComponent(device.name)}`;
     } else {
+      const realityPublicKey = (cfg.realityPublicKey as string | undefined) ?? "";
+      const realityShortId = (cfg.realityShortId as string | undefined) ?? "";
+      const realityServerName = (cfg.realityServerName as string | undefined) ?? "www.microsoft.com";
+
+      if (!realityPublicKey) {
+        return error("VALIDATION_ERROR", "validation.realityIncomplete");
+      }
+
       streamSettings = {
         network: "tcp",
         security: "reality",
@@ -175,7 +163,7 @@ PersistentKeepalive = 25
       shareLink = `vless://${device.xrayUuid}@${endpoint}:${xrayPort}?${vlessParams.toString()}#${encodeURIComponent(device.name)}`;
     }
 
-    const vnextAddress = isWsTls ? (nodeTransport?.xrayTlsDomain ?? endpoint) : endpoint;
+    const vnextAddress = transport === "ws-tls" ? ((cfg.tlsDomain as string | undefined) ?? endpoint) : endpoint;
 
     const xrayConfig = {
       log: { loglevel: "warning" },
@@ -227,8 +215,8 @@ PersistentKeepalive = 25
     }
 
     const endpoint = entryNodeRow.nodeDomain ?? entryNodeRow.nodeIp;
-    const lineRow = db.select({ socks5Port: lines.socks5Port }).from(lines).where(eq(lines.id, device.lineId!)).get();
-    const socks5Port = lineRow?.socks5Port ?? (entryNodeRow.nodeXrayPort ?? getXrayDefaultPort());
+    const socks5Port = getLineProtocolPort(db, lineId, "socks5");
+    if (socks5Port == null) return error("INTERNAL_ERROR", "internal.missingProtocolPort");
 
     const proxyUrl = `socks5://${device.socks5Username}:${password}@${endpoint}:${socks5Port}`;
 

@@ -15,16 +15,15 @@ function encodeBase64Query(s: string): string {
 }
 
 export function buildVlessUri(ctx: DeviceContext): string | null {
-  if (ctx.protocol !== "xray" || !ctx.xray) return null;
+  if (!ctx.xray) return null;
   const server = ctx.entry.domain ?? ctx.entry.ip;
   const tag = fragment(deviceDisplayName(ctx));
-  const port = ctx.lineXrayPort ?? ctx.entry.xrayPort;
+  const port = ctx.linePort;
   if (!port) return null;
-  const transport = ctx.entry.xrayTransport ?? "reality";
 
-  if (transport === "ws-tls") {
-    const sni = ctx.entry.xrayTlsDomain ?? server;
-    const path = ctx.entry.xrayWsPath ?? "/default";
+  if (ctx.protocol === "xray-wstls") {
+    const sni = ctx.entry.xrayWsTls?.tlsDomain ?? server;
+    const path = ctx.entry.xrayWsTls?.wsPath ?? "/default";
     const params = new URLSearchParams({
       encryption: "none",
       security: "tls",
@@ -36,25 +35,28 @@ export function buildVlessUri(ctx: DeviceContext): string | null {
     return `vless://${ctx.xray.uuid}@${sni}:${port}?${params.toString()}${tag}`;
   }
 
-  // reality
-  if (!ctx.entry.realityPublicKey) return null;
-  const params = new URLSearchParams({
-    encryption: "none",
-    flow: "xtls-rprx-vision",
-    security: "reality",
-    sni: ctx.entry.realityServerName ?? "www.microsoft.com",
-    fp: "chrome",
-    pbk: ctx.entry.realityPublicKey,
-    type: "tcp",
-  });
-  if (ctx.entry.realityShortId) params.set("sid", ctx.entry.realityShortId);
-  return `vless://${ctx.xray.uuid}@${server}:${port}?${params.toString()}${tag}`;
+  if (ctx.protocol === "xray-reality") {
+    if (!ctx.entry.xrayReality?.publicKey) return null;
+    const params = new URLSearchParams({
+      encryption: "none",
+      flow: "xtls-rprx-vision",
+      security: "reality",
+      sni: ctx.entry.xrayReality.serverName ?? "www.microsoft.com",
+      fp: "chrome",
+      pbk: ctx.entry.xrayReality.publicKey,
+      type: "tcp",
+    });
+    if (ctx.entry.xrayReality.shortId) params.set("sid", ctx.entry.xrayReality.shortId);
+    return `vless://${ctx.xray.uuid}@${server}:${port}?${params.toString()}${tag}`;
+  }
+
+  return null;
 }
 
 export function buildSocks5Uri(ctx: DeviceContext): string | null {
   if (ctx.protocol !== "socks5" || !ctx.socks5) return null;
   const server = ctx.entry.domain ?? ctx.entry.ip;
-  const port = ctx.lineSocks5Port ?? ctx.entry.xrayPort;
+  const port = ctx.linePort;
   if (!port) return null;
   const tag = fragment(deviceDisplayName(ctx));
   const userpass = encodeURIComponent(`${ctx.socks5.username}:${ctx.socks5.password}`);

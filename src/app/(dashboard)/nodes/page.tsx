@@ -27,6 +27,9 @@ import {
 } from "@/components/ui/popover";
 import { AlertCircle } from "lucide-react";
 import { NodePortsDetail } from "@/components/node-ports-detail";
+import type { DeviceProtocol } from "@/lib/protocols";
+
+type PortGroup = { protocol: DeviceProtocol; ports: { lineId: number; port: number }[] };
 
 type Node = {
   id: number;
@@ -36,14 +39,12 @@ type Node = {
   status: string;
   agentVersion: string | null;
   xrayVersion: string | null;
-  xrayTransport: string | null;
   upgradeTriggeredAt: string | null;
   xrayUpgradeTriggeredAt: string | null;
   ports: {
     wg: number;
-    xray: number[];
     tunnels: number[];
-    socks5: number[];
+    groups: PortGroup[];
   };
 };
 
@@ -253,9 +254,8 @@ export default function NodesPage() {
         const node = row as unknown as Node;
         const allPorts = [
           node.ports.wg,
-          ...node.ports.xray,
           ...node.ports.tunnels,
-          ...node.ports.socks5,
+          ...node.ports.groups.flatMap(g => g.ports.map(p => p.port)),
         ];
         const uniqueCount = new Set(allPorts).size;
 
@@ -267,7 +267,7 @@ export default function NodesPage() {
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-64">
-              <NodePortsDetail ports={node.ports} xrayTransport={node.xrayTransport} />
+              <NodePortsDetail ports={node.ports} />
             </PopoverContent>
           </Popover>
         );

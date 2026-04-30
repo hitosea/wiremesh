@@ -1,4 +1,4 @@
-export type DeviceProtocol = "wireguard" | "xray" | "socks5";
+export type { DeviceProtocol } from "@/lib/protocols";
 
 export type EntryNodeContext = {
   id: number;
@@ -8,23 +8,18 @@ export type EntryNodeContext = {
   wgPort: number;
   wgPublicKey: string;
   wgAddress: string;
-  xrayPort: number | null;
-  xrayTransport: string | null;
-  xrayTlsDomain: string | null;
-  xrayWsPath: string | null;
-  realityPublicKey: string | null;
-  realityShortId: string | null;
-  realityServerName: string | null;
+  // active transport for this device:
+  xrayReality?: { publicKey: string; shortId: string; dest: string; serverName: string } | null;
+  xrayWsTls?: { wsPath: string; tlsDomain: string } | null;
 };
 
 export type DeviceContext = {
   id: number;
   name: string;
   remark: string | null;
-  protocol: DeviceProtocol;
-  lineId: number;
-  lineXrayPort: number | null;
-  lineSocks5Port: number | null;
+  protocol: import("@/lib/protocols").DeviceProtocol;
+  lineId: number | null;
+  linePort: number | null; // port for THIS device's protocol
   entry: EntryNodeContext;
 
   wg?: {

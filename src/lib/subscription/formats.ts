@@ -6,6 +6,8 @@
  * when multiple clients share the same on-the-wire format.
  */
 
+import type { DeviceProtocol } from "@/lib/protocols";
+
 export type ClientId =
   | "generic"
   | "shadowrocket"
@@ -69,12 +71,12 @@ export function resolveFormat(slug: string): FormatKind | null {
  * Which protocols each canonical format can carry. UI shows this so admins
  * see at a glance whether a given client URL will silently drop devices.
  */
-export const FORMAT_PROTOCOL_SUPPORT: Record<FormatKind, { wireguard: boolean; xray: boolean; socks5: boolean }> = {
-  clash: { wireguard: true, xray: true, socks5: true },
-  shadowrocket: { wireguard: true, xray: true, socks5: true },
+export const FORMAT_PROTOCOL_SUPPORT: Record<FormatKind, Record<DeviceProtocol, boolean>> = {
+  clash: { wireguard: true, "xray-reality": true, "xray-wstls": true, socks5: true },
+  shadowrocket: { wireguard: true, "xray-reality": true, "xray-wstls": true, socks5: true },
   // V2Ray family now ships wg:// for WG devices. Modern V2RayN/NG/NekoBox
   // builds parse it; older or strict V2Ray builds silently ignore — either
   // way the vless/socks5 entries still work, so we count this as supported.
-  v2ray: { wireguard: true, xray: true, socks5: true },
-  singbox: { wireguard: true, xray: true, socks5: true },
+  v2ray: { wireguard: true, "xray-reality": true, "xray-wstls": true, socks5: true },
+  singbox: { wireguard: true, "xray-reality": true, "xray-wstls": true, socks5: true },
 };

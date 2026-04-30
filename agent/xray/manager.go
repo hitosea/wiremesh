@@ -25,7 +25,7 @@ func Sync(cfg *api.XrayConfig, client *api.Client) error {
 		return stopIfRunning()
 	}
 
-	if len(cfg.Routes) == 0 {
+	if len(cfg.Inbounds) == 0 {
 		log.Println("[xray] No clients configured, skipping")
 		return stopIfRunning()
 	}
@@ -63,7 +63,7 @@ func Sync(cfg *api.XrayConfig, client *api.Client) error {
 	if err := os.WriteFile(XrayConfigFile, configBytes, 0644); err != nil {
 		return fmt.Errorf("write xray config: %w", err)
 	}
-	log.Printf("[xray] Config written to %s (%d lines)", XrayConfigFile, len(cfg.Routes))
+	log.Printf("[xray] Config written to %s (%d inbounds)", XrayConfigFile, len(cfg.Inbounds))
 
 	if IsRunning() {
 		return restart()
@@ -130,26 +130,30 @@ func ensureRunning() error {
 }
 
 func writeCertFiles(cfg *api.XrayConfig) (bool, error) {
-	if cfg.Transport != "ws-tls" || cfg.TlsDomain == "" || cfg.TlsCert == "" {
-		return false, nil
-	}
+	anyChanged := false
+	for _, inb := range cfg.Inbounds {
+		if inb.Transport != "ws-tls" || inb.TlsDomain == "" || inb.TlsCert == "" {
+			continue
+		}
 
-	certPath := fmt.Sprintf("%s/%s.crt", XrayConfigDir, cfg.TlsDomain)
-	keyPath := fmt.Sprintf("%s/%s.key", XrayConfigDir, cfg.TlsDomain)
+		certPath := fmt.Sprintf("%s/%s.crt", XrayConfigDir, inb.TlsDomain)
+		keyPath := fmt.Sprintf("%s/%s.key", XrayConfigDir, inb.TlsDomain)
 
-	certChanged, err := writeIfChanged(certPath, cfg.TlsCert, 0644)
-	if err != nil {
-		return false, fmt.Errorf("write cert file: %w", err)
-	}
-	keyChanged, err := writeIfChanged(keyPath, cfg.TlsKey, 0600)
-	if err != nil {
-		return false, fmt.Errorf("write key file: %w", err)
-	}
+		certChanged, err := writeIfChanged(certPath, inb.TlsCert, 0644)
+		if err != nil {
+			return false, fmt.Errorf("write cert file: %w", err)
+		}
+		keyChanged, err := writeIfChanged(keyPath, inb.TlsKey, 0600)
+		if err != nil {
+			return false, fmt.Errorf("write key file: %w", err)
+		}
 
-	if certChanged || keyChanged {
-		log.Printf("[xray] TLS cert files updated for %s", cfg.TlsDomain)
+		if certChanged || keyChanged {
+			log.Printf("[xray] TLS cert files updated for %s", inb.TlsDomain)
+			anyChanged = true
+		}
 	}
-	return certChanged || keyChanged, nil
+	return anyChanged, nil
 }
 
 func writeIfChanged(path, content string, perm os.FileMode) (bool, error) {

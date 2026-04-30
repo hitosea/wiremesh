@@ -47,10 +47,14 @@ const STATUS_MAP: Record<ErrorCode, number> = {
 export function error(
   code: ErrorCode,
   message: string,
-  params?: Record<string, string | number>
+  params?: Record<string, string | number>,
+  details?: Record<string, unknown>,
 ) {
   return NextResponse.json(
-    { error: { code, message, ...(params && { params }) } },
+    {
+      error: { code, message, ...(params && { params }) },
+      ...(details && { details }),
+    },
     { status: STATUS_MAP[code] }
   );
 }

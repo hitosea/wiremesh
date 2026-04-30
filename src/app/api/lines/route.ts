@@ -1,9 +1,10 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { lines, lineNodes, lineTunnels, lineBranches, branchFilters, nodes, settings, filters } from "@/lib/db/schema";
+import { lines, lineNodes, lineTunnels, lineBranches, branchFilters, nodes, nodeProtocols, settings, filters } from "@/lib/db/schema";
 import { created, error, paginated } from "@/lib/api-response";
 import { parsePaginationParams, paginationOffset } from "@/lib/pagination";
 import { eq, like, count, and, sql, SQL, inArray } from "drizzle-orm";
+import { DEVICE_PROTOCOLS, isXrayProtocol, type DeviceProtocol } from "@/lib/protocols";
 import { encrypt } from "@/lib/crypto";
 import { generateKeyPair } from "@/lib/wireguard";
 import { allocateTunnelSubnet, allocateTunnelPort, parseTunnelPortBlacklist } from "@/lib/ip-allocator";
@@ -15,10 +16,40 @@ export async function GET(request: NextRequest) {
   const params = parsePaginationParams(request.nextUrl.searchParams);
   const search = request.nextUrl.searchParams.get("search");
   const status = request.nextUrl.searchParams.get("status");
+  const supportsProtocolRaw = request.nextUrl.searchParams.get("supportsProtocol");
+
+  let supportsProtocol: DeviceProtocol | null = null;
+  if (supportsProtocolRaw) {
+    if (!(DEVICE_PROTOCOLS as readonly string[]).includes(supportsProtocolRaw)) {
+      return error("VALIDATION_ERROR", "validation.protocolInvalid");
+    }
+    supportsProtocol = supportsProtocolRaw as DeviceProtocol;
+  }
 
   const conditions: SQL[] = [];
   if (search) conditions.push(like(lines.name, `%${search}%`));
   if (status) conditions.push(eq(lines.status, status));
+
+  // For Xray protocols, restrict to lines whose entry node has the matching
+  // transport row in node_protocols. WireGuard / SOCKS5 are entry-node-agnostic
+  // (lazy-allocated on first device bind), so they don't filter the line list.
+  if (supportsProtocol && isXrayProtocol(supportsProtocol)) {
+    const eligibleLineIds = db
+      .select({ lineId: lineNodes.lineId })
+      .from(lineNodes)
+      .innerJoin(nodeProtocols, and(
+        eq(nodeProtocols.nodeId, lineNodes.nodeId),
+        eq(nodeProtocols.protocol, supportsProtocol),
+      ))
+      .where(eq(lineNodes.role, "entry"))
+      .all()
+      .map((r) => r.lineId);
+    if (eligibleLineIds.length === 0) {
+      return paginated([], { page: params.page, pageSize: params.pageSize, total: 0 });
+    }
+    conditions.push(inArray(lines.id, eligibleLineIds));
+  }
+
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
   const total =

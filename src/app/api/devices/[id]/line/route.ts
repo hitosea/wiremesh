@@ -1,17 +1,19 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { devices, lines, lineNodes, nodes } from "@/lib/db/schema";
+import { devices, lines } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
 import { eq, and } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
-import { allocateProxyPort, getXrayDefaultPort } from "@/lib/proxy-port";
 import { notifyLineNodes } from "@/lib/line-notify";
-
-function getEntryNodeId(lineId: number): number | null {
-  const entry = db.select({ nodeId: lineNodes.nodeId }).from(lineNodes)
-    .where(and(eq(lineNodes.lineId, lineId), eq(lineNodes.role, "entry"))).get();
-  return entry?.nodeId ?? null;
-}
+import {
+  ensureLineProtocol,
+  releaseLineProtocol,
+  enableNodeProtocol,
+  isProtocolSupportedByEntryNode,
+  getEntryNodeIdForLine,
+  getStartPortForLine,
+} from "@/lib/db/protocols";
+import { isXrayProtocol, type DeviceProtocol, DEVICE_PROTOCOLS } from "@/lib/protocols";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -21,11 +23,15 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (isNaN(deviceId)) return error("VALIDATION_ERROR", "validation.invalidDeviceId");
 
   const existing = db
-    .select({ id: devices.id, name: devices.name, lineId: devices.lineId })
+    .select({ id: devices.id, name: devices.name, lineId: devices.lineId, protocol: devices.protocol })
     .from(devices)
     .where(eq(devices.id, deviceId))
     .get();
   if (!existing) return error("NOT_FOUND", "notFound.device");
+  if (!DEVICE_PROTOCOLS.includes(existing.protocol as DeviceProtocol)) {
+    return error("INTERNAL_ERROR", "internal.invalidStoredProtocol");
+  }
+  const protocol = existing.protocol as DeviceProtocol;
 
   const body = await request.json();
   const { lineId } = body;
@@ -40,54 +46,84 @@ export async function PUT(request: NextRequest, { params }: Params) {
     if (!line) return error("NOT_FOUND", "notFound.line");
   }
 
-  const updated = db
-    .update(devices)
-    .set({
-      lineId: lineId ?? null,
-      updatedAt: new Date().toISOString(),
-    })
-    .where(eq(devices.id, deviceId))
-    .returning({
-      id: devices.id,
-      name: devices.name,
-      lineId: devices.lineId,
-    })
-    .get();
+  const oldLineId = existing.lineId;
+  const newLineId: number | null = lineId ?? null;
 
-  // Allocate proxy port if moving an xray/socks5 device to a line that lacks one
-  if (lineId) {
-    const device = db.select({ protocol: devices.protocol }).from(devices)
-      .where(eq(devices.id, deviceId)).get();
-    if (device && (device.protocol === "xray" || device.protocol === "socks5")) {
-      const portField = device.protocol === "xray" ? "xrayPort" : "socks5Port";
-      const line = db.select({ xrayPort: lines.xrayPort, socks5Port: lines.socks5Port })
-        .from(lines).where(eq(lines.id, lineId)).get();
-      const entryNodeId = getEntryNodeId(lineId);
-      if (line && line[portField] === null && entryNodeId !== null) {
-        const nodeRow = db.select({ xrayPort: nodes.xrayPort }).from(nodes)
-          .where(eq(nodes.id, entryNodeId)).get();
-        const basePort = nodeRow?.xrayPort ?? getXrayDefaultPort();
-        const port = allocateProxyPort(entryNodeId, basePort);
-        db.update(lines).set({ [portField]: port }).where(eq(lines.id, lineId)).run();
+  // Validate line and protocol compatibility BEFORE entering the transaction
+  // so validation errors are returned as 4xx (not swallowed as 500s)
+  let entryNodeIdForNewLine: number | null = null;
+  if (newLineId) {
+    entryNodeIdForNewLine = getEntryNodeIdForLine(db, newLineId);
+    if (!entryNodeIdForNewLine) {
+      return error("VALIDATION_ERROR", "validation.lineHasNoEntryNode");
+    }
+    if (isXrayProtocol(protocol)) {
+      // Xray transports must be explicitly enabled on the node
+      if (!isProtocolSupportedByEntryNode(db, entryNodeIdForNewLine, protocol)) {
+        return error("CONFLICT", "validation.deviceProtocolNotSupported");
       }
     }
+    // WireGuard / SOCKS5: lazy-create node_protocols row — handled inside transaction
   }
+
+  const updated = db.transaction((tx) => {
+    if (newLineId && entryNodeIdForNewLine) {
+      if (!isXrayProtocol(protocol)) {
+        // WireGuard / SOCKS5: lazy-create node_protocols row on first device
+        if (!isProtocolSupportedByEntryNode(tx, entryNodeIdForNewLine, protocol)) {
+          enableNodeProtocol(tx, entryNodeIdForNewLine, protocol, {});
+        }
+      }
+
+      // lazy-allocate per-line port (WireGuard returns null and only marks the row)
+      const startPort = getStartPortForLine(tx, newLineId);
+      ensureLineProtocol(tx, newLineId, protocol, { startPort });
+    }
+
+    const result = tx
+      .update(devices)
+      .set({
+        lineId: newLineId,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(devices.id, deviceId))
+      .returning({
+        id: devices.id,
+        name: devices.name,
+        lineId: devices.lineId,
+      })
+      .get();
+
+    // Release old line_protocols if no peers of the same protocol remain on old line
+    if (oldLineId && oldLineId !== newLineId) {
+      const peers = tx
+        .select({ id: devices.id })
+        .from(devices)
+        .where(and(eq(devices.lineId, oldLineId), eq(devices.protocol, protocol)))
+        .get();
+      if (!peers) {
+        releaseLineProtocol(tx, oldLineId, protocol);
+      }
+    }
+
+    return result;
+  });
 
   writeAuditLog({
     action: "update",
     targetType: "device",
     targetId: deviceId,
     targetName: existing.name,
-    detail: lineId ? `lineId=${lineId}` : "unlinked line",
+    detail: newLineId ? `lineId=${newLineId}` : "unlinked line",
   });
 
   // Notify all nodes on old line
-  if (existing.lineId && existing.lineId !== lineId) {
-    notifyLineNodes(existing.lineId);
+  if (oldLineId && oldLineId !== newLineId) {
+    notifyLineNodes(oldLineId);
   }
   // Notify all nodes on new line
-  if (lineId) {
-    notifyLineNodes(lineId);
+  if (newLineId) {
+    notifyLineNodes(newLineId);
   }
 
   return success(updated);

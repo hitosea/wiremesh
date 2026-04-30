@@ -28,31 +28,10 @@ export function buildSingboxOutbound(ctx: DeviceContext): SingboxOutbound | null
     };
   }
 
-  if (ctx.protocol === "xray" && ctx.xray) {
-    const port = ctx.lineXrayPort ?? ctx.entry.xrayPort;
+  if (ctx.protocol === "xray-reality" && ctx.xray) {
+    const port = ctx.linePort;
     if (!port) return null;
-    const transport = ctx.entry.xrayTransport ?? "reality";
-
-    if (transport === "ws-tls") {
-      const sni = ctx.entry.xrayTlsDomain ?? server;
-      const path = ctx.entry.xrayWsPath ?? "/default";
-      return {
-        tag,
-        type: "vless",
-        server: sni,
-        server_port: port,
-        uuid: ctx.xray.uuid,
-        flow: "",
-        packet_encoding: "packetaddr",
-        tls: {
-          enabled: true,
-          server_name: sni,
-          utls: { enabled: true, fingerprint: "chrome" },
-        },
-        transport: { type: "ws", path, headers: { Host: sni } },
-      };
-    }
-    if (!ctx.entry.realityPublicKey) return null;
+    if (!ctx.entry.xrayReality?.publicKey) return null;
     return {
       tag,
       type: "vless",
@@ -63,19 +42,41 @@ export function buildSingboxOutbound(ctx: DeviceContext): SingboxOutbound | null
       packet_encoding: "packetaddr",
       tls: {
         enabled: true,
-        server_name: ctx.entry.realityServerName ?? "www.microsoft.com",
+        server_name: ctx.entry.xrayReality.serverName ?? "www.microsoft.com",
         utls: { enabled: true, fingerprint: "chrome" },
         reality: {
           enabled: true,
-          public_key: ctx.entry.realityPublicKey,
-          ...(ctx.entry.realityShortId ? { short_id: ctx.entry.realityShortId } : {}),
+          public_key: ctx.entry.xrayReality.publicKey,
+          ...(ctx.entry.xrayReality.shortId ? { short_id: ctx.entry.xrayReality.shortId } : {}),
         },
       },
     };
   }
 
+  if (ctx.protocol === "xray-wstls" && ctx.xray) {
+    const port = ctx.linePort;
+    if (!port) return null;
+    const sni = ctx.entry.xrayWsTls?.tlsDomain ?? server;
+    const path = ctx.entry.xrayWsTls?.wsPath ?? "/default";
+    return {
+      tag,
+      type: "vless",
+      server: sni,
+      server_port: port,
+      uuid: ctx.xray.uuid,
+      flow: "",
+      packet_encoding: "packetaddr",
+      tls: {
+        enabled: true,
+        server_name: sni,
+        utls: { enabled: true, fingerprint: "chrome" },
+      },
+      transport: { type: "ws", path, headers: { Host: sni } },
+    };
+  }
+
   if (ctx.protocol === "socks5" && ctx.socks5) {
-    const port = ctx.lineSocks5Port ?? ctx.entry.xrayPort;
+    const port = ctx.linePort;
     if (!port) return null;
     return {
       tag,

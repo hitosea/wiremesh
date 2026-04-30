@@ -34,7 +34,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import Link from "next/link";
+import { Loader2 } from "lucide-react";
 import { useSetBreadcrumbLabel } from "@/components/breadcrumb-context";
+import { isXrayProtocol } from "@/lib/protocols";
 
 type LineOption = { id: number; name: string };
 
@@ -65,6 +67,12 @@ export default function DeviceDetailPage() {
   );
 }
 
+function protocolToKey(p: string): string {
+  if (p === "xray-reality") return "xrayReality";
+  if (p === "xray-wstls") return "xrayWsTls";
+  return p;
+}
+
 function DeviceDetailContent() {
   const t = useTranslations("deviceDetail");
   const ts = useTranslations("devices");
@@ -85,13 +93,18 @@ function DeviceDetailContent() {
   const [remark, setRemark] = useState("");
   const [lineId, setLineId] = useState("");
   const [lineOptions, setLineOptions] = useState<LineOption[]>([]);
+  const [linesLoading, setLinesLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/lines?page=1&pageSize=100")
+    if (!device?.protocol) return;
+    setLinesLoading(true);
+    const url = `/api/lines?page=1&pageSize=100&supportsProtocol=${encodeURIComponent(device.protocol)}`;
+    fetch(url)
       .then((res) => res.json())
       .then((json) => setLineOptions((json.data ?? []).map((l: LineOption) => ({ id: l.id, name: l.name }))))
-      .catch(() => {});
-  }, []);
+      .catch(() => {})
+      .finally(() => setLinesLoading(false));
+  }, [device?.protocol]);
 
   useEffect(() => {
     fetch(`/api/devices/${deviceId}`)
@@ -206,7 +219,7 @@ function DeviceDetailContent() {
           <div className="space-y-2">
             <Label>{t("protocol")}</Label>
             <p className="text-sm font-medium">
-              {ts(`protocol.${device.protocol}`)}
+              {ts(`protocol.${protocolToKey(device.protocol)}`)}
             </p>
           </div>
           {device.protocol === "wireguard" && (
@@ -223,7 +236,7 @@ function DeviceDetailContent() {
               </div>
             </>
           )}
-          {device.protocol === "xray" && (
+          {isXrayProtocol(device.protocol) && (
             <div className="space-y-2">
               <Label>{t("xrayUuid")}</Label>
               <code className="block text-xs bg-muted px-3 py-2 rounded break-all">
@@ -260,7 +273,7 @@ function DeviceDetailContent() {
       </Card>
 
       {/* Active connections (Xray only) */}
-      {device.protocol === "xray" && (
+      {isXrayProtocol(device.protocol) && (
         <Card>
           <CardHeader>
             <CardTitle>{t("activeConnections")}</CardTitle>
@@ -323,24 +336,37 @@ function DeviceDetailContent() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="lineId">{tn("line")}</Label>
-            {lineOptions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                {tn("noLines")}<Link href="/lines/new" className="text-primary hover:underline">{tn("createLine")}</Link>
+            <div className="flex">
+              <div className="flex items-center gap-2">
+                <Select
+                  value={lineId || "none"}
+                  onValueChange={(v) => setLineId(v === "none" ? "" : v)}
+                  disabled={linesLoading || lineOptions.length === 0}
+                >
+                  <SelectTrigger id="lineId" className="flex-1">
+                    <SelectValue
+                      placeholder={linesLoading ? tn("loadingLines") : tn("selectLine")}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">{tn("noLine")}</SelectItem>
+                    {lineOptions.map((l) => (
+                      <SelectItem key={l.id} value={String(l.id)}>
+                        {l.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {linesLoading && (
+                  <Loader2 className="size-4 animate-spin text-muted-foreground shrink-0" />
+                )}
+              </div>
+            </div>
+            {!linesLoading && lineOptions.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                {tn("noLines")}
+                <Link href="/lines/new" className="text-primary hover:underline">{tn("createLine")}</Link>
               </p>
-            ) : (
-              <Select value={lineId || "none"} onValueChange={(v) => setLineId(v === "none" ? "" : v)}>
-                <SelectTrigger id="lineId">
-                  <SelectValue placeholder={tn("selectLine")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">{tn("noLine")}</SelectItem>
-                  {lineOptions.map((l) => (
-                    <SelectItem key={l.id} value={String(l.id)}>
-                      {l.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             )}
           </div>
         </CardContent>

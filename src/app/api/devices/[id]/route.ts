@@ -1,11 +1,13 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { devices, lines } from "@/lib/db/schema";
+import { devices } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
 import { eq, and } from "drizzle-orm";
 import { writeAuditLog } from "@/lib/audit-log";
 import { computeDeviceStatus } from "@/lib/device-status";
 import { notifyLineNodes } from "@/lib/line-notify";
+import { releaseLineProtocol } from "@/lib/db/protocols";
+import { isXrayProtocol } from "@/lib/protocols";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -105,20 +107,21 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     .get();
   if (!existing) return error("NOT_FOUND", "notFound.device");
 
-  db.delete(devices).where(eq(devices.id, deviceId)).run();
+  db.transaction((tx) => {
+    tx.delete(devices).where(eq(devices.id, deviceId)).run();
 
-  // Release proxy port if this was the last xray/socks5 device on the line
-  if (existing.lineId && (existing.protocol === "xray" || existing.protocol === "socks5")) {
-    const remaining = db
-      .select({ id: devices.id })
-      .from(devices)
-      .where(and(eq(devices.lineId, existing.lineId), eq(devices.protocol, existing.protocol)))
-      .get();
-    if (!remaining) {
-      const portField = existing.protocol === "xray" ? "xrayPort" : "socks5Port";
-      db.update(lines).set({ [portField]: null }).where(eq(lines.id, existing.lineId)).run();
+    // Release line_protocols if this was the last device of the same protocol on the line
+    if (existing.lineId && (isXrayProtocol(existing.protocol) || existing.protocol === "socks5")) {
+      const remaining = tx
+        .select({ id: devices.id })
+        .from(devices)
+        .where(and(eq(devices.lineId, existing.lineId), eq(devices.protocol, existing.protocol)))
+        .get();
+      if (!remaining) {
+        releaseLineProtocol(tx, existing.lineId, existing.protocol);
+      }
     }
-  }
+  });
 
   writeAuditLog({
     action: "delete",

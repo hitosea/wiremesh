@@ -1,6 +1,6 @@
 {
-  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "prevId": "8c90d0bc-1129-4a50-8f29-7c550838efee",
+  "id": "91514b78-9600-431a-a2b6-091743ead360",
+  "prevId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "version": "6",
   "dialect": "sqlite",
   "tables": {
@@ -870,6 +870,28 @@
           "notNull": true,
           "autoincrement": false,
           "default": "(datetime('now'))"
+        },
+        "agent_version": {
+          "name": "agent_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "xray_version": {
+          "name": "xray_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "pending_delete": {
+          "name": "pending_delete",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {
