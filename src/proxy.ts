@@ -28,6 +28,11 @@ function isSubscriptionFetchPath(pathname: string): boolean {
   return pathname.startsWith("/api/sub/");
 }
 
+function isWebhookPath(pathname: string): boolean {
+  // Webhooks are bearer-authed in their own handler.
+  return pathname.startsWith("/api/webhooks/");
+}
+
 function isStaticPath(pathname: string): boolean {
   return pathname.startsWith("/_next") || pathname === "/favicon.ico";
 }
@@ -49,7 +54,8 @@ export async function proxy(request: NextRequest) {
     isAgentPath(pathname) ||
     isNodeScriptPath(pathname) ||
     isUninstallScriptPath(pathname) ||
-    isSubscriptionFetchPath(pathname)
+    isSubscriptionFetchPath(pathname) ||
+    isWebhookPath(pathname)
   ) {
     return NextResponse.next();
   }

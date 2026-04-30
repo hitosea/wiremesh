@@ -31,7 +31,8 @@ type ErrorCode =
   | "CONFLICT"
   | "INTERNAL_ERROR"
   | "NODE_OFFLINE"
-  | "CONFIG_SYNC_FAILED";
+  | "CONFIG_SYNC_FAILED"
+  | "CERTD_WEBHOOK_DISABLED";
 
 const STATUS_MAP: Record<ErrorCode, number> = {
   UNAUTHORIZED: 401,
@@ -42,6 +43,7 @@ const STATUS_MAP: Record<ErrorCode, number> = {
   INTERNAL_ERROR: 500,
   NODE_OFFLINE: 503,
   CONFIG_SYNC_FAILED: 502,
+  CERTD_WEBHOOK_DISABLED: 503,
 };
 
 export function error(

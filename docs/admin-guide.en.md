@@ -302,6 +302,69 @@ Audit logs live under the **Audit Logs** tab at the top of the **System Settings
 
 ---
 
+## Integrating certd for cert auto-renewal
+
+If you use [certd](https://github.com/certd/certd) to centrally manage Let's Encrypt / ZeroSSL certificates, you can push renewed certificates to WireMesh via webhook. WireMesh finds every entry node that uses `ws-tls` with a matching domain, stores the new cert, and notifies the Agent to reload Xray — no on-node ACME, no need to expose port 80.
+
+### Enable the webhook
+
+WireMesh reads the webhook secret from an environment variable at startup. Add the following to your `.env`, systemd unit, or docker `environment`:
+
+```
+CERTD_WEBHOOK_SECRET=<32 random bytes>
+```
+
+Generate one with:
+
+```
+openssl rand -base64 32
+```
+
+Restart the WireMesh process after setting it. If `CERTD_WEBHOOK_SECRET` is unset or empty, the endpoint returns 503 — there is no window during which the webhook accepts unauthenticated requests.
+
+**Rotation:** change the env var → restart the process → update the `Authorization` header in the certd task.
+
+### Configure the certd task
+
+Add a `WebhookDeployCert` ("webhook方式部署证书") deploy task in certd with the following fields:
+
+| Field | Value |
+|-------|-------|
+| Webhook URL | `https://<wiremesh-host>/api/webhooks/certd` |
+| Method | `POST` |
+| ContentType | `application/json` |
+| Headers | `Authorization=Bearer <CERTD_WEBHOOK_SECRET>` |
+| Body template | `{"domain":"${domain}","crt":"${crt}","key":"${key}"}` |
+| Success match (optional) | `"matched"` |
+
+certd will fire this task automatically after each successful renewal.
+
+### Behaviour
+
+- On receipt, WireMesh selects every node where `xray_transport='ws-tls'` and `xray_tls_domain` equals the pushed `domain`, stores the new cert (private key is AES-256-GCM encrypted at rest), and sends an SSE event so the Agent pulls fresh config.
+- Multiple nodes sharing a domain are all updated.
+- If no node currently uses the domain, the endpoint returns 200 with `matched: 0` — this is **not** a failure: certd keeps the cert on its side and state stays consistent.
+- Pushing the same cert again is idempotent — no extra SSE events are emitted.
+
+### Response and error codes
+
+Success response:
+
+```json
+{ "data": { "domain": "example.com", "matched": 2, "updated": 2 } }
+```
+
+`matched` is the number of nodes that matched the domain; `updated` is the number actually written (re-pushing the same cert yields `updated: 0`).
+
+| Status | code | When |
+|--------|------|------|
+| 200 | — | Authentication passed and payload is valid (even when `matched` is 0) |
+| 400 | `VALIDATION_ERROR` | Body is not valid JSON, fields are missing, or `crt` / `key` is not valid PEM |
+| 401 | `UNAUTHORIZED` | Missing or wrong Bearer token |
+| 503 | `CERTD_WEBHOOK_DISABLED` | `CERTD_WEBHOOK_SECRET` is not configured |
+
+---
+
 ## FAQ
 
 **Node shows offline after installation**
