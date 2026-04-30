@@ -13,5 +13,6 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - PUBLIC_URL=${PUBLIC_URL:-http://localhost:3456}
+      - CERTD_WEBHOOK_SECRET=${CERTD_WEBHOOK_SECRET:-}
       - HOSTNAME=0.0.0.0
     restart: unless-stopped
