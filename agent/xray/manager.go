@@ -71,6 +71,23 @@ func Sync(cfg *api.XrayConfig, client *api.Client) error {
 	return start()
 }
 
+// RenewCertIfNeeded re-runs the auto-cert flow for ws-tls auto-mode nodes.
+// Safe to call periodically: it no-ops unless the cert is within 30 days of
+// expiry, in which case it re-issues, re-uploads, and restarts Xray via Sync.
+func RenewCertIfNeeded(cfg *api.XrayConfig, client *api.Client) error {
+	if cfg == nil || !cfg.Enabled {
+		return nil
+	}
+	if !needsAutocert(cfg) {
+		return nil
+	}
+	if certValid(cfg) {
+		return nil
+	}
+	log.Printf("[xray] Cert for %s approaching expiry, renewing", cfg.TlsDomain)
+	return Sync(cfg, client)
+}
+
 // Stop stops the Xray service. Called during agent shutdown.
 func Stop() {
 	if IsRunning() {

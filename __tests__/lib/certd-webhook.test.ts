@@ -57,6 +57,7 @@ type NodeRow = {
   xrayTlsDomain: string | null;
   xrayTlsCert: string | null;
   xrayTlsKey: string | null;
+  xrayCertMode: string | null;
   updatedAt: string | null;
 };
 
@@ -257,9 +258,9 @@ describe("certd-webhook applyCertToMatchingNodes", () => {
 
   it("updates only nodes with ws-tls + matching domain", () => {
     dbState.rows = [
-      { id: 1, xrayTransport: "ws-tls", xrayTlsDomain: "test.example.com", xrayTlsCert: null, xrayTlsKey: null, updatedAt: null },
-      { id: 2, xrayTransport: "reality", xrayTlsDomain: "test.example.com", xrayTlsCert: null, xrayTlsKey: null, updatedAt: null },
-      { id: 3, xrayTransport: "ws-tls", xrayTlsDomain: "other.example.com", xrayTlsCert: null, xrayTlsKey: null, updatedAt: null },
+      { id: 1, xrayTransport: "ws-tls", xrayTlsDomain: "test.example.com", xrayTlsCert: null, xrayTlsKey: null, xrayCertMode: "auto", updatedAt: null },
+      { id: 2, xrayTransport: "reality", xrayTlsDomain: "test.example.com", xrayTlsCert: null, xrayTlsKey: null, xrayCertMode: "auto", updatedAt: null },
+      { id: 3, xrayTransport: "ws-tls", xrayTlsDomain: "other.example.com", xrayTlsCert: null, xrayTlsKey: null, xrayCertMode: "auto", updatedAt: null },
     ];
 
     const r = applyCertToMatchingNodes(payload);
@@ -271,12 +272,13 @@ describe("certd-webhook applyCertToMatchingNodes", () => {
     expect(dbState.rows[1].xrayTlsCert).toBeNull();
     expect(dbState.rows[2].xrayTlsCert).toBeNull();
     expect(sseState.notified).toEqual([1]);
+    expect(dbState.rows[0].xrayCertMode).toBe("certd");
   });
 
   it("updates all matching nodes when multiple share the domain", () => {
     dbState.rows = [
-      { id: 1, xrayTransport: "ws-tls", xrayTlsDomain: "test.example.com", xrayTlsCert: null, xrayTlsKey: null, updatedAt: null },
-      { id: 2, xrayTransport: "ws-tls", xrayTlsDomain: "test.example.com", xrayTlsCert: null, xrayTlsKey: null, updatedAt: null },
+      { id: 1, xrayTransport: "ws-tls", xrayTlsDomain: "test.example.com", xrayTlsCert: null, xrayTlsKey: null, xrayCertMode: "auto", updatedAt: null },
+      { id: 2, xrayTransport: "ws-tls", xrayTlsDomain: "test.example.com", xrayTlsCert: null, xrayTlsKey: null, xrayCertMode: "auto", updatedAt: null },
     ];
 
     const r = applyCertToMatchingNodes(payload);
@@ -287,7 +289,7 @@ describe("certd-webhook applyCertToMatchingNodes", () => {
 
   it("skips UPDATE and SSE when stored cert is byte-identical to payload", () => {
     dbState.rows = [
-      { id: 1, xrayTransport: "ws-tls", xrayTlsDomain: "test.example.com", xrayTlsCert: TEST_CRT, xrayTlsKey: "old-encrypted", updatedAt: "old" },
+      { id: 1, xrayTransport: "ws-tls", xrayTlsDomain: "test.example.com", xrayTlsCert: TEST_CRT, xrayTlsKey: "old-encrypted", xrayCertMode: "auto", updatedAt: "old" },
     ];
 
     const r = applyCertToMatchingNodes(payload);
@@ -299,12 +301,20 @@ describe("certd-webhook applyCertToMatchingNodes", () => {
 
   it("returns matched:0 when no node uses this domain", () => {
     dbState.rows = [
-      { id: 1, xrayTransport: "ws-tls", xrayTlsDomain: "other.example.com", xrayTlsCert: null, xrayTlsKey: null, updatedAt: null },
+      { id: 1, xrayTransport: "ws-tls", xrayTlsDomain: "other.example.com", xrayTlsCert: null, xrayTlsKey: null, xrayCertMode: "auto", updatedAt: null },
     ];
 
     const r = applyCertToMatchingNodes(payload);
     expect(r.matched).toBe(0);
     expect(r.updated).toBe(0);
     expect(sseState.notified).toEqual([]);
+  });
+
+  it("flips served nodes to certd mode", () => {
+    dbState.rows = [
+      { id: 1, xrayTransport: "ws-tls", xrayTlsDomain: "test.example.com", xrayTlsCert: null, xrayTlsKey: null, xrayCertMode: "auto", updatedAt: null },
+    ];
+    applyCertToMatchingNodes(payload);
+    expect(dbState.rows[0].xrayCertMode).toBe("certd");
   });
 });

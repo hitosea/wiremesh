@@ -15,6 +15,7 @@ import { generateRealityKeypair, generateShortId } from "@/lib/reality";
 import { normalizeRealityDest } from "@/lib/reality-dest";
 import { writeAuditLog } from "@/lib/audit-log";
 import { sseManager } from "@/lib/sse-manager";
+import { isCertMode } from "@/lib/cert-mode";
 
 export async function GET(request: NextRequest) {
   const params = parsePaginationParams(request.nextUrl.searchParams);
@@ -165,6 +166,7 @@ export async function POST(request: NextRequest) {
     xrayTlsDomain,
     xrayTlsCert,
     xrayTlsKey,
+    xrayCertMode,
   } = body;
 
   if (!name || !ip) {
@@ -174,6 +176,12 @@ export async function POST(request: NextRequest) {
   const transport: "reality" | "ws-tls" =
     xrayTransport === "ws-tls" ? "ws-tls" : "reality";
   const normalizedTlsDomain = String(xrayTlsDomain ?? "").trim();
+  const certMode =
+    transport === "ws-tls" && isCertMode(xrayCertMode)
+      ? xrayCertMode
+      : transport === "ws-tls"
+        ? "auto"
+        : "manual";
 
   if (transport === "ws-tls" && !normalizedTlsDomain) {
     return error("VALIDATION_ERROR", "validation.wsTlsDomainRequired");
@@ -249,6 +257,7 @@ export async function POST(request: NextRequest) {
       xrayTlsCert: transport === "ws-tls" && xrayTlsCert ? xrayTlsCert : null,
       xrayTlsKey:
         transport === "ws-tls" && xrayTlsKey ? encrypt(xrayTlsKey) : null,
+      xrayCertMode: certMode,
       xrayPort: xrayPort ?? parseInt(settingsMap["xray_default_port"] ?? String(DEFAULT_PROXY_PORT)),
       xrayConfig: resolvedXrayConfig,
       externalInterface: externalInterface ?? "eth0",

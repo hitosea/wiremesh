@@ -86,6 +86,7 @@ export function applyCertToMatchingNodes(payload: CertdPayload): ApplyResult {
           .set({
             xrayTlsCert: payload.crt,
             xrayTlsKey: encryptedKey,
+            xrayCertMode: "certd",
             updatedAt: sql`(datetime('now'))`,
           })
           .where(eq(nodes.id, row.id))

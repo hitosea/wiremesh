@@ -44,7 +44,7 @@ export default function NewNodePage() {
   const [realityDest, setRealityDest] = useState(DEFAULT_REALITY_DEST);
   const [xrayTransport, setXrayTransport] = useState<"reality" | "ws-tls">("reality");
   const [tlsDomain, setTlsDomain] = useState("");
-  const [tlsCertMode, setTlsCertMode] = useState<"auto" | "manual">("auto");
+  const [tlsCertMode, setTlsCertMode] = useState<"auto" | "certd" | "manual">("auto");
   const [tlsCert, setTlsCert] = useState("");
   const [tlsKey, setTlsKey] = useState("");
   const [defaults, setDefaults] = useState<Record<string, string>>({});
@@ -81,6 +81,7 @@ export default function NewNodePage() {
         body.realityDest = realityDest || undefined;
       } else {
         body.xrayTlsDomain = tlsDomain.trim();
+        body.xrayCertMode = tlsCertMode;
         if (tlsCertMode === "manual") {
           body.xrayTlsCert = tlsCert;
           body.xrayTlsKey = tlsKey;
@@ -260,7 +261,7 @@ export default function NewNodePage() {
                   <Select
                     value={tlsCertMode}
                     onValueChange={(v: string) =>
-                      setTlsCertMode(v as "auto" | "manual")
+                      setTlsCertMode(v as "auto" | "certd" | "manual")
                     }
                   >
                     <SelectTrigger>
@@ -268,11 +269,15 @@ export default function NewNodePage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="auto">{ts("tlsCertModeAuto")}</SelectItem>
+                      <SelectItem value="certd">{ts("tlsCertModeCertd")}</SelectItem>
                       <SelectItem value="manual">{ts("tlsCertModeManual")}</SelectItem>
                     </SelectContent>
                   </Select>
                   {tlsCertMode === "auto" && (
                     <p className="text-xs text-muted-foreground">{ts("tlsCertAutoHint")}</p>
+                  )}
+                  {tlsCertMode === "certd" && (
+                    <p className="text-xs text-muted-foreground">{ts("tlsCertCertdHint")}</p>
                   )}
                 </div>
                 {tlsCertMode === "manual" && (

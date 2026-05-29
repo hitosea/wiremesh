@@ -18,14 +18,15 @@ import (
 )
 
 type Agent struct {
-	cfg           *config.Config
-	client        *api.Client
-	sse           *api.SSEClient
+	cfg            *config.Config
+	client         *api.Client
+	sse            *api.SSEClient
 	activeTunnels  map[string]wg.ActiveTunnel
 	meshPeers      []api.MeshPeer
 	socks5Manager  *socks5.Manager
 	routingManager *routing.Manager
 	lastVersion    string
+	lastXray       *api.XrayConfig
 	version        string
 	ctx            context.Context
 	cancel         context.CancelFunc
@@ -69,6 +70,10 @@ func (a *Agent) Run() error {
 	reportTicker := time.NewTicker(time.Duration(a.cfg.ReportInterval) * time.Second)
 	defer reportTicker.Stop()
 
+	// Daily cert-renewal ticker (auto-mode ws-tls nodes only)
+	certTicker := time.NewTicker(24 * time.Hour)
+	defer certTicker.Stop()
+
 	// 5. Event loop
 	for {
 		select {
@@ -83,6 +88,10 @@ func (a *Agent) Run() error {
 			a.handleSSEEvent(evt)
 		case <-reportTicker.C:
 			a.reportStatus()
+		case <-certTicker.C:
+			if err := xray.RenewCertIfNeeded(a.lastXray, a.client); err != nil {
+				log.Printf("[agent] Cert renewal check failed: %v", err)
+			}
 		}
 	}
 }
@@ -226,6 +235,7 @@ func (a *Agent) pullAndApplyConfigForce(force bool) error {
 	}
 
 	a.lastVersion = cfgData.Version
+	a.lastXray = cfgData.Xray
 	xrayStatus := "disabled"
 	if cfgData.Xray != nil && cfgData.Xray.Enabled {
 		clientCount := 0

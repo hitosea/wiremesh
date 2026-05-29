@@ -49,6 +49,7 @@ type NodeDetail = {
   xrayTlsDomain: string | null;
   xrayTlsCert: string | null;
   xrayTlsKey: string | null;
+  xrayCertMode: "auto" | "certd" | "manual" | null;
   status: string;
   errorMessage: string | null;
   externalInterface: string;
@@ -94,7 +95,7 @@ export default function NodeDetailPage() {
   const [defaults, setDefaults] = useState<Record<string, string>>({});
   const [xrayTransport, setXrayTransport] = useState("reality");
   const [tlsDomain, setTlsDomain] = useState("");
-  const [tlsCertMode, setTlsCertMode] = useState<"auto" | "manual">("auto");
+  const [tlsCertMode, setTlsCertMode] = useState<"auto" | "certd" | "manual">("auto");
   const [tlsCert, setTlsCert] = useState("");
   const [tlsKey, setTlsKey] = useState("");
   const [wsPath, setWsPath] = useState("");
@@ -177,13 +178,9 @@ export default function NodeDetailPage() {
         setXrayTransport(n.xrayTransport === "ws-tls" ? "ws-tls" : "reality");
         setTlsDomain(n.xrayTlsDomain || "");
         setWsPath(n.xrayWsPath || "");
-        if (n.xrayTlsCert) {
-          setTlsCertMode("manual");
-          setTlsCert(n.xrayTlsCert);
-        }
-        if (n.xrayTlsKey) {
-          setTlsKey(n.xrayTlsKey);
-        }
+        setTlsCertMode(n.xrayCertMode ?? "manual");
+        if (n.xrayTlsCert) setTlsCert(n.xrayTlsCert);
+        if (n.xrayTlsKey) setTlsKey(n.xrayTlsKey);
       })
       .catch(() => toast.error(ts("loadNodeFailed")))
       .finally(() => setLoading(false));
@@ -217,6 +214,7 @@ export default function NodeDetailPage() {
       body.xrayTransport = xrayTransport;
       if (xrayTransport === "ws-tls") {
         body.xrayTlsDomain = tlsDomain;
+        body.xrayCertMode = tlsCertMode;
         if (tlsCertMode === "manual") {
           body.xrayTlsCert = tlsCert;
           body.xrayTlsKey = tlsKey;
@@ -490,15 +488,19 @@ export default function NodeDetailPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>{ts("tlsCertMode")}</Label>
-                  <Select value={tlsCertMode} onValueChange={(v: string) => setTlsCertMode(v as "auto" | "manual")}>
+                  <Select value={tlsCertMode} onValueChange={(v: string) => setTlsCertMode(v as "auto" | "certd" | "manual")}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="auto">{ts("tlsCertModeAuto")}</SelectItem>
+                      <SelectItem value="certd">{ts("tlsCertModeCertd")}</SelectItem>
                       <SelectItem value="manual">{ts("tlsCertModeManual")}</SelectItem>
                     </SelectContent>
                   </Select>
                   {tlsCertMode === "auto" && (
                     <p className="text-xs text-muted-foreground">{ts("tlsCertAutoHint")}</p>
+                  )}
+                  {tlsCertMode === "certd" && (
+                    <p className="text-xs text-muted-foreground">{ts("tlsCertCertdHint")}</p>
                   )}
                 </div>
                 {tlsCertMode === "manual" && (

@@ -309,6 +309,7 @@ export async function GET(request: NextRequest) {
     tlsDomain?: string;
     tlsCert?: string;
     tlsKey?: string;
+    certMode?: string;
     routes: { lineId: number; uuids: string[]; port: number; tunnel: string; mark: number; branches: { mark: number; tunnel: string; is_default: boolean; domain_rules: string[] }[] }[];
     dnsProxy?: string;
   } | null = null;
@@ -442,6 +443,7 @@ export async function GET(request: NextRequest) {
         tlsDomain: node.xrayTlsDomain ?? "",
         tlsCert: node.xrayTlsCert ?? "",
         tlsKey,
+        certMode: node.xrayCertMode ?? "manual",
         routes: xrayRoutes,
         dnsProxy: xrayDnsProxy,
       };

@@ -16,14 +16,24 @@ import (
 )
 
 func needsAutocert(cfg *api.XrayConfig) bool {
-	return cfg.Transport == "ws-tls" && cfg.TlsDomain != "" && cfg.TlsCert == ""
+	return cfg.Transport == "ws-tls" && cfg.TlsDomain != "" && cfg.CertMode == "auto"
 }
 
-func localCertValid(domain string) bool {
-	certPath := fmt.Sprintf("%s/%s.crt", XrayConfigDir, domain)
-	data, err := os.ReadFile(certPath)
-	if err != nil {
-		return false
+// certValid reports whether the effective certificate for the domain is valid
+// for at least 30 more days. It prefers the platform-supplied PEM (cfg.TlsCert)
+// and falls back to the on-disk file, so a fresh disk (no file yet) does not
+// trigger a needless re-issue when the platform already holds a valid cert.
+func certValid(cfg *api.XrayConfig) bool {
+	var data []byte
+	if cfg.TlsCert != "" {
+		data = []byte(cfg.TlsCert)
+	} else {
+		certPath := fmt.Sprintf("%s/%s.crt", XrayConfigDir, cfg.TlsDomain)
+		b, err := os.ReadFile(certPath)
+		if err != nil {
+			return false
+		}
+		data = b
 	}
 	block, _ := pem.Decode(data)
 	if block == nil {
@@ -42,11 +52,9 @@ func AutoCert(cfg *api.XrayConfig, client *api.Client) error {
 	}
 
 	domain := cfg.TlsDomain
-	certPath := fmt.Sprintf("%s/%s.crt", XrayConfigDir, domain)
-	keyPath := fmt.Sprintf("%s/%s.key", XrayConfigDir, domain)
 
-	if localCertValid(domain) {
-		log.Printf("[acme] Local cert for %s is still valid, skipping", domain)
+	if certValid(cfg) {
+		log.Printf("[acme] Cert for %s still valid (>30d), skipping", domain)
 		return nil
 	}
 
@@ -109,17 +117,12 @@ func AutoCert(cfg *api.XrayConfig, client *api.Client) error {
 	}
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privDER})
 
-	// Save locally
-	if err := os.MkdirAll(XrayConfigDir, 0755); err != nil {
-		return fmt.Errorf("create xray config dir: %w", err)
-	}
-	if err := os.WriteFile(certPath, certPEM, 0644); err != nil {
-		return fmt.Errorf("write cert: %w", err)
-	}
-	if err := os.WriteFile(keyPath, keyPEM, 0600); err != nil {
-		return fmt.Errorf("write key: %w", err)
-	}
-	log.Printf("[acme] Certificate saved for %s", domain)
+	// Make the freshly issued cert the effective one for the rest of this Sync
+	// pass (writeCertFiles + GenerateConfig + restart), and for the next call.
+	// writeCertFiles is the single writer of the leaf cert/key files, so it can
+	// detect the change and trigger an Xray restart on renewal.
+	cfg.TlsCert = string(certPEM)
+	cfg.TlsKey = string(keyPEM)
 
 	// Upload to platform
 	if err := client.UploadCert(domain, string(certPEM), string(keyPEM)); err != nil {

@@ -10,6 +10,7 @@ import { generateRealityKeypair, generateShortId } from "@/lib/reality";
 import { normalizeRealityDest } from "@/lib/reality-dest";
 import { sseManager } from "@/lib/sse-manager";
 import { getNodePorts } from "@/lib/node-ports";
+import { isCertMode } from "@/lib/cert-mode";
 import { deleteSource as deleteLatencySource } from "@/lib/node-latency-matrix";
 
 type Params = { params: Promise<{ id: string }> };
@@ -37,6 +38,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       xrayTlsDomain: nodes.xrayTlsDomain,
       xrayTlsCert: nodes.xrayTlsCert,
       xrayTlsKey: nodes.xrayTlsKey,
+      xrayCertMode: nodes.xrayCertMode,
       status: nodes.status,
       errorMessage: nodes.errorMessage,
       remark: nodes.remark,
@@ -81,6 +83,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
       xrayWsPath: nodes.xrayWsPath,
       xrayTlsDomain: nodes.xrayTlsDomain,
       xrayTransport: nodes.xrayTransport,
+      xrayCertMode: nodes.xrayCertMode,
     })
     .from(nodes)
     .where(eq(nodes.id, nodeId))
@@ -174,6 +177,12 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (body.xrayTlsKey !== undefined) {
     updateData.xrayTlsKey = body.xrayTlsKey ? encrypt(body.xrayTlsKey) : null;
   }
+  if (body.xrayCertMode !== undefined) {
+    if (!isCertMode(body.xrayCertMode)) {
+      return error("VALIDATION_ERROR", "validation.invalidCertMode");
+    }
+    updateData.xrayCertMode = body.xrayCertMode;
+  }
 
   // Validate: ws-tls requires a domain
   if (updateData.xrayTransport === "ws-tls") {
@@ -181,6 +190,25 @@ export async function PUT(request: NextRequest, { params }: Params) {
     if (!domain) {
       return error("VALIDATION_ERROR", "validation.wsTlsDomainRequired");
     }
+  }
+
+  // Normalize cert mode against the effective transport. Cert mode only applies
+  // to ws-tls; reality/tcp nodes are forced to "manual" (the field is dormant),
+  // so switching a node away from ws-tls can't leave a stale "auto"/"certd".
+  const effectiveTransport = updateData.xrayTransport ?? existing.xrayTransport;
+  if (effectiveTransport !== "ws-tls") {
+    updateData.xrayCertMode = "manual";
+  } else if (
+    updateData.xrayCertMode !== undefined &&
+    updateData.xrayCertMode !== "manual" &&
+    existing.xrayCertMode === "manual" &&
+    body.xrayTlsCert === undefined
+  ) {
+    // Switching from a manually-uploaded cert to a managed mode (auto/certd):
+    // drop the stale manual cert/key so the agent (or certd) provisions a fresh
+    // one, instead of certValid() seeing the old cert and skipping issuance.
+    updateData.xrayTlsCert = null;
+    updateData.xrayTlsKey = null;
   }
 
   // Auto-generate xrayWsPath when switching to ws-tls and node has none

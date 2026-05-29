@@ -46,6 +46,7 @@ export const nodes = sqliteTable("nodes", {
   xrayTlsDomain: text("xray_tls_domain"),
   xrayTlsCert: text("xray_tls_cert"),
   xrayTlsKey: text("xray_tls_key"),
+  xrayCertMode: text("xray_cert_mode").notNull().default("manual"),
   externalInterface: text("external_interface").notNull().default("eth0"),
   status: text("status").notNull().default("offline"),
   errorMessage: text("error_message"),

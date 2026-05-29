@@ -6,14 +6,14 @@ type ConfigResponse struct {
 }
 
 type ConfigData struct {
-	Node    NodeConfig     `json:"node"`
-	Peers   []PeerConfig   `json:"peers"`
-	Tunnels TunnelConfig   `json:"tunnels"`
-	Xray    *XrayConfig    `json:"xray"`
-	Socks5  *Socks5Config  `json:"socks5"`
-	Routing *RoutingConfig `json:"routing"`
-	MeshPeers []MeshPeer   `json:"meshPeers,omitempty"`
-	Version string         `json:"version"`
+	Node          NodeConfig     `json:"node"`
+	Peers         []PeerConfig   `json:"peers"`
+	Tunnels       TunnelConfig   `json:"tunnels"`
+	Xray          *XrayConfig    `json:"xray"`
+	Socks5        *Socks5Config  `json:"socks5"`
+	Routing       *RoutingConfig `json:"routing"`
+	MeshPeers     []MeshPeer     `json:"meshPeers,omitempty"`
+	Version       string         `json:"version"`
 	PendingDelete bool           `json:"pending_delete"`
 }
 
@@ -63,36 +63,37 @@ type DeviceRoute struct {
 }
 
 type XrayConfig struct {
-	Enabled            bool              `json:"enabled"`
-	Protocol           string            `json:"protocol"`
-	Port               int               `json:"port"`
-	RealityPrivateKey  string            `json:"realityPrivateKey"`
-	RealityShortId     string            `json:"realityShortId"`
-	RealityDest        string            `json:"realityDest"`
-	RealityServerNames []string          `json:"realityServerNames"`
-	Transport          string            `json:"transport,omitempty"`  // "reality" or "ws-tls"
-	WsPath             string            `json:"wsPath,omitempty"`
-	TlsDomain          string            `json:"tlsDomain,omitempty"`
-	TlsCert            string            `json:"tlsCert,omitempty"`
-	TlsKey             string            `json:"tlsKey,omitempty"`
-	Routes             []XrayLineRoute   `json:"routes"`
-	DNSProxy           string            `json:"dnsProxy,omitempty"` // agent DNS proxy IP, e.g. "10.210.0.1"
+	Enabled            bool            `json:"enabled"`
+	Protocol           string          `json:"protocol"`
+	Port               int             `json:"port"`
+	RealityPrivateKey  string          `json:"realityPrivateKey"`
+	RealityShortId     string          `json:"realityShortId"`
+	RealityDest        string          `json:"realityDest"`
+	RealityServerNames []string        `json:"realityServerNames"`
+	Transport          string          `json:"transport,omitempty"` // "reality" or "ws-tls"
+	WsPath             string          `json:"wsPath,omitempty"`
+	TlsDomain          string          `json:"tlsDomain,omitempty"`
+	TlsCert            string          `json:"tlsCert,omitempty"`
+	TlsKey             string          `json:"tlsKey,omitempty"`
+	CertMode           string          `json:"certMode,omitempty"` // "auto" | "certd" | "manual"
+	Routes             []XrayLineRoute `json:"routes"`
+	DNSProxy           string          `json:"dnsProxy,omitempty"` // agent DNS proxy IP, e.g. "10.210.0.1"
 }
 
 // XrayLineRoute maps UUIDs on a specific line to a dedicated inbound+outbound pair.
 type XrayLineRoute struct {
-	LineID   int              `json:"lineId"`
-	UUIDs    []string         `json:"uuids"`
-	Port     int              `json:"port"`      // dedicated Xray inbound port for this line
-	Tunnel   string           `json:"tunnel"`    // default branch tunnel
-	Mark     int              `json:"mark"`      // fwmark for this line's outbound
-	Branches []XrayBranch     `json:"branches"`  // per-branch routing for split tunneling
+	LineID   int          `json:"lineId"`
+	UUIDs    []string     `json:"uuids"`
+	Port     int          `json:"port"`     // dedicated Xray inbound port for this line
+	Tunnel   string       `json:"tunnel"`   // default branch tunnel
+	Mark     int          `json:"mark"`     // fwmark for this line's outbound
+	Branches []XrayBranch `json:"branches"` // per-branch routing for split tunneling
 }
 
 // XrayBranch defines a branch outbound for Xray domain-based routing.
 type XrayBranch struct {
-	Mark        int      `json:"mark"`         // branch fwmark (e.g. 30001)
-	Tunnel      string   `json:"tunnel"`       // tunnel interface name
+	Mark        int      `json:"mark"`   // branch fwmark (e.g. 30001)
+	Tunnel      string   `json:"tunnel"` // tunnel interface name
 	IsDefault   bool     `json:"is_default"`
 	DomainRules []string `json:"domain_rules"` // domains routed to this branch
 }
