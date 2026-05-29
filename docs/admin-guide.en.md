@@ -339,6 +339,17 @@ Add a `WebhookDeployCert` ("webhook方式部署证书") deploy task in certd wit
 
 certd will fire this task automatically after each successful renewal.
 
+**Deploying multiple domains at once:** the body also accepts an array, so a single push can deliver the same cert/key to several domains (e.g. one SAN cert covering multiple hostnames):
+
+```json
+[
+  {"domain":"aa.abc.com","crt":"${crt}","key":"${key}"},
+  {"domain":"bb.abc.com","crt":"${crt}","key":"${key}"}
+]
+```
+
+Each array element is validated exactly like the single-object form; if any element is invalid (missing field, bad PEM) the whole request returns 400. Duplicate `domain` values are de-duplicated (last one wins) so a node is never written twice in a single push.
+
 ### Behaviour
 
 - On receipt, WireMesh selects every node where `xray_transport='ws-tls'` and `xray_tls_domain` equals the pushed `domain`, stores the new cert (private key is AES-256-GCM encrypted at rest), and sends an SSE event so the Agent pulls fresh config.
@@ -351,10 +362,16 @@ certd will fire this task automatically after each successful renewal.
 Success response:
 
 ```json
-{ "data": { "domain": "example.com", "matched": 2, "updated": 2 } }
+{
+  "data": {
+    "results": [{ "domain": "example.com", "matched": 2, "updated": 2 }],
+    "matched": 2,
+    "updated": 2
+  }
+}
 ```
 
-`matched` is the number of nodes that matched the domain; `updated` is the number actually written (re-pushing the same cert yields `updated: 0`).
+`results` lists the match/write counts per domain; the top-level `matched`/`updated` are the totals across all domains. `matched` is the number of nodes that matched the domain; `updated` is the number actually written (re-pushing the same cert yields `updated: 0`). The single-object and array bodies return the same structure (a single object is treated as a one-element array).
 
 | Status | code | When |
 |--------|------|------|

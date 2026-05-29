@@ -137,6 +137,7 @@ import {
   authenticate,
   parsePayload,
   applyCertToMatchingNodes,
+  applyCerts,
 } from "@/lib/certd-webhook";
 
 const ENC_KEY = "a".repeat(64);
@@ -205,13 +206,42 @@ describe("certd-webhook parsePayload", () => {
   it("accepts a valid payload", () => {
     const r = parsePayload({ domain: "test.example.com", crt: TEST_CRT, key: TEST_KEY });
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.data.domain).toBe("test.example.com");
+    if (r.ok) {
+      expect(r.data).toHaveLength(1);
+      expect(r.data[0].domain).toBe("test.example.com");
+    }
   });
 
   it("trims domain whitespace", () => {
     const r = parsePayload({ domain: "  test.example.com  ", crt: TEST_CRT, key: TEST_KEY });
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.data.domain).toBe("test.example.com");
+    if (r.ok) expect(r.data[0].domain).toBe("test.example.com");
+  });
+
+  it("accepts an array of payloads", () => {
+    const r = parsePayload([
+      { domain: "aa.abc.com", crt: TEST_CRT, key: TEST_KEY },
+      { domain: "bb.abc.com", crt: TEST_CRT, key: TEST_KEY },
+    ]);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.data).toHaveLength(2);
+      expect(r.data.map((d) => d.domain)).toEqual(["aa.abc.com", "bb.abc.com"]);
+    }
+  });
+
+  it("rejects an empty array", () => {
+    const r = parsePayload([]);
+    expect(r.ok).toBe(false);
+  });
+
+  it("rejects an array where one entry is invalid", () => {
+    const r = parsePayload([
+      { domain: "aa.abc.com", crt: TEST_CRT, key: TEST_KEY },
+      { domain: "bb.abc.com", crt: "not a pem", key: TEST_KEY },
+    ]);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toContain("entry[1]");
   });
 
   it("rejects non-object body", () => {
@@ -316,5 +346,57 @@ describe("certd-webhook applyCertToMatchingNodes", () => {
     ];
     applyCertToMatchingNodes(payload);
     expect(dbState.rows[0].xrayCertMode).toBe("certd");
+  });
+});
+
+describe("certd-webhook applyCerts", () => {
+  it("applies a cert per domain and aggregates totals", () => {
+    dbState.rows = [
+      { id: 1, xrayTransport: "ws-tls", xrayTlsDomain: "aa.abc.com", xrayTlsCert: null, xrayTlsKey: null, xrayCertMode: "auto", updatedAt: null },
+      { id: 2, xrayTransport: "ws-tls", xrayTlsDomain: "bb.abc.com", xrayTlsCert: null, xrayTlsKey: null, xrayCertMode: "auto", updatedAt: null },
+      { id: 3, xrayTransport: "ws-tls", xrayTlsDomain: "cc.abc.com", xrayTlsCert: null, xrayTlsKey: null, xrayCertMode: "auto", updatedAt: null },
+    ];
+
+    const r = applyCerts([
+      { domain: "aa.abc.com", crt: TEST_CRT, key: TEST_KEY },
+      { domain: "bb.abc.com", crt: TEST_CRT, key: TEST_KEY },
+    ]);
+
+    expect(r.matched).toBe(2);
+    expect(r.updated).toBe(2);
+    expect(r.results).toEqual([
+      { domain: "aa.abc.com", matched: 1, updated: 1 },
+      { domain: "bb.abc.com", matched: 1, updated: 1 },
+    ]);
+    expect(dbState.rows[0].xrayTlsCert).toBe(TEST_CRT);
+    expect(dbState.rows[1].xrayTlsCert).toBe(TEST_CRT);
+    expect(dbState.rows[2].xrayTlsCert).toBeNull();
+    expect(sseState.notified).toEqual([1, 2]);
+  });
+
+  it("collapses duplicate domains so a node is written once", () => {
+    dbState.rows = [
+      { id: 1, xrayTransport: "ws-tls", xrayTlsDomain: "aa.abc.com", xrayTlsCert: null, xrayTlsKey: null, xrayCertMode: "auto", updatedAt: null },
+    ];
+
+    const r = applyCerts([
+      { domain: "aa.abc.com", crt: TEST_CRT, key: TEST_KEY },
+      { domain: "aa.abc.com", crt: TEST_CRT, key: TEST_KEY },
+    ]);
+
+    expect(r.results).toHaveLength(1);
+    expect(r.updated).toBe(1);
+    expect(sseState.notified).toEqual([1]);
+  });
+
+  it("handles a single-element list like the legacy single payload", () => {
+    dbState.rows = [
+      { id: 1, xrayTransport: "ws-tls", xrayTlsDomain: "test.example.com", xrayTlsCert: null, xrayTlsKey: null, xrayCertMode: "auto", updatedAt: null },
+    ];
+
+    const r = applyCerts([{ domain: "test.example.com", crt: TEST_CRT, key: TEST_KEY }]);
+    expect(r.matched).toBe(1);
+    expect(r.updated).toBe(1);
+    expect(r.results).toEqual([{ domain: "test.example.com", matched: 1, updated: 1 }]);
   });
 });

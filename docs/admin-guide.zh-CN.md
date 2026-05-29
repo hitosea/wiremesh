@@ -339,6 +339,17 @@ openssl rand -base64 32
 
 certd 续签成功后会自动触发该部署任务。
 
+**批量部署多个域名：** body 也支持数组形式，一次推送即可把同一份证书/私钥下发到多个域名（例如一张 SAN 证书覆盖多个域名）：
+
+```json
+[
+  {"domain":"aa.abc.com","crt":"${crt}","key":"${key}"},
+  {"domain":"bb.abc.com","crt":"${crt}","key":"${key}"}
+]
+```
+
+数组中每一项的校验规则与单对象完全一致；任意一项非法（缺字段、PEM 不合法）都会导致整个请求返回 400。重复出现的 `domain` 会被去重（后者覆盖前者），保证同一节点在一次推送中只写入一次。
+
 ### 行为说明
 
 - 推送到达后，WireMesh 找出所有 `xray_transport='ws-tls'` 且 `xray_tls_domain` 匹配 `domain` 的节点，写入新证书（私钥使用 AES-256-GCM 加密入库），并通过 SSE 通知对应 Agent 重新拉取配置。
@@ -351,10 +362,16 @@ certd 续签成功后会自动触发该部署任务。
 成功响应：
 
 ```json
-{ "data": { "domain": "example.com", "matched": 2, "updated": 2 } }
+{
+  "data": {
+    "results": [{ "domain": "example.com", "matched": 2, "updated": 2 }],
+    "matched": 2,
+    "updated": 2
+  }
+}
 ```
 
-`matched` 是匹配到的节点数；`updated` 是真正写入的节点数（重复推送相同证书时 `updated` 为 0）。
+`results` 按域名列出每个域名的匹配/写入情况；顶层的 `matched`/`updated` 是所有域名的合计。`matched` 是匹配到的节点数；`updated` 是真正写入的节点数（重复推送相同证书时 `updated` 为 0）。单对象与数组 body 返回结构一致（单对象等价于只含一项的数组）。
 
 | 状态码 | code | 触发条件 |
 |--------|------|----------|

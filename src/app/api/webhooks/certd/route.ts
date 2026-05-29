@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import {
   authenticate,
   parsePayload,
-  applyCertToMatchingNodes,
+  applyCerts,
 } from "@/lib/certd-webhook";
 import { success, error } from "@/lib/api-response";
 
@@ -22,9 +22,9 @@ export async function POST(request: NextRequest) {
   const parsed = parsePayload(body);
   if (!parsed.ok) return error("VALIDATION_ERROR", parsed.reason);
 
-  const result = applyCertToMatchingNodes(parsed.data);
+  const result = applyCerts(parsed.data);
   return success({
-    domain: parsed.data.domain,
+    results: result.results,
     matched: result.matched,
     updated: result.updated,
   });
