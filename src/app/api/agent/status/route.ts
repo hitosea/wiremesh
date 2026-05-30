@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
     xray_transfers?: { uuid: string; upload_bytes: number; download_bytes: number }[];
     xray_connections?: { uuid: string; ips: { ip: string; last_seen: number }[] }[];
     socks5_transfers?: { line_id: number; upload_bytes: number; download_bytes: number }[];
+    http_transfers?: { line_id: number; upload_bytes: number; download_bytes: number }[];
     forward_upload?: number;
     forward_download?: number;
     agent_version?: string;
@@ -45,6 +46,7 @@ export async function POST(request: NextRequest) {
     xray_transfers = [],
     xray_connections = [],
     socks5_transfers = [],
+    http_transfers = [],
     forward_upload = 0,
     forward_download = 0,
     agent_version,
@@ -66,6 +68,10 @@ export async function POST(request: NextRequest) {
   for (const st of socks5_transfers) {
     totalUpload += st.upload_bytes ?? 0;
     totalDownload += st.download_bytes ?? 0;
+  }
+  for (const ht of http_transfers) {
+    totalUpload += ht.upload_bytes ?? 0;
+    totalDownload += ht.download_bytes ?? 0;
   }
 
   db.insert(nodeStatus)

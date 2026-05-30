@@ -9,6 +9,7 @@ import (
 	"github.com/wiremesh/agent/api"
 	"github.com/wiremesh/agent/collector"
 	"github.com/wiremesh/agent/config"
+	"github.com/wiremesh/agent/httpproxy"
 	"github.com/wiremesh/agent/iptables"
 	"github.com/wiremesh/agent/lifecycle"
 	"github.com/wiremesh/agent/routing"
@@ -24,6 +25,7 @@ type Agent struct {
 	activeTunnels  map[string]wg.ActiveTunnel
 	meshPeers      []api.MeshPeer
 	socks5Manager  *socks5.Manager
+	httpManager    *httpproxy.Manager
 	routingManager *routing.Manager
 	lastVersion    string
 	lastXray       *api.XrayConfig
@@ -40,6 +42,7 @@ func New(cfg *config.Config, version string) *Agent {
 		client:         client,
 		activeTunnels:  make(map[string]wg.ActiveTunnel),
 		socks5Manager:  socks5.NewManager(),
+		httpManager:    httpproxy.NewManager(),
 		routingManager: routing.NewManager(client),
 		version:        version,
 		ctx:            ctx,
@@ -213,16 +216,19 @@ func (a *Agent) pullAndApplyConfigForce(force bool) error {
 		}
 	}
 
-	// 7. Sync SOCKS5
+	// 7. Sync SOCKS5 + HTTP proxy servers
 	if a.socks5Manager != nil {
 		a.socks5Manager.Sync(cfgData.Socks5)
 	}
+	if a.httpManager != nil {
+		a.httpManager.Sync(cfgData.Http)
+	}
 
-	// 8. Sync SOCKS5 fwmark routing
-	if cfgData.Socks5 != nil && len(cfgData.Socks5.Routes) > 0 {
-		if err := wg.SyncSocks5Routing(cfgData.Socks5.Routes); err != nil {
-			log.Printf("[agent] socks5 routing sync error: %v", err)
-		}
+	// 8. Sync proxy fwmark routing. SOCKS5 and HTTP share per-line marks, so
+	// merge both route sets (dedup by mark) and feed the single range-cleaning
+	// sync once — an HTTP-only line still gets its routing table built.
+	if err := wg.SyncSocks5Routing(mergeProxyRoutes(cfgData.Socks5, cfgData.Http)); err != nil {
+		log.Printf("[agent] proxy routing sync error: %v", err)
 	}
 
 	// 9. Sync branch routing (with Xray routes for OUTPUT chain split tunneling)
@@ -252,12 +258,20 @@ func (a *Agent) pullAndApplyConfigForce(force bool) error {
 		}
 		socks5Status = fmt.Sprintf("enabled (%d users, %d lines)", userCount, len(cfgData.Socks5.Routes))
 	}
+	httpStatus := "disabled"
+	if cfgData.Http != nil && len(cfgData.Http.Routes) > 0 {
+		userCount := 0
+		for _, r := range cfgData.Http.Routes {
+			userCount += len(r.Users)
+		}
+		httpStatus = fmt.Sprintf("enabled (%d users, %d lines)", userCount, len(cfgData.Http.Routes))
+	}
 	routingStatus := "disabled"
 	if cfgData.Routing != nil && cfgData.Routing.Enabled {
 		routingStatus = fmt.Sprintf("enabled (%d branches)", len(cfgData.Routing.Branches))
 	}
-	log.Printf("[agent] Config applied. Tunnels: %d, iptables: %d, xray: %s, socks5: %s, routing: %s",
-		len(a.activeTunnels), len(cfgData.Tunnels.IptablesRules), xrayStatus, socks5Status, routingStatus)
+	log.Printf("[agent] Config applied. Tunnels: %d, iptables: %d, xray: %s, socks5: %s, http: %s, routing: %s",
+		len(a.activeTunnels), len(cfgData.Tunnels.IptablesRules), xrayStatus, socks5Status, httpStatus, routingStatus)
 	return nil
 }
 
@@ -278,6 +292,7 @@ func (a *Agent) shutdown() {
 	}
 	xray.Stop()
 	a.socks5Manager.Stop()
+	a.httpManager.Stop()
 	for name := range a.activeTunnels {
 		log.Printf("[agent] Destroying tunnel %s", name)
 		wg.IpLinkSetDown(name)
@@ -287,4 +302,30 @@ func (a *Agent) shutdown() {
 	wg.CleanupRouting()
 	iptables.RemoveAllWireMeshRules()
 	log.Println("[agent] Shutdown complete")
+}
+
+// mergeProxyRoutes unions SOCKS5 and HTTP routes for fwmark routing. Both
+// protocols use the same per-line mark/tunnel, so duplicates (a line running
+// both proxies) are collapsed by mark. SyncSocks5Routing only reads Mark and
+// Tunnel, so the HTTP routes are mapped onto Socks5Route with empty Users.
+func mergeProxyRoutes(s *api.Socks5Config, h *api.HttpConfig) []api.Socks5Route {
+	seen := make(map[int]bool)
+	var out []api.Socks5Route
+	if s != nil {
+		for _, r := range s.Routes {
+			if !seen[r.Mark] {
+				seen[r.Mark] = true
+				out = append(out, r)
+			}
+		}
+	}
+	if h != nil {
+		for _, r := range h.Routes {
+			if !seen[r.Mark] {
+				seen[r.Mark] = true
+				out = append(out, api.Socks5Route{LineID: r.LineID, Port: r.Port, Mark: r.Mark, Tunnel: r.Tunnel})
+			}
+		}
+	}
+	return out
 }

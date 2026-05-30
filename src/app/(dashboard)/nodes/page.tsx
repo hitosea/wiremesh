@@ -44,6 +44,7 @@ type Node = {
     xray: number[];
     tunnels: number[];
     socks5: number[];
+    http: number[];
   };
 };
 
@@ -256,6 +257,7 @@ export default function NodesPage() {
           ...node.ports.xray,
           ...node.ports.tunnels,
           ...node.ports.socks5,
+          ...node.ports.http,
         ];
         const uniqueCount = new Set(allPorts).size;
 

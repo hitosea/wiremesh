@@ -242,5 +242,33 @@ PersistentKeepalive = 25
     });
   }
 
+  if (protocol === "http") {
+    if (!device.socks5Username || !device.socks5Password) {
+      return error("VALIDATION_ERROR", "validation.deviceHttpIncomplete");
+    }
+
+    let password: string;
+    try {
+      password = decrypt(device.socks5Password);
+    } catch {
+      return error("INTERNAL_ERROR", "internal.decryptDeviceFailed");
+    }
+
+    const endpoint = entryNodeRow.nodeDomain ?? entryNodeRow.nodeIp;
+    const lineRow = db.select({ httpPort: lines.httpPort }).from(lines).where(eq(lines.id, device.lineId!)).get();
+    const httpPort = lineRow?.httpPort ?? (entryNodeRow.nodeXrayPort ?? getXrayDefaultPort());
+
+    const proxyUrl = `http://${device.socks5Username}:${password}@${endpoint}:${httpPort}`;
+
+    return success({
+      format: "http",
+      proxyUrl,
+      server: endpoint,
+      port: httpPort,
+      username: device.socks5Username,
+      password,
+    });
+  }
+
   return error("VALIDATION_ERROR", "validation.unsupportedProtocol");
 }

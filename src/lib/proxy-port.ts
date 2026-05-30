@@ -12,7 +12,7 @@ export function getXrayDefaultPort(): number {
 
 /**
  * Allocate the next free proxy port for a line on its entry node.
- * Scans all occupied xray_port and socks5_port values on that node,
+ * Scans all occupied xray_port, socks5_port and http_port values on that node,
  * then returns the first unused port starting from basePort.
  */
 export function allocateProxyPort(entryNodeId: number, basePort: number): number {
@@ -26,9 +26,9 @@ export function allocateProxyPort(entryNodeId: number, basePort: number): number
 
   if (entryLineIds.length === 0) return basePort;
 
-  // Collect all occupied ports (both xray and socks5) on these lines
+  // Collect all occupied ports (xray, socks5 and http) on these lines
   const occupiedRows = db
-    .select({ xrayPort: lines.xrayPort, socks5Port: lines.socks5Port })
+    .select({ xrayPort: lines.xrayPort, socks5Port: lines.socks5Port, httpPort: lines.httpPort })
     .from(lines)
     .where(inArray(lines.id, entryLineIds))
     .all();
@@ -37,6 +37,7 @@ export function allocateProxyPort(entryNodeId: number, basePort: number): number
   for (const row of occupiedRows) {
     if (row.xrayPort !== null) occupied.add(row.xrayPort);
     if (row.socks5Port !== null) occupied.add(row.socks5Port);
+    if (row.httpPort !== null) occupied.add(row.httpPort);
   }
 
   // Find first free port
@@ -59,15 +60,15 @@ export function backfillProxyPorts(): void {
     .where(and(
       inArray(lines.id,
         db.select({ lineId: devices.lineId }).from(devices)
-          .where(and(isNotNull(devices.lineId), or(eq(devices.protocol, "xray"), eq(devices.protocol, "socks5"))))
+          .where(and(isNotNull(devices.lineId), or(eq(devices.protocol, "xray"), eq(devices.protocol, "socks5"), eq(devices.protocol, "http"))))
       ),
-      or(isNull(lines.xrayPort), isNull(lines.socks5Port))
+      or(isNull(lines.xrayPort), isNull(lines.socks5Port), isNull(lines.httpPort))
     ))
     .get();
   if (!needsBackfill) return;
 
   // Batch-fetch all data needed for backfill
-  const allLineRows = db.select({ id: lines.id, xrayPort: lines.xrayPort, socks5Port: lines.socks5Port }).from(lines).all();
+  const allLineRows = db.select({ id: lines.id, xrayPort: lines.xrayPort, socks5Port: lines.socks5Port, httpPort: lines.httpPort }).from(lines).all();
   const lineMap = new Map(allLineRows.map((r) => [r.id, r]));
 
   const allEntryNodes = db.select({ lineId: lineNodes.lineId, nodeId: lineNodes.nodeId }).from(lineNodes).where(eq(lineNodes.hopOrder, 0)).all();
@@ -78,8 +79,8 @@ export function backfillProxyPorts(): void {
 
   const defaultPort = getXrayDefaultPort();
 
-  for (const protocol of ["xray", "socks5"] as const) {
-    const portField = protocol === "xray" ? "xrayPort" : "socks5Port";
+  for (const protocol of ["xray", "socks5", "http"] as const) {
+    const portField = protocol === "xray" ? "xrayPort" : protocol === "socks5" ? "socks5Port" : "httpPort";
 
     const lineIds = [...new Set(
       db.select({ lineId: devices.lineId }).from(devices)

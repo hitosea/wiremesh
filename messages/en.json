@@ -140,6 +140,7 @@
     "portsXray": "Xray/TCP",
     "portsTunnel": "Tunnel/UDP",
     "portsSocks5": "SOCKS5/TCP",
+    "portsHttp": "HTTP/TCP",
     "agentVersion": "Agent",
     "xrayVersion": "Xray",
     "versionUnknown": "Unknown",
@@ -238,7 +239,8 @@
     "protocol": {
       "wireguard": "WireGuard",
       "xray": "Xray",
-      "socks5": "SOCKS5"
+      "socks5": "SOCKS5",
+      "http": "HTTP"
     },
     "loadFailed": "Failed to load devices",
     "deleted": "Device deleted",
@@ -342,7 +344,8 @@
     "copyConfig": "Copy Config",
     "username": "Username",
     "password": "Password",
-    "socks5Hint": "Configure SOCKS5 proxy in your browser or system proxy settings"
+    "socks5Hint": "Configure SOCKS5 proxy in your browser or system proxy settings",
+    "httpHint": "Configure HTTP proxy in your browser or system proxy settings"
   },
   "lines": {
     "status": {
@@ -762,7 +765,7 @@
       "passwordMinLength": "Password must be at least 6 characters",
       "nameRequired": "Name is required",
       "nameAndIpRequired": "Name and IP are required",
-      "protocolInvalid": "Protocol must be wireguard or xray",
+      "protocolInvalid": "Protocol must be wireguard, xray, socks5 or http",
       "usernameAndPasswordRequired": "Username and password are required",
       "currentAndNewPasswordRequired": "Current and new password are required",
       "newPasswordMinLength": "New password must be at least 6 characters",
@@ -798,6 +801,8 @@
       "deviceNotBound": "Device is not bound to a line, cannot generate config",
       "deviceWgIncomplete": "Device WireGuard config is incomplete",
       "deviceXrayIncomplete": "Device Xray UUID is incomplete",
+      "deviceSocks5Incomplete": "Device SOCKS5 credentials are incomplete",
+      "deviceHttpIncomplete": "Device HTTP credentials are incomplete",
       "realityIncomplete": "Entry node Reality config is incomplete",
       "unsupportedProtocol": "Unsupported protocol type",
       "wgPortRange": "WireGuard default port must be an integer between 1-65535",

@@ -54,13 +54,13 @@ export async function PUT(request: NextRequest, { params }: Params) {
     })
     .get();
 
-  // Allocate proxy port if moving an xray/socks5 device to a line that lacks one
+  // Allocate proxy port if moving an xray/socks5/http device to a line that lacks one
   if (lineId) {
     const device = db.select({ protocol: devices.protocol }).from(devices)
       .where(eq(devices.id, deviceId)).get();
-    if (device && (device.protocol === "xray" || device.protocol === "socks5")) {
-      const portField = device.protocol === "xray" ? "xrayPort" : "socks5Port";
-      const line = db.select({ xrayPort: lines.xrayPort, socks5Port: lines.socks5Port })
+    if (device && (device.protocol === "xray" || device.protocol === "socks5" || device.protocol === "http")) {
+      const portField = device.protocol === "xray" ? "xrayPort" : device.protocol === "socks5" ? "socks5Port" : "httpPort";
+      const line = db.select({ xrayPort: lines.xrayPort, socks5Port: lines.socks5Port, httpPort: lines.httpPort })
         .from(lines).where(eq(lines.id, lineId)).get();
       const entryNodeId = getEntryNodeId(lineId);
       if (line && line[portField] === null && entryNodeId !== null) {

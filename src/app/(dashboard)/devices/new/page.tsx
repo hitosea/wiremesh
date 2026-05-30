@@ -35,7 +35,7 @@ export default function NewDevicePage() {
   const [submitting, setSubmitting] = useState(false);
 
   const [name, setName] = useState("");
-  const [protocol, setProtocol] = useState<"wireguard" | "xray" | "socks5">("wireguard");
+  const [protocol, setProtocol] = useState<"wireguard" | "xray" | "socks5" | "http">("wireguard");
   const [lineId, setLineId] = useState<string>("");
   const [remark, setRemark] = useState("");
 
@@ -122,7 +122,7 @@ export default function NewDevicePage() {
               </Label>
               <Select
                 value={protocol}
-                onValueChange={(v) => setProtocol(v as "wireguard" | "xray" | "socks5")}
+                onValueChange={(v) => setProtocol(v as "wireguard" | "xray" | "socks5" | "http")}
               >
                 <SelectTrigger id="protocol">
                   <SelectValue placeholder={t("selectProtocol")} />
@@ -131,6 +131,7 @@ export default function NewDevicePage() {
                   <SelectItem value="wireguard">WireGuard</SelectItem>
                   <SelectItem value="xray">Xray</SelectItem>
                   <SelectItem value="socks5">SOCKS5</SelectItem>
+                  <SelectItem value="http">HTTP</SelectItem>
                 </SelectContent>
               </Select>
             </div>

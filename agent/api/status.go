@@ -9,6 +9,7 @@ type StatusReport struct {
 	XrayTransfers    []XrayTransferReport   `json:"xray_transfers,omitempty"`
 	XrayConnections  []XrayConnectionReport `json:"xray_connections,omitempty"`
 	Socks5Transfers  []Socks5TransferReport `json:"socks5_transfers,omitempty"`
+	HttpTransfers    []Socks5TransferReport `json:"http_transfers,omitempty"`
 	ForwardUpload    int64                  `json:"forward_upload,omitempty"`
 	ForwardDownload  int64                  `json:"forward_download,omitempty"`
 	AgentVersion     string                 `json:"agent_version,omitempty"`

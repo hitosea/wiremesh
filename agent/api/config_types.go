@@ -11,6 +11,7 @@ type ConfigData struct {
 	Tunnels       TunnelConfig   `json:"tunnels"`
 	Xray          *XrayConfig    `json:"xray"`
 	Socks5        *Socks5Config  `json:"socks5"`
+	Http          *HttpConfig    `json:"http"`
 	Routing       *RoutingConfig `json:"routing"`
 	MeshPeers     []MeshPeer     `json:"meshPeers,omitempty"`
 	Version       string         `json:"version"`
@@ -144,4 +145,19 @@ type Socks5Route struct {
 type Socks5User struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+}
+
+// HttpConfig is the per-line HTTP proxy configuration delivered to entry nodes.
+// HTTP proxies reuse the same per-line fwmark/tunnel as SOCKS5; Users reuses
+// the SOCKS5 credential shape since both store username/password pairs.
+type HttpConfig struct {
+	Routes []HttpRoute `json:"routes"`
+}
+
+type HttpRoute struct {
+	LineID int          `json:"lineId"`
+	Port   int          `json:"port"`
+	Mark   int          `json:"mark"`
+	Tunnel string       `json:"tunnel"`
+	Users  []Socks5User `json:"users"`
 }

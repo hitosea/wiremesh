@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
   if (!name) {
     return error("VALIDATION_ERROR", "validation.nameRequired");
   }
-  if (!protocol || !["wireguard", "xray", "socks5"].includes(protocol)) {
+  if (!protocol || !["wireguard", "xray", "socks5", "http"].includes(protocol)) {
     return error("VALIDATION_ERROR", "validation.protocolInvalid");
   }
 
@@ -141,6 +141,10 @@ export async function POST(request: NextRequest) {
   } else if (protocol === "socks5") {
     socks5Username = generateRandomString(8);
     socks5Password = encrypt(generateRandomString(16));
+  } else if (protocol === "http") {
+    // HTTP proxy reuses the socks5 credential columns.
+    socks5Username = generateRandomString(8);
+    socks5Password = encrypt(generateRandomString(16));
   }
 
   const result = db
@@ -175,10 +179,10 @@ export async function POST(request: NextRequest) {
 
   const entryNodeId = result.lineId ? getEntryNodeId(result.lineId) : null;
 
-  // Allocate proxy port for the line if this is the first xray/socks5 device
-  if (result.lineId && entryNodeId !== null && (protocol === "xray" || protocol === "socks5")) {
-    const portField = protocol === "xray" ? "xrayPort" : "socks5Port";
-    const line = db.select({ xrayPort: lines.xrayPort, socks5Port: lines.socks5Port }).from(lines).where(eq(lines.id, result.lineId)).get();
+  // Allocate proxy port for the line if this is the first xray/socks5/http device
+  if (result.lineId && entryNodeId !== null && (protocol === "xray" || protocol === "socks5" || protocol === "http")) {
+    const portField = protocol === "xray" ? "xrayPort" : protocol === "socks5" ? "socks5Port" : "httpPort";
+    const line = db.select({ xrayPort: lines.xrayPort, socks5Port: lines.socks5Port, httpPort: lines.httpPort }).from(lines).where(eq(lines.id, result.lineId)).get();
     if (line && line[portField] === null) {
       const nodeRow = db.select({ xrayPort: nodes.xrayPort }).from(nodes).where(eq(nodes.id, entryNodeId)).get();
       const basePort = nodeRow?.xrayPort ?? getXrayDefaultPort();

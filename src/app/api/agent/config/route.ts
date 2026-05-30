@@ -327,7 +327,7 @@ export async function GET(request: NextRequest) {
 
   // Batch-fetch persisted proxy ports for all entry lines
   const linePortRows = entryLineIds.length > 0
-    ? db.select({ id: lines.id, xrayPort: lines.xrayPort, socks5Port: lines.socks5Port })
+    ? db.select({ id: lines.id, xrayPort: lines.xrayPort, socks5Port: lines.socks5Port, httpPort: lines.httpPort })
         .from(lines).where(inArray(lines.id, entryLineIds)).all()
     : [];
   const linePortMap = new Map(linePortRows.map((r) => [r.id, r]));
@@ -507,6 +507,55 @@ export async function GET(request: NextRequest) {
 
     if (socks5Routes.length > 0) {
       socks5Config = { routes: socks5Routes };
+    }
+  }
+
+  // ---- HTTP proxy config ----
+  // Mirrors SOCKS5: same per-line mark/tunnel, credentials reuse socks5 columns,
+  // port comes from lines.http_port.
+  let httpConfig: {
+    routes: { lineId: number; port: number; mark: number; tunnel: string; users: { username: string; password: string }[] }[];
+  } | null = null;
+
+  if (entryLineIds.length > 0) {
+    const httpRoutes: { lineId: number; port: number; mark: number; tunnel: string; users: { username: string; password: string }[] }[] = [];
+    const proxyBasePort = node.xrayPort ?? xrayDefaultPort;
+
+    for (const lineId of entryLineIds) {
+      const httpDevices = db
+        .select({ socks5Username: devices.socks5Username, socks5Password: devices.socks5Password })
+        .from(devices)
+        .where(and(eq(devices.lineId, lineId), eq(devices.protocol, "http")))
+        .all()
+        .filter((d) => d.socks5Username && d.socks5Password);
+
+      if (httpDevices.length === 0) continue;
+
+      const users = httpDevices.map((d) => {
+        let password = "";
+        try { password = decrypt(d.socks5Password!); } catch {}
+        return { username: d.socks5Username!, password };
+      }).filter((u) => u.password);
+
+      if (users.length === 0) continue;
+
+      const isSingleNode = singleNodeLineIds.has(lineId);
+      const tunnel = isSingleNode ? extIface : (lineToDownstreamIface.get(lineId) ?? "");
+      if (!tunnel) continue;
+
+      const port = linePortMap.get(lineId)?.httpPort ?? proxyBasePort;
+
+      httpRoutes.push({
+        lineId,
+        port,
+        mark: SOCKS5_MARK_START + lineId, // HTTP shares the SOCKS5 per-line mark
+        tunnel,
+        users,
+      });
+    }
+
+    if (httpRoutes.length > 0) {
+      httpConfig = { routes: httpRoutes };
     }
   }
 
@@ -709,6 +758,7 @@ export async function GET(request: NextRequest) {
     },
     xray: xrayConfig,
     socks5: socks5Config,
+    http: httpConfig,
     routing: routingConfig,
     meshPeers,
     version: node.updatedAt,

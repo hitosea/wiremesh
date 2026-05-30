@@ -170,6 +170,7 @@ export default function DeviceConfigPage() {
 
   const isXray = configData?.format === "xray";
   const isSocks5 = configData?.format === "socks5";
+  const isHttp = configData?.format === "http";
   const shadowrocketUri = configData ? buildShadowrocketUri(configData) : null;
   const clashConfig = configData ? buildClashMeta(configData) : null;
 
@@ -226,7 +227,7 @@ export default function DeviceConfigPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle>
-                {t("configTitle", { format: configData.format === "wireguard" ? "WireGuard" : configData.format === "xray" ? "Xray" : configData.format === "socks5" ? "SOCKS5" : configData.format })}
+                {t("configTitle", { format: configData.format === "wireguard" ? "WireGuard" : configData.format === "xray" ? "Xray" : configData.format === "socks5" ? "SOCKS5" : configData.format === "http" ? "HTTP" : configData.format })}
               </CardTitle>
               <div className="flex gap-2">
                 <Button size="sm" onClick={() => handleCopy()}>
@@ -244,8 +245,8 @@ export default function DeviceConfigPage() {
             </CardContent>
           </Card>
 
-          {/* QR code card — not shown for SOCKS5 */}
-          {!isSocks5 && <Card>
+          {/* QR code card — not shown for SOCKS5 or HTTP */}
+          {!isSocks5 && !isHttp && <Card>
             <CardHeader>
               <CardTitle>{t("qrCode")}</CardTitle>
             </CardHeader>
@@ -276,14 +277,14 @@ export default function DeviceConfigPage() {
             </CardContent>
           </Card>}
 
-          {/* SOCKS5 client config */}
-          {isSocks5 && (
+          {/* SOCKS5 / HTTP client config */}
+          {(isSocks5 || isHttp) && (
             <Card>
               <CardHeader>
                 <CardTitle>{t("clientConfig")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">{t("socks5Hint")}</p>
+                <p className="text-sm text-muted-foreground">{isHttp ? t("httpHint") : t("socks5Hint")}</p>
                 <div className="code-block rounded-lg p-4 text-xs space-y-1">
                   {configData.server && (
                     <ConfigRow label={t("address")} value={configData.server} />

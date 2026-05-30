@@ -7,6 +7,7 @@ export type NodePorts = {
   xray: number[];
   tunnels: number[];
   socks5: number[];
+  http: number[];
 };
 
 /**
@@ -38,16 +39,18 @@ export function getNodePorts(nodeId: number, wgPort: number): NodePorts {
 
   const xrayPorts: number[] = [];
   const socks5Ports: number[] = [];
+  const httpPorts: number[] = [];
 
   if (entryLineIds.length > 0) {
     const lineRows = db
-      .select({ id: lines.id, xrayPort: lines.xrayPort, socks5Port: lines.socks5Port })
+      .select({ id: lines.id, xrayPort: lines.xrayPort, socks5Port: lines.socks5Port, httpPort: lines.httpPort })
       .from(lines)
       .where(inArray(lines.id, entryLineIds))
       .all();
     for (const row of lineRows) {
       if (row.xrayPort !== null) xrayPorts.push(row.xrayPort);
       if (row.socks5Port !== null) socks5Ports.push(row.socks5Port);
+      if (row.httpPort !== null) httpPorts.push(row.httpPort);
     }
   }
 
@@ -56,5 +59,6 @@ export function getNodePorts(nodeId: number, wgPort: number): NodePorts {
     xray: xrayPorts.sort((a, b) => a - b),
     tunnels: [...tunnelPorts].sort((a, b) => a - b),
     socks5: socks5Ports.sort((a, b) => a - b),
+    http: httpPorts.sort((a, b) => a - b),
   };
 }

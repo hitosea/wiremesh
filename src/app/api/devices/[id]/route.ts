@@ -107,15 +107,15 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 
   db.delete(devices).where(eq(devices.id, deviceId)).run();
 
-  // Release proxy port if this was the last xray/socks5 device on the line
-  if (existing.lineId && (existing.protocol === "xray" || existing.protocol === "socks5")) {
+  // Release proxy port if this was the last xray/socks5/http device on the line
+  if (existing.lineId && (existing.protocol === "xray" || existing.protocol === "socks5" || existing.protocol === "http")) {
     const remaining = db
       .select({ id: devices.id })
       .from(devices)
       .where(and(eq(devices.lineId, existing.lineId), eq(devices.protocol, existing.protocol)))
       .get();
     if (!remaining) {
-      const portField = existing.protocol === "xray" ? "xrayPort" : "socks5Port";
+      const portField = existing.protocol === "xray" ? "xrayPort" : existing.protocol === "socks5" ? "socks5Port" : "httpPort";
       db.update(lines).set({ [portField]: null }).where(eq(lines.id, existing.lineId)).run();
     }
   }

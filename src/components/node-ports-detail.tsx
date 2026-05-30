@@ -7,6 +7,7 @@ type NodePorts = {
   xray: number[];
   tunnels: number[];
   socks5: number[];
+  http: number[];
 };
 
 export function NodePortsDetail({ ports, xrayTransport }: { ports: NodePorts; xrayTransport?: string | null }) {
@@ -47,6 +48,16 @@ export function NodePortsDetail({ ports, xrayTransport }: { ports: NodePorts; xr
           <span className="text-muted-foreground text-xs">{t("portsSocks5")}</span>
           <div className="flex flex-wrap gap-1.5 mt-1">
             {ports.socks5.map((p) => (
+              <span key={p} className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{p}</span>
+            ))}
+          </div>
+        </div>
+      )}
+      {ports.http.length > 0 && (
+        <div>
+          <span className="text-muted-foreground text-xs">{t("portsHttp")}</span>
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {ports.http.map((p) => (
               <span key={p} className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{p}</span>
             ))}
           </div>

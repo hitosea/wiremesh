@@ -62,6 +62,7 @@ type NodeDetail = {
     xray: number[];
     tunnels: number[];
     socks5: number[];
+    http: number[];
   };
 };
 

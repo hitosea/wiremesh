@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
 
   // Batch query proxy ports from lines
   const linePortRows = allEntryLineIds.length > 0
-    ? db.select({ id: lines.id, xrayPort: lines.xrayPort, socks5Port: lines.socks5Port })
+    ? db.select({ id: lines.id, xrayPort: lines.xrayPort, socks5Port: lines.socks5Port, httpPort: lines.httpPort })
         .from(lines).where(inArray(lines.id, allEntryLineIds)).all()
     : [];
   const linePortMap = new Map(linePortRows.map((r) => [r.id, r]));
@@ -128,10 +128,12 @@ export async function GET(request: NextRequest) {
     // Read persisted proxy ports from lines table
     const xrayPorts: number[] = [];
     const socks5Ports: number[] = [];
+    const httpPorts: number[] = [];
     for (const lid of nodeEntryLines.sort((a, b) => a - b)) {
       const lp = linePortMap.get(lid);
       if (lp?.xrayPort !== null && lp?.xrayPort !== undefined) xrayPorts.push(lp.xrayPort);
       if (lp?.socks5Port !== null && lp?.socks5Port !== undefined) socks5Ports.push(lp.socks5Port);
+      if (lp?.httpPort !== null && lp?.httpPort !== undefined) httpPorts.push(lp.httpPort);
     }
 
     return {
@@ -141,6 +143,7 @@ export async function GET(request: NextRequest) {
         xray: xrayPorts,
         tunnels,
         socks5: socks5Ports,
+        http: httpPorts,
       },
     };
   });
