@@ -127,8 +127,8 @@ Test Docker image is built once via `lib/build-image.sh` (content-hashed tag —
   - `ip.sb group` (domainRules: `ip.sb`) — NEW, used by Split-Direct branch 2
   - `overseas services` (domainRules)
   - `China` (sourceUrl: `https://raw.githubusercontent.com/gaoyifan/china-operator-ip/ip-lists/china.txt`, mode: whitelist) — NEW, external IP list covering three major Chinese carriers (~4000+ CIDRs)
-- 7 lines: split-routing (A→B/C/D), direct (A→B), relay (A→B→C), reverse (B→A), single-node (B only, nodeIds=[] for entry=exit), **split-direct (A→B/C/[] — third branch has nodeIds=[] for branch-level direct-exit)**, **shared-relay (A→B→C / A→B→D / A→B — same node B is relay in two branches AND exit in a third, exercising per-branch role resolution)**
-- 16 devices: see Expected Results table (WG + Xray + SOCKS5)
+- 8 lines: split-routing (A→B/C/D), direct (A→B), relay (A→B→C), reverse (B→A), single-node (B only, nodeIds=[] for entry=exit), **split-direct (A→B/C/[] — third branch has nodeIds=[] for branch-level direct-exit)**, **shared-relay (A→B→C / A→B→D / A→B — same node B is relay in two branches AND exit in a third, exercising per-branch role resolution)**, **http-only (A→B — entry A runs ONLY an HTTP-proxy device, no SOCKS5/Xray/WG on this line, so the HTTP route builds its fwmark table standalone)**
+- 21 devices: see Expected Results table (WG + Xray + SOCKS5 + **HTTP**). HTTP proxy (commit b1a50d6) is a peer protocol to SOCKS5: per-line HTTP server on entry nodes, CONNECT + plain-forward, Basic auth, SO_MARK into the line's tunnel. `protocol: "http"` reuses the socks5 credential columns; device config returns `http://user:pass@host:port`.
 
 #### Split-Direct Line Configuration
 Exercises features not covered by other lines: per-branch direct-exit (entry acts as exit for one branch while other branches tunnel out), external `sourceUrl` IP lists, and multi-filter-per-branch union semantics. Also exercises the dual-ipset model (`wm-branch-N-cidr` + `wm-branch-N-dns`) by binding both a `sourceUrl` filter and a `domainRules` filter to the same branch.
@@ -158,7 +158,7 @@ One device attaches to this line: `SharedRelay-WG` (WG). One device is sufficien
 - Verify all nodes report "online"
 
 ### 6. Server Verification (read-only SSH)
-Entry node: WG peers, tunnel handshakes, Xray ports, SOCKS5 ports, ipset, iptables (PREROUTING + OUTPUT + NAT), ip rules, DNS proxy.
+Entry node: WG peers, tunnel handshakes, Xray ports, SOCKS5 ports, HTTP-proxy ports (`[http] Server started` log + `ss -tlnp`), ipset, iptables (PREROUTING + OUTPUT + NAT), ip rules, DNS proxy.
 Exit nodes: tunnel handshakes, NAT MASQUERADE, return routes.
 Dual-role node: both entry and exit tunnels, Xray, MASQUERADE.
 Single-node entry=exit: verify NO tunnels created, iptables has wm-wg0 → extIface FORWARD + MASQUERADE, SOCKS5 listening.
@@ -176,7 +176,7 @@ Any match = ipset race regression (`agent/routing/sync.go` per-branch rebuild lo
 journalctl -u wiremesh-agent --since "5 minutes ago" --no-pager | grep -E \
   'bind: address already in use'
 ```
-Any match = SOCKS5 listener race regression (`agent/socks5/server.go` lost `SO_REUSEADDR`/`SO_REUSEPORT`; commit `d2b2020`). Manager.Sync always restarts SOCKS5 listeners to pick up credential changes; without REUSE flags, the kernel hasn't released the old socket and the rebind fails with EADDRINUSE.
+Any match = SOCKS5/HTTP listener race regression (`agent/socks5/server.go` or `agent/httpproxy/server.go` lost `SO_REUSEADDR`/`SO_REUSEPORT`; commit `d2b2020`, HTTP added in `b1a50d6`). Manager.Sync always restarts both listener sets to pick up credential changes; without REUSE flags, the kernel hasn't released the old socket and the rebind fails with EADDRINUSE.
 
 (Both checks should return zero matches.)
 
@@ -249,7 +249,7 @@ Critical regression sentinels (any match = the per-branch role refactor regresse
 ### 7. Docker Container Testing
 All containers run on the **local dev machine** (not on remote servers — containers simulate external clients connecting into the VPN). The container handling — `wg-quick up` for WG, local Xray client for Xray, `socks5h://` URL for SOCKS5 — is hidden inside `lib/run-test.sh`; this phase just builds a TSV matrix and calls the batch runner.
 
-**Build the matrix** (16 device entries; substitute the device IDs returned by Phase 4's `POST /api/devices` calls into column 1):
+**Build the matrix** (21 device entries; substitute the device IDs returned by Phase 4's `POST /api/devices` calls into column 1):
 ```tsv
 <id>	MacBook-WG	wireguard	<split_id>	ifconfig.me=B,ip.me=C,icanhazip.com=D
 <id>	iPhone-WG	wireguard	<direct_id>	ifconfig.me=B,ip.me=B,icanhazip.com=B
@@ -257,9 +257,14 @@ All containers run on the **local dev machine** (not on remote servers — conta
 <id>	Smart-WG	wireguard	<splitdirect_id>	ifconfig.me=B,ip.sb=C,ip.me=A,pconline=A
 <id>	Smart-Xray	xray	<splitdirect_id>	ifconfig.me=B,ip.sb=C,ip.me=A,pconline=A
 <id>	SharedRelay-WG	wireguard	<sharedrelay_id>	ifconfig.me=C,ip.me=B,icanhazip.com=D
+<id>	Router-HTTP	http	<reverse_id>	ifconfig.me=A,ip.me=A,icanhazip.com=A
+<id>	Phone-HTTP	http	<direct_id>	ifconfig.me=B,ip.me=B,icanhazip.com=B
+<id>	Desktop-HTTP	http	<single_id>	ifconfig.me=B,ip.me=B,icanhazip.com=B
+<id>	Camera-HTTP	http	<relay_id>	ifconfig.me=C,ip.me=C,icanhazip.com=C
+<id>	Solo-HTTP	http	<httponly_id>	ifconfig.me=B,ip.me=B,icanhazip.com=B
 ```
 
-**Run all 16 in parallel** (default `-j 8`, ~20 seconds wall-clock):
+**Run all 21 in parallel** (default `-j 8`, ~20 seconds wall-clock):
 ```bash
 .claude/skills/e2e-test/lib/batch-test.sh /tmp/wm-matrix.tsv
 ```
@@ -279,6 +284,7 @@ The runner already handles the previously-painful edge cases — this list is fo
 - WG: `--privileged` container, `wg-quick up`, manual `/etc/resolv.conf` (Alpine has no `resolvconf`), 15s connect timeout for the first handshake.
 - Xray: local Xray binary baked into the `wm-test` image; container starts it pointing at the API-supplied JSON config and curls through `socks5h://127.0.0.1:1080`.
 - SOCKS5: forces `socks5h://` (DNS server-side) so `ip.me` doesn't return geo-bogus IPs.
+- HTTP: uses the API-supplied `http://user:pass@host:port` directly; curl issues CONNECT for https targets so DNS resolves server-side (same effect as socks5h). The agent dials IPv4-only (`tcp4`) because tunnels have no v6 fwmark route — without that, dual-stack targets (ip.me, ip.sb) blackhole on the AAAA attempt (fixed in `agent/httpproxy/server.go`).
 - WS+TLS clients use `$A_DOMAIN` as the server address; DNS resolution from inside the container must succeed (the public DNS resolves it to Server A).
 
 ## Expected Results
@@ -301,6 +307,11 @@ The runner already handles the previously-painful edge cases — this list is fo
 | Smart-WG | WG | Split-Direct | B | C | **A** | — | **A** |
 | Smart-Xray | Xray | Split-Direct | B | C | **A** | — | **A** |
 | SharedRelay-WG | WG | SharedRelay | C | — | **B** | **D** | — |
+| Router-HTTP | HTTP | Reverse | A | — | A | A | — |
+| Phone-HTTP | HTTP | Direct | B | — | B | B | — |
+| Desktop-HTTP | HTTP | Single-B | B | — | B | B | — |
+| Camera-HTTP | HTTP | Relay | C | — | C | C | — |
+| Solo-HTTP | HTTP | HTTP-only | B | — | B | B | — |
 
 A=47.84.135.129, B=47.236.3.88, C=47.245.89.95, D=47.84.231.26
 
@@ -326,7 +337,7 @@ Distinct from single-node lines: in Split-Direct only **one branch** (branch 3) 
 
 ### 8a. Add New Lines
 - Add 2 new direct lines: Direct-AD (A→D), Direct-AB2 (A→B)
-- Create 1 Xray + 1 WG + 1 SOCKS5 device on each new line
+- Create 1 Xray + 1 WG + 1 SOCKS5 + 1 HTTP device on each new line
 - Wait for Agent to auto-sync config
 
 ### 8b. Verify Stability
