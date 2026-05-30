@@ -164,6 +164,15 @@ func makeDialer(lineId int, mark int) dialFunc {
 				})
 			},
 		}
+		// Force IPv4: all WireMesh tunnels are IPv4-only (10.211/16, see arch
+		// constraints), so the SO_MARK fwmark table has no IPv6 route. Without
+		// this, Go's dual-stack dialer races an AAAA connection that gets marked
+		// into the v4 tunnel and blackholes — dual-stack sites (ip.me, ip.sb)
+		// then hang for the full timeout. SOCKS5 avoids this by resolving to a
+		// single IP; mirror that here by pinning the TCP network to v4.
+		if network == "tcp" {
+			network = "tcp4"
+		}
 		conn, err := dialer.DialContext(ctx, network, addr)
 		if err != nil {
 			return nil, err

@@ -101,6 +101,14 @@ case "$PROTO" in
         BLOCK=$(build_curl_block "--proxy $PROXY")
         docker run --rm --name "$CONTAINER" "$WM_IMAGE" sh -c "$BLOCK"
         ;;
+    http)
+        # HTTP proxy (commit b1a50d6). proxyUrl is already http://user:pass@host:port.
+        # curl issues CONNECT for https targets, so DNS resolves server-side
+        # (same effect as socks5h) and ip.me etc. report the real exit IP.
+        PROXY=$(echo "$CONFIG_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['proxyUrl'])")
+        BLOCK=$(build_curl_block "--proxy $PROXY")
+        docker run --rm --name "$CONTAINER" "$WM_IMAGE" sh -c "$BLOCK"
+        ;;
     *)
         echo "ERROR: unknown protocol $PROTO" >&2
         exit 1
