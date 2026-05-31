@@ -6,7 +6,7 @@ WireMesh is a WireGuard mesh VPN management platform for internal use. It lets y
 
 - **Nodes** — Linux servers running the `wiremesh-agent` binary. Each node has a public IP and connects to the management platform over SSE. Nodes form the backbone of the VPN network.
 - **Lines** — Multi-hop routes that chain nodes together. Each line has an entry node and one or more branches, where each branch defines a chain of relay and exit nodes. Clients are assigned to a line to determine their traffic path.
-- **Devices** — Client endpoints (laptops, phones) that connect to the VPN. Each device gets a WireGuard, Xray, or SOCKS5 configuration.
+- **Devices** — Client endpoints (laptops, phones) that connect to the VPN. Each device gets a WireGuard, Xray, SOCKS5, or HTTP proxy configuration.
 - **Filter Rules** — Domain- or IP-based routing rules linked to line branches. They control which traffic goes through which branch, supporting whitelist and blacklist modes.
 
 ---
@@ -45,7 +45,7 @@ Below the cards, three tables provide quick access to recent status:
    - **WG Port** (optional) — WireGuard listen port, defaults to 41820.
    - **Tags** (optional) — comma-separated tags for organizing nodes.
    - **Notes** (optional) — free-text remarks.
-   - **Proxy Base Port** (optional) — the starting port for the Xray and SOCKS5 shared port pool, defaults to 41443. Each line is automatically assigned a unique port.
+   - **Proxy Base Port** (optional) — the starting port for the Xray, SOCKS5, and HTTP proxy shared port pool, defaults to 41443. Each line is automatically assigned a unique port.
    - **Reality Target** (optional) — Xray Reality camouflage target, must support TLS 1.3, defaults to `www.microsoft.com:443`.
 3. Click **Save**.
 
@@ -149,7 +149,7 @@ WireMesh automatically allocates /30 subnets from the tunnel subnet (10.211.0.0/
 1. Go to **Devices → Add Device**.
 2. Fill in the form:
    - **Device Name** (required).
-   - **Protocol** (required) — choose **WireGuard**, **Xray**, or **SOCKS5**.
+   - **Protocol** (required) — choose **WireGuard**, **Xray**, **SOCKS5**, or **HTTP proxy**.
    - **Line** (optional) — assign the device to a line, or leave unassigned.
    - **Tags** (optional) — comma-separated tags.
    - **Notes** (optional).
@@ -169,11 +169,13 @@ For Xray devices, additional tabs show:
 - **Shadowrocket** — manual configuration fields (address, port, UUID, TLS settings).
 - **Clash Meta** — YAML config for Clash-compatible clients.
 
-For SOCKS5 devices, the config page shows a proxy URL (`socks5://username:password@host:port`). Configure it in your system or browser proxy settings.
+For SOCKS5 and HTTP proxy devices, the config page shows a proxy URL (`socks5://username:password@host:port` for SOCKS5, `http://username:password@host:port` for HTTP). Configure it in your system or browser proxy settings. The config page also provides a one-click copyable **environment variable** snippet (`ALL_PROXY`, `HTTP_PROXY`, `HTTPS_PROXY`, etc.) — paste it into a terminal to route command-line tools like curl, wget, and git through the proxy.
 
 ### Viewing Device Details
 
-Click a device to see its detail page with protocol info, WireGuard address/public key, Xray UUID, or SOCKS5 proxy address. You can edit the device's name, tags, notes, and line assignment.
+Click a device to see its detail page with protocol info, WireGuard address/public key, Xray UUID, or SOCKS5 / HTTP proxy address. You can edit the device's name, tags, notes, and line assignment.
+
+> **About online/offline:** SOCKS5 and HTTP proxies are stateless connections — there is no handshake or persistent session, so they have no online/offline concept. These devices show "—" for status across the list, detail page, and dashboard, and are excluded from the online/offline counts on the dashboard device card.
 
 ### Deleting a Device
 
@@ -299,6 +301,18 @@ Update your login password from the settings page. Enter current password, new p
 ### Audit Logs
 
 Audit logs live under the **Audit Logs** tab at the top of the **System Settings** page. They record all management operations with timestamps and affected resources.
+
+---
+
+## Xray TLS Certificates
+
+A TLS certificate is only needed when a node's Xray transport is set to **ws-tls**; the Reality transport has built-in camouflage and uses no certificate. For ws-tls nodes you choose a **certificate mode** (auto / certd / manual) on the node detail or new-node page:
+
+- **auto** — The Agent's built-in ACME client requests a Let's Encrypt certificate automatically and renews it within 30 days of expiry. Requires the node's domain to resolve to the node and **port 80 to be reachable** (for HTTP-01 validation). No manual steps.
+- **certd** — Certificates are pushed by an external [certd](https://github.com/certd/certd) via webhook (see "Integrating certd" below). When certd first pushes a cert for a domain, the platform automatically switches the matching node to certd mode, and the Agent stops its built-in ACME so the two renewal paths don't conflict.
+- **manual** — You upload the certificate and private key yourself. The platform performs no automatic request or renewal; you must replace the cert before it expires.
+
+> Switching a node's transport normalizes the cert mode: any non-ws-tls transport is treated as manual.
 
 ---
 
