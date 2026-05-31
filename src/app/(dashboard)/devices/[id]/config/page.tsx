@@ -37,6 +37,21 @@ type LineInfo = {
   name: string;
 };
 
+function buildProxyEnv(proxyUrl: string): string {
+  // For SOCKS5 use the socks5h:// scheme so the proxy (exit node) resolves DNS,
+  // matching WireMesh's entry-node DNS model and avoiding local DNS leaks.
+  // HTTP proxies already resolve DNS at the proxy, so they are left untouched.
+  const url = proxyUrl.replace(/^socks5:\/\//, "socks5h://");
+  return [
+    `export ALL_PROXY='${url}'`,
+    `export all_proxy="$ALL_PROXY"`,
+    `export HTTP_PROXY="$ALL_PROXY"`,
+    `export HTTPS_PROXY="$ALL_PROXY"`,
+    `export http_proxy="$ALL_PROXY"`,
+    `export https_proxy="$ALL_PROXY"`,
+  ].join("\n");
+}
+
 function buildShadowrocketUri(data: ConfigData): string | null {
   if (!data.shareLink) return null;
   // Shadowrocket can import standard VLESS share links directly
@@ -299,6 +314,26 @@ export default function DeviceConfigPage() {
                     <ConfigRow label={t("password")} value={configData.password} />
                   )}
                 </div>
+
+                {configData.proxyUrl && (
+                  <div className="space-y-2 pt-2">
+                    <h4 className="font-medium text-sm">{t("envConfig")}</h4>
+                    <p className="text-sm text-muted-foreground">{t("envConfigHint")}</p>
+                    <pre className="code-block p-4 rounded-lg text-xs w-full overflow-x-auto whitespace-pre-wrap break-all">
+                      {buildProxyEnv(configData.proxyUrl)}
+                    </pre>
+                    {isSocks5 && (
+                      <p className="text-xs text-muted-foreground">{t("envConfigSocks5Note")}</p>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCopy(buildProxyEnv(configData.proxyUrl!))}
+                    >
+                      {t("copyConfig")}
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

@@ -347,7 +347,10 @@
     "username": "用户名",
     "password": "密码",
     "socks5Hint": "在浏览器或系统代理设置中配置 SOCKS5 代理",
-    "httpHint": "在浏览器或系统代理设置中配置 HTTP 代理"
+    "httpHint": "在浏览器或系统代理设置中配置 HTTP 代理",
+    "envConfig": "环境变量",
+    "envConfigHint": "在终端中粘贴以下命令，即可让 curl、wget、git 等命令行工具走此代理（仅对当前 shell 会话生效）",
+    "envConfigSocks5Note": "需客户端支持 SOCKS5（curl、git 可用；wget 不支持 SOCKS）。已使用 socks5h，由出口节点解析 DNS。"
   },
   "lines": {
     "status": {

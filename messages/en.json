@@ -347,7 +347,10 @@
     "username": "Username",
     "password": "Password",
     "socks5Hint": "Configure SOCKS5 proxy in your browser or system proxy settings",
-    "httpHint": "Configure HTTP proxy in your browser or system proxy settings"
+    "httpHint": "Configure HTTP proxy in your browser or system proxy settings",
+    "envConfig": "Environment Variables",
+    "envConfigHint": "Paste these commands into a terminal to route command-line tools (curl, wget, git, etc.) through this proxy (applies to the current shell session only)",
+    "envConfigSocks5Note": "Requires a SOCKS5-aware client (curl and git work; wget does not support SOCKS). Uses socks5h so DNS is resolved at the exit node."
   },
   "lines": {
     "status": {
