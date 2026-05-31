@@ -34,7 +34,7 @@ Admin credentials are always `admin / admin123` (re-initialised every Phase 1).
 
 ### Transport Mode Assignment
 - **Server A**: WebSocket + TLS (`xrayTransport: "ws-tls"`, `xrayTlsDomain: "$A_DOMAIN"`)
-  After node creation, call `PUT /api/nodes/{A_ID}` with `{"xrayTransport":"ws-tls","xrayTlsDomain":"$A_DOMAIN"}`. ACME auto-cert will provision a Let's Encrypt certificate on first Agent config sync (requires port 80 accessible on A).
+  After node creation, call `PUT /api/nodes/{A_ID}` with `{"xrayTransport":"ws-tls","xrayTlsDomain":"$A_DOMAIN","xrayCertMode":"auto"}`. The `xrayCertMode:"auto"` is **required** to trigger ACME — the node's certMode defaults to `"manual"`, and the agent only runs ACME HTTP-01 when `certMode == "auto"` (`agent/xray/acme.go`). Omit it and you get **no `[acme]` log lines at all** (the agent never attempts it), missing cert/key files, and WS+TLS devices that can't connect. With it set, ACME provisions a Let's Encrypt certificate on first Agent config sync (requires port 80 accessible on A); the log shows `[acme] Requesting certificate ... via HTTP-01` then `[acme] Certificate uploaded to platform`.
 - **Server B**: REALITY (default, no extra config needed)
 - This tests both transports coexisting: lines with A as entry use WS+TLS, lines with B as entry use REALITY
 
@@ -120,7 +120,7 @@ Test Docker image is built once via `lib/build-image.sh` (content-hashed tag —
 
 ### 4. Platform Data
 - 4 nodes — IPs come from `$A_IP/$B_IP/$C_IP/$D_IP`. Server A also gets `domain: $A_DOMAIN`.
-- After creating A, set it to WS+TLS: `PUT /api/nodes/{A_ID}` with `{"xrayTransport":"ws-tls","xrayTlsDomain":"$A_DOMAIN"}` (see Transport Mode Assignment above)
+- After creating A, set it to WS+TLS: `PUT /api/nodes/{A_ID}` with `{"xrayTransport":"ws-tls","xrayTlsDomain":"$A_DOMAIN","xrayCertMode":"auto"}` — `xrayCertMode:"auto"` is required for ACME (see Transport Mode Assignment above)
 - 5 filters:
   - `icanhazip group` (domainRules: `icanhazip.com`) — bound to Split branch-3 (→ D). The Expected Results "icanhazip.com" column is the third tested URL for non-Smart devices; `ifconfig.me` itself is intentionally **un**filtered so it falls through to the default branch.
   - `ip.me group` (domainRules: `ip.me`)
@@ -184,7 +184,9 @@ Any match = SOCKS5/HTTP listener race regression (`agent/socks5/server.go` or `a
 - Check Xray config uses `"network": "ws"` and `"security": "tls"` (not `"tcp"` / `"reality"`)
 - Check TLS cert files exist: `/etc/wiremesh/xray/$A_DOMAIN.crt` and `.key`
 - If ACME auto-cert was triggered, check agent logs for `[acme]` entries
-- If cert files are missing (ACME failed because port 80 is blocked), the agent log will show the error. In that case, manually upload a cert via `PUT /api/nodes/{id}` with `xrayTlsCert` and `xrayTlsKey` fields, wait for agent sync, then re-verify.
+- If cert files are missing, distinguish two cases by the agent log:
+  - **No `[acme]` lines at all** → the node's `xrayCertMode` is still `"manual"` (ACME never attempted). Fix: `PUT /api/nodes/{A_ID}` with `{"xrayTransport":"ws-tls","xrayTlsDomain":"$A_DOMAIN","xrayCertMode":"auto"}`, wait for sync, re-verify. (This is the most common cause — see Transport Mode Assignment.)
+  - **`[acme]` error lines present** (e.g. `cannot listen on port 80`) → ACME ran but failed because port 80 is blocked. Fix: manually upload a cert via `PUT /api/nodes/{id}` with `xrayTlsCert` and `xrayTlsKey` fields, wait for agent sync, then re-verify.
 - Verify Xray is listening on the configured port with TLS by testing: `curl -s --connect-timeout 5 https://$A_DOMAIN:{xray_port}/ -k` (should get a response or TLS handshake, not connection refused)
 
 #### REALITY Verification (Server B)
