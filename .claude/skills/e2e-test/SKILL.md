@@ -579,7 +579,9 @@ Fail conditions:
 - Any ipset race log appears during the reload (Bug C regressed — per-branch mutex broken)
 - Reload window exceeds 30s before `Updated filter=<id>` reappears with count 3
 
-### 8g. Agent Hot-Upgrade Regression
+### 8g. Agent Hot-Upgrade Regression (opt-in — skipped by default)
+
+> **Skipped by default.** A normal e2e run ends after Phase 8f. Run this phase **only when the user explicitly asks** to test the agent upgrade / hot-upgrade path (e.g. "顺便测一下升级", "test the agent upgrade"). When skipped, all nodes stay on the version built in Phase 2 — do NOT bump the version or trigger a batch upgrade.
 
 Guards SOCKS5 listener bind race in commit `d2b2020`. The SOCKS5 manager always closes and rebinds listeners on every config Sync (to pick up credential changes). Without `SO_REUSEADDR` + `SO_REUSEPORT`, the kernel hasn't yet released the old socket and `net.Listen` fails with `EADDRINUSE`, leaving the entry node with no SOCKS5 listeners until manual restart.
 
@@ -628,7 +630,7 @@ Fail conditions:
 - `bind: address already in use` appears in agent log
 - Representative device traffic test fails after upgrade
 
-Side effect: every successful e2e run leaves the agent at a slightly newer version. That's intentional — it doubles as a "the upgrade path works" sanity check before any real release.
+Side effect (only when this opt-in phase runs): it leaves the agent at a slightly newer version, doubling as an "the upgrade path works" sanity check before a real release. Default runs that stop at 8f leave the agent at the Phase 2 version.
 
 ## Failure Protocol
 
