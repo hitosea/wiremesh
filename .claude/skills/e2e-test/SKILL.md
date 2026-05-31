@@ -57,7 +57,7 @@ The matrix file is tab-separated: `<id>\t<name>\t<protocol>\t<line_id>\t<expecte
 | API settings fields are **snake_case** | `wg_default_port`, `xray_default_port`, `tunnel_port_start` — NOT camelCase |
 | Install script endpoint | `GET /api/nodes/{id}/script` — NOT `/api/nodes/{id}/install-script` |
 | Settings must be set BEFORE creating nodes | Nodes inherit default ports at creation time |
-| Dev server port and DB refresh | Use `PORT=3456 npm run dev`. After DB wipe, must restart dev server (Next.js caches DB state) |
+| Dev server port and DB refresh | After a DB wipe the dev server MUST be restarted (Next.js caches DB state). **Always restart via `.claude/skills/e2e-test/lib/restart-dev.sh`** — it stops only the process listening on the dev port whose cwd is this checkout, then relaunches `PORT=3456 npm run dev` and waits until ready. **NEVER** use `pkill -f next`, `killall node`, `kill $(lsof -ti:3456)`, or any broad match: this host also runs other Node/Next apps (and other containers), and a broad kill has crashed the machine before. If `restart-dev.sh` aborts because the port is held by a non-wiremesh process, investigate manually — do not force-kill |
 | Use localhost for API calls | `$LOCAL_URL` (typically `http://localhost:3456`) with cookie auth. External Coder URL strips custom headers |
 | `/api/agent/*` paths bypass auth | Real Agents have no cookie; the proxy middleware (`src/proxy.ts`) lets `/api/agent/*` through. Test fixtures used by Agents (e.g. `sourceUrl` filters in Phase 8f) must live under this prefix |
 | Cross-branch filter binding regressions | The `ip.me group` filter is intentionally bound to BOTH Split branch-2 (→ C) and Split-Direct branch-10 (→ A direct-exit) — same domain, two ipsets. This is the canonical regression case for `agent/dns/rules.go` multi-binding (commit `d2b2020`). Don't "simplify" the test data by removing one binding |
@@ -67,7 +67,12 @@ Test Docker image is built once via `lib/build-image.sh` (content-hashed tag —
 ## Phases
 
 ### 1. Clean Slate
-- Clear platform database (`rm -f data/wiremesh*` — includes .db, .db-shm, .db-wal), restart dev server, then re-initialize admin account via `POST /api/setup`
+- Clear platform database (`rm -f data/wiremesh*` — includes .db, .db-shm, .db-wal), then restart the dev server with the safe helper, then re-initialize admin account via `POST /api/setup`:
+  ```bash
+  rm -f data/wiremesh*
+  .claude/skills/e2e-test/lib/restart-dev.sh   # safe, scoped restart — never pkill/killall
+  ```
+  The helper kills only the wiremesh dev server (the PID on the dev port whose cwd is this checkout) and waits until it is ready. Do NOT restart by hand with broad process matches — that has crashed the host before.
 - SSH into all 4 servers and run the uninstall script. Use the helper:
   ```bash
   for HOST in "$A_IP" "$B_IP" "$C_IP" "$D_IP"; do
