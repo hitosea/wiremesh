@@ -60,8 +60,6 @@ export async function GET(request: NextRequest) {
       protocol: devices.protocol,
       wgPublicKey: devices.wgPublicKey,
       wgAddress: devices.wgAddress,
-      xrayUuid: devices.xrayUuid,
-      xrayConfig: devices.xrayConfig,
       lineId: devices.lineId,
       status: devices.status,
       lastHandshake: devices.lastHandshake,
@@ -78,9 +76,63 @@ export async function GET(request: NextRequest) {
     .offset(paginationOffset(params))
     .all();
 
+  // Resolve the proxy service endpoint (server:port) for xray/socks5/http
+  // devices, mirroring the export logic in /api/devices/[id]/config. The
+  // endpoint is shared per line, so results are cached by lineId for the page.
+  const PROXY_PROTOCOLS = new Set(["xray", "socks5", "http"]);
+  const endpointCache = new Map<number, { base: string | null; xrayServer: string | null; xrayPort: number | null; socks5Port: number | null; httpPort: number | null; nodeXrayPort: number | null }>();
+
+  function getLineEndpoint(lineId: number) {
+    const cached = endpointCache.get(lineId);
+    if (cached) return cached;
+    const lineRow = db
+      .select({ xrayPort: lines.xrayPort, socks5Port: lines.socks5Port, httpPort: lines.httpPort })
+      .from(lines)
+      .where(eq(lines.id, lineId))
+      .get();
+    const entry = db
+      .select({
+        ip: nodes.ip,
+        domain: nodes.domain,
+        xrayPort: nodes.xrayPort,
+        xrayTransport: nodes.xrayTransport,
+        xrayTlsDomain: nodes.xrayTlsDomain,
+      })
+      .from(lineNodes)
+      .innerJoin(nodes, eq(lineNodes.nodeId, nodes.id))
+      .where(and(eq(lineNodes.lineId, lineId), eq(lineNodes.hopOrder, 0)))
+      .get();
+    const base = entry ? (entry.domain ?? entry.ip) : null;
+    const info = {
+      base,
+      xrayServer: entry?.xrayTransport === "ws-tls" ? (entry.xrayTlsDomain ?? base) : base,
+      xrayPort: lineRow?.xrayPort ?? null,
+      socks5Port: lineRow?.socks5Port ?? null,
+      httpPort: lineRow?.httpPort ?? null,
+      nodeXrayPort: entry?.xrayPort ?? null,
+    };
+    endpointCache.set(lineId, info);
+    return info;
+  }
+
+  function resolveServerEndpoint(protocol: string, lineId: number | null): string | null {
+    if (lineId === null || !PROXY_PROTOCOLS.has(protocol)) return null;
+    const info = getLineEndpoint(lineId);
+    if (!info.base) return null;
+    const fallbackPort = info.nodeXrayPort ?? getXrayDefaultPort();
+    if (protocol === "xray") {
+      return info.xrayServer ? `${info.xrayServer}:${info.xrayPort ?? fallbackPort}` : null;
+    }
+    if (protocol === "socks5") {
+      return `${info.base}:${info.socks5Port ?? fallbackPort}`;
+    }
+    return `${info.base}:${info.httpPort ?? fallbackPort}`;
+  }
+
   const data = rows.map((row) => ({
     ...row,
     status: computeDeviceStatus(row.lastHandshake, row.protocol),
+    serverEndpoint: resolveServerEndpoint(row.protocol, row.lineId),
   }));
 
   return paginated(data, {

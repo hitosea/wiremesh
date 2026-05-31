@@ -38,7 +38,7 @@ type Device = {
   name: string;
   protocol: string;
   wgAddress: string | null;
-  xrayUuid: string | null;
+  serverEndpoint: string | null;
   lineId: number | null;
   status: string;
   uploadBytes: number;
@@ -318,7 +318,7 @@ function DevicesListTab() {
         <span className="text-sm font-mono">
           {row.protocol === "wireguard"
             ? (row.wgAddress ?? "—")
-            : (row.xrayUuid ?? "—")}
+            : (row.serverEndpoint ?? "—")}
         </span>
       ),
     },
