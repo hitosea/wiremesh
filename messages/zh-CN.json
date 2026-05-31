@@ -234,7 +234,9 @@
     "status": {
       "online": "在线",
       "offline": "离线",
-      "error": "异常"
+      "error": "异常",
+      "stateless": "不适用",
+      "statelessHint": "SOCKS5 / HTTP 为无状态代理，没有在线/离线状态"
     },
     "protocol": {
       "wireguard": "WireGuard",

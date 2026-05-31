@@ -2,8 +2,8 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { nodes, devices, lines, nodeStatus } from "@/lib/db/schema";
 import { success } from "@/lib/api-response";
-import { eq, count, desc, sql, gt, or, isNull, lte } from "drizzle-orm";
-import { computeDeviceStatus } from "@/lib/device-status";
+import { eq, count, desc, sql, gt, or, isNull, lte, and, notInArray } from "drizzle-orm";
+import { computeDeviceStatus, STATELESS_PROTOCOLS } from "@/lib/device-status";
 
 export async function GET(request: NextRequest) {
   // Node counts
@@ -15,12 +15,20 @@ export async function GET(request: NextRequest) {
   const errorNodes =
     db.select({ count: count() }).from(nodes).where(eq(nodes.status, "error")).get()?.count ?? 0;
 
-  // Device counts (status computed from lastHandshake)
+  // Device counts. SOCKS5/HTTP proxy devices are stateless — they have no
+  // online/offline concept, so they count toward the total but are excluded
+  // from the online/offline breakdown (online + offline <= total).
   const totalDevices = db.select({ count: count() }).from(devices).get()?.count ?? 0;
   const deviceThreshold = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  const statefulOnly = notInArray(devices.protocol, [...STATELESS_PROTOCOLS]);
   const onlineDevices =
-    db.select({ count: count() }).from(devices).where(gt(devices.lastHandshake, deviceThreshold)).get()?.count ?? 0;
-  const offlineDevices = totalDevices - onlineDevices;
+    db.select({ count: count() }).from(devices)
+      .where(and(statefulOnly, gt(devices.lastHandshake, deviceThreshold)))
+      .get()?.count ?? 0;
+  const offlineDevices =
+    db.select({ count: count() }).from(devices)
+      .where(and(statefulOnly, or(isNull(devices.lastHandshake), lte(devices.lastHandshake, deviceThreshold))))
+      .get()?.count ?? 0;
 
   // Line counts
   const totalLines = db.select({ count: count() }).from(lines).get()?.count ?? 0;
@@ -99,7 +107,7 @@ export async function GET(request: NextRequest) {
     .all();
   const recentDevices = recentDevicesRaw.map((d) => ({
     ...d,
-    status: computeDeviceStatus(d.lastHandshake),
+    status: computeDeviceStatus(d.lastHandshake, d.protocol),
   }));
 
   return success({

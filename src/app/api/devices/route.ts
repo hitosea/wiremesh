@@ -4,13 +4,13 @@ import { db } from "@/lib/db";
 import { devices, settings, nodes, lineNodes, lines } from "@/lib/db/schema";
 import { success, created, error, paginated } from "@/lib/api-response";
 import { parsePaginationParams, paginationOffset } from "@/lib/pagination";
-import { eq, or, like, count, and, gt, lte, isNull, SQL } from "drizzle-orm";
+import { eq, or, like, count, and, gt, lte, isNull, notInArray, SQL } from "drizzle-orm";
 import { encrypt, generateRandomString } from "@/lib/crypto";
 import { generateKeyPair } from "@/lib/wireguard";
 import { allocateDeviceIp } from "@/lib/ip-allocator";
 import { allocateProxyPort, getXrayDefaultPort } from "@/lib/proxy-port";
 import { writeAuditLog } from "@/lib/audit-log";
-import { computeDeviceStatus } from "@/lib/device-status";
+import { computeDeviceStatus, STATELESS_PROTOCOLS } from "@/lib/device-status";
 import { notifyLineNodes } from "@/lib/line-notify";
 
 function getEntryNodeId(lineId: number): number | null {
@@ -30,6 +30,9 @@ export async function GET(request: NextRequest) {
     conditions.push(like(devices.name, `%${search}%`));
   }
   if (status) {
+    // Stateless proxy devices (SOCKS5/HTTP) have no online/offline status,
+    // so they are excluded from both online and offline filters.
+    conditions.push(notInArray(devices.protocol, [...STATELESS_PROTOCOLS]));
     const threshold = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     if (status === "online") {
       conditions.push(gt(devices.lastHandshake, threshold));
@@ -77,7 +80,7 @@ export async function GET(request: NextRequest) {
 
   const data = rows.map((row) => ({
     ...row,
-    status: computeDeviceStatus(row.lastHandshake),
+    status: computeDeviceStatus(row.lastHandshake, row.protocol),
   }));
 
   return paginated(data, {

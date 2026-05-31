@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { StatusDot } from "@/components/status-dot";
 import { StatusDotWithCount } from "@/components/status-dot-with-count";
+import { ProxyStatusDash } from "@/components/proxy-status-dash";
 import { formatBytes } from "@/lib/format-bytes";
 import { useAdminSSE } from "@/components/admin-sse-provider";
 import {
@@ -246,7 +247,7 @@ export default function DashboardPage() {
                       </TableCell>
                       <TableCell>
                         {device.status === "-" ? (
-                          <span className="text-muted-foreground text-sm">-</span>
+                          <ProxyStatusDash />
                         ) : (
                           <StatusDotWithCount
                             status={device.status}

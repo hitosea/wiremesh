@@ -16,6 +16,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { StatusDotWithCount } from "@/components/status-dot-with-count";
+import { ProxyStatusDash } from "@/components/proxy-status-dash";
 import { PageHeader } from "@/components/page-header";
 import { formatBytes } from "@/lib/format-bytes";
 import {
@@ -172,13 +173,16 @@ function DeviceDetailContent() {
           )
         }
         badge={
-          device && device.status !== "-" && (
+          device &&
+          (device.status === "-" ? (
+            <ProxyStatusDash />
+          ) : (
             <StatusDotWithCount
               status={device.status}
               label={ts(`status.${device.status}`)}
               count={device.connectionCount}
             />
-          )
+          ))
         }
         actions={
           <>

@@ -9,6 +9,7 @@ import { useTranslations } from "next-intl";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { StatusDotWithCount } from "@/components/status-dot-with-count";
+import { ProxyStatusDash } from "@/components/proxy-status-dash";
 import { formatBytes } from "@/lib/format-bytes";
 import { useAdminSSE } from "@/components/admin-sse-provider";
 import {
@@ -48,14 +49,6 @@ type Device = {
 type LineOption = {
   id: number;
   name: string;
-};
-
-const PROTOCOL_VARIANTS: Record<
-  string,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  wireguard: "default",
-  xray: "outline",
 };
 
 export default function DevicesPage() {
@@ -313,7 +306,7 @@ function DevicesListTab() {
       key: "protocol",
       label: t("protocolCol"),
       render: (row) => (
-        <Badge variant={PROTOCOL_VARIANTS[row.protocol] ?? "secondary"}>
+        <Badge variant="secondary">
           {t(`protocol.${row.protocol}`)}
         </Badge>
       ),
@@ -354,13 +347,16 @@ function DevicesListTab() {
     {
       key: "status",
       label: t("statusCol"),
-      render: (row) => (
-        <StatusDotWithCount
-          status={row.status}
-          label={t(`status.${row.status}`)}
-          count={row.connectionCount}
-        />
-      ),
+      render: (row) =>
+        row.status === "-" ? (
+          <ProxyStatusDash />
+        ) : (
+          <StatusDotWithCount
+            status={row.status}
+            label={t(`status.${row.status}`)}
+            count={row.connectionCount}
+          />
+        ),
     },
     {
       key: "actions",

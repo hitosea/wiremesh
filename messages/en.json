@@ -234,7 +234,9 @@
     "status": {
       "online": "Online",
       "offline": "Offline",
-      "error": "Error"
+      "error": "Error",
+      "stateless": "N/A",
+      "statelessHint": "SOCKS5 / HTTP are stateless proxies with no online/offline status"
     },
     "protocol": {
       "wireguard": "WireGuard",

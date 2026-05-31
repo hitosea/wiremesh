@@ -39,7 +39,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     .get();
 
   if (!device) return error("NOT_FOUND", "notFound.device");
-  return success({ ...device, status: computeDeviceStatus(device.lastHandshake) });
+  return success({ ...device, status: computeDeviceStatus(device.lastHandshake, device.protocol) });
 }
 
 export async function PUT(request: NextRequest, { params }: Params) {
