@@ -1,5 +1,5 @@
 ---
-name: release
+name: wiremesh-release
 description: Use when user wants to release a new version, publish a version, bump the version, ship a release, or "发版/发布版本/发个版本". Reads current version, proposes next, then bumps package.json, commits, and pushes.
 ---
 

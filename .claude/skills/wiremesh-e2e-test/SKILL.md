@@ -1,5 +1,5 @@
 ---
-name: e2e-test
+name: wiremesh-e2e-test
 description: Use when code changes affect Agent, routing, Xray, tunnels, or iptables logic and need full integration verification. Also use when user explicitly requests end-to-end testing or re-deployment of test nodes.
 ---
 
