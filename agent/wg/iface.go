@@ -35,10 +35,41 @@ func SyncMainInterface(nodeConfig api.NodeConfig, peers []api.PeerConfig) error 
 	if err := os.WriteFile(confPath, []byte(sb.String()), 0600); err != nil {
 		return fmt.Errorf("write %s config: %w", MainInterface, err)
 	}
-	if err := WgSyncConf(MainInterface, confPath); err != nil {
+
+	if _, err := RunSilent("ip", "link", "show", MainInterface); err != nil {
+		log.Printf("[wg] Creating %s", MainInterface)
+		if err := IpLinkAdd(MainInterface); err != nil {
+			return fmt.Errorf("create %s: %w", MainInterface, err)
+		}
+		if err := WgSetConf(MainInterface, confPath); err != nil {
+			IpLinkDel(MainInterface)
+			return fmt.Errorf("setconf %s: %w", MainInterface, err)
+		}
+	} else if err := WgSyncConf(MainInterface, confPath); err != nil {
 		return fmt.Errorf("syncconf %s: %w", MainInterface, err)
 	}
 
+	if err := ensureMainAddress(nodeConfig.WgAddress); err != nil {
+		return err
+	}
+	if err := IpLinkSetUp(MainInterface); err != nil {
+		return fmt.Errorf("set %s up: %w", MainInterface, err)
+	}
+
 	log.Printf("[wg] Synced %s with %d peers", MainInterface, len(peers))
+	return nil
+}
+
+func ensureMainAddress(address string) error {
+	if address == "" {
+		return nil
+	}
+	out, err := RunSilent("ip", "addr", "show", "dev", MainInterface)
+	if err == nil && strings.Contains(out, address) {
+		return nil
+	}
+	if err := IpAddrAdd(address, MainInterface); err != nil {
+		return fmt.Errorf("add %s address %s: %w", MainInterface, address, err)
+	}
 	return nil
 }

@@ -49,6 +49,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       upgradeTriggeredAt: nodes.upgradeTriggeredAt,
       xrayUpgradeTriggeredAt: nodes.xrayUpgradeTriggeredAt,
       tunnelPortBlacklist: nodes.tunnelPortBlacklist,
+      externalInterface: nodes.externalInterface,
     })
     .from(nodes)
     .where(eq(nodes.id, nodeId))
@@ -235,6 +236,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
       xrayConfig: nodes.xrayConfig,
       status: nodes.status,
       errorMessage: nodes.errorMessage,
+      externalInterface: nodes.externalInterface,
       remark: nodes.remark,
       createdAt: nodes.createdAt,
       updatedAt: nodes.updatedAt,
