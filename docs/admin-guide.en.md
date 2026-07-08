@@ -43,6 +43,7 @@ Below the cards, three tables provide quick access to recent status:
    - **IP Address** (required) — the server's public IP.
    - **Domain** (optional) — a domain name pointing to the server.
    - **WG Port** (optional) — WireGuard listen port, defaults to 41820.
+   - **MTU** (optional) — node MTU override for WireGuard tunnels. Leave empty to inherit the system default MTU; valid range is 1280–9000.
    - **Tags** (optional) — comma-separated tags for organizing nodes.
    - **Notes** (optional) — free-text remarks.
    - **Proxy Base Port** (optional) — the starting port for the Xray, SOCKS5, and HTTP proxy shared port pool, defaults to 41443. Each line is automatically assigned a unique port.
@@ -73,7 +74,7 @@ Click a node row to open its detail page. You can see:
 - **Latency chart** — round-trip latency from the management platform over time.
 - **Traffic chart** — upload/download bytes over time.
 
-You can also edit the node's name, IP, domain, WG port, Xray / SOCKS5 settings, tags, and notes from this page.
+You can also edit the node's name, IP, domain, WG port, MTU, Xray / SOCKS5 settings, tags, and notes from this page.
 
 ### Version Management
 
@@ -277,6 +278,7 @@ Go to **Settings** to adjust global parameters. Settings are organized into grou
 | Default Port | 41820 | WireGuard listen port for device access (wm-wg0) |
 | Default Subnet | 10.210.0.0/24 | IP range for nodes and devices |
 | Default DNS | 1.1.1.1 | DNS resolver pushed to device configs |
+| Default MTU | 1420 | MTU used when a node has no per-node override; leave empty to use the built-in default 1420. Valid range: 1280–9000. |
 | Node IP Start | 1 | Starting IP offset for nodes in the subnet |
 | Device IP Start | 100 | Starting IP offset for devices in the subnet |
 
@@ -286,6 +288,8 @@ Go to **Settings** to adjust global parameters. Settings are organized into grou
 |---------|---------|-------------|
 | Subnet | 10.211.0.0/16 | IP range for inter-node tunnels (/30 per tunnel) |
 | Port Start | 41830 | First port for node-to-node tunnels |
+
+Tunnel interfaces use the lower effective MTU of the two tunnel endpoints. For each endpoint, WireMesh uses that node's MTU override if set, otherwise the system **Default MTU**, otherwise the built-in value `1420`.
 
 ### Filter
 

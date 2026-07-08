@@ -53,6 +53,7 @@ type NodeDetail = {
   status: string;
   errorMessage: string | null;
   externalInterface: string;
+  mtu: number | null;
   remark: string | null;
   agentVersion: string | null;
   xrayVersion: string | null;
@@ -89,6 +90,7 @@ export default function NodeDetailPage() {
   const [port, setPort] = useState("");
   const [remark, setRemark] = useState("");
   const [externalInterface, setExternalInterface] = useState("eth0");
+  const [mtu, setMtu] = useState("");
   const [xrayPort, setXrayPort] = useState("");
   const [realityDest, setRealityDest] = useState("");
   const [realityPublicKey, setRealityPublicKey] = useState("");
@@ -167,6 +169,7 @@ export default function NodeDetailPage() {
         setPort(n.port ? String(n.port) : "");
         setRemark(n.remark ?? "");
         setExternalInterface(n.externalInterface ?? "eth0");
+        setMtu(n.mtu ? String(n.mtu) : "");
         setXrayPort(n.xrayPort ? String(n.xrayPort) : "");
         if (n.xrayConfig) {
           try {
@@ -209,6 +212,7 @@ export default function NodeDetailPage() {
         port: port ? parseInt(port) : undefined,
         remark: remark.trim() || null,
         externalInterface: externalInterface.trim() || "eth0",
+        mtu: mtu ? parseInt(mtu, 10) : null,
         xrayPort: xrayPort ? parseInt(xrayPort) : null,
         realityDest: realityDest || undefined,
       };
@@ -415,6 +419,22 @@ export default function NodeDetailPage() {
             />
             <p className="text-xs text-muted-foreground">
               {tn("externalInterfaceHint")}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="mtu">{tn("mtu")}</Label>
+            <Input
+              id="mtu"
+              type="number"
+              min={1280}
+              max={9000}
+              value={mtu}
+              onChange={(e) => setMtu(e.target.value)}
+              placeholder={defaults.default_mtu || "1420"}
+            />
+            <p className="text-xs text-muted-foreground">
+              {tn("mtuHint")}
             </p>
           </div>
 

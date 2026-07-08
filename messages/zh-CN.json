@@ -192,6 +192,8 @@
     "xrayPortHint": "每条线路自动分配独立端口（如 {port0}、{port1}、{port2}...），Xray 和 SOCKS5 共享同一端口池，请确保防火墙放行对应端口",
     "externalInterface": "外网网卡",
     "externalInterfaceHint": "节点的外网网卡名称，默认 eth0，常见如 ens3、bond0 等",
+    "mtu": "MTU",
+    "mtuHint": "节点间隧道的 MTU；留空则继承系统默认。线路两端会使用两个节点 MTU 中较小的值。",
     "realityTarget": "Reality 目标网站",
     "realityTargetHint": "Xray Reality 伪装目标，需支持 TLS 1.3，如 www.microsoft.com:443",
     "createNode": "创建节点"
@@ -603,6 +605,7 @@
     "xray_default_port": { "label": "默认端口", "hint": "Xray/SOCKS5 代理监听端口的起始值" },
     "tunnel_subnet": { "label": "隧道子网", "hint": "节点间隧道的内网网段，CIDR 格式" },
     "tunnel_port_start": { "label": "隧道端口起始值", "hint": "隧道 WireGuard 监听端口，从此值递增" },
+    "default_mtu": { "label": "默认 MTU", "hint": "节点未单独设置 MTU 时使用；留空则使用内置默认 1420" },
     "filter_sync_interval": { "label": "同步间隔（秒）", "hint": "自动拉取外部规则源的间隔" },
     "dns_upstream": { "label": "DNS 上游", "hint": "用于域名解析的上游 DNS，逗号分隔" }
   },
@@ -818,6 +821,7 @@
       "ipOverlap": "节点 IP 起始位 ({nodeStart}) 必须小于设备 IP 起始位 ({deviceStart})，否则 IP 会重叠",
       "tunnelSubnetFormat": "隧道子网格式不正确（如 10.211.0.0/16）",
       "tunnelPortRange": "隧道端口起始值必须是 1-65535 的整数",
+      "mtuRange": "MTU 必须为空，或为 1280-9000 的整数",
       "xrayPortRange": "Xray 默认端口必须是 1-65535 的整数",
       "portConflict": "WireGuard 默认端口 ({wgPort}) 必须小于隧道端口起始值 ({tunnelPort})",
       "xrayPortConflict": "Xray 默认端口不能与 WireGuard 端口或隧道起始端口相同",

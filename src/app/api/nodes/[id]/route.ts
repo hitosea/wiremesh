@@ -12,8 +12,15 @@ import { sseManager } from "@/lib/sse-manager";
 import { getNodePorts } from "@/lib/node-ports";
 import { isCertMode } from "@/lib/cert-mode";
 import { deleteSource as deleteLatencySource } from "@/lib/node-latency-matrix";
+import { parseMtu } from "@/lib/mtu";
 
 type Params = { params: Promise<{ id: string }> };
+
+function normalizeOptionalMtu(value: unknown): number | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  return parseMtu(value) ?? undefined;
+}
 
 export async function GET(request: NextRequest, { params }: Params) {
   const { id } = await params;
@@ -50,6 +57,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       xrayUpgradeTriggeredAt: nodes.xrayUpgradeTriggeredAt,
       tunnelPortBlacklist: nodes.tunnelPortBlacklist,
       externalInterface: nodes.externalInterface,
+      mtu: nodes.mtu,
     })
     .from(nodes)
     .where(eq(nodes.id, nodeId))
@@ -85,6 +93,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
       xrayTlsDomain: nodes.xrayTlsDomain,
       xrayTransport: nodes.xrayTransport,
       xrayCertMode: nodes.xrayCertMode,
+      mtu: nodes.mtu,
     })
     .from(nodes)
     .where(eq(nodes.id, nodeId))
@@ -101,6 +110,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
     xrayTransport,
     xrayPort,
     externalInterface,
+    mtu,
     remark,
     tunnelPortBlacklist,
   } = body;
@@ -118,6 +128,10 @@ export async function PUT(request: NextRequest, { params }: Params) {
   const updateData: Partial<typeof nodes.$inferInsert> = {
     updatedAt: new Date().toISOString(),
   };
+  const normalizedMtu = normalizeOptionalMtu(mtu);
+  if (mtu !== undefined && normalizedMtu === undefined) {
+    return error("VALIDATION_ERROR", "validation.mtuRange");
+  }
   if (name !== undefined) updateData.name = name;
   if (ip !== undefined) updateData.ip = ip;
   if (domain !== undefined) updateData.domain = domain;
@@ -126,6 +140,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (xrayTransport !== undefined) updateData.xrayTransport = xrayTransport;
   if (xrayPort !== undefined) updateData.xrayPort = xrayPort;
   if (externalInterface !== undefined) updateData.externalInterface = externalInterface;
+  if (mtu !== undefined) updateData.mtu = normalizedMtu ?? null;
   if (remark !== undefined) updateData.remark = remark;
   if (tunnelPortBlacklist !== undefined) updateData.tunnelPortBlacklist = tunnelPortBlacklist;
 
@@ -237,6 +252,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
       status: nodes.status,
       errorMessage: nodes.errorMessage,
       externalInterface: nodes.externalInterface,
+      mtu: nodes.mtu,
       remark: nodes.remark,
       createdAt: nodes.createdAt,
       updatedAt: nodes.updatedAt,
@@ -257,7 +273,8 @@ export async function PUT(request: NextRequest, { params }: Params) {
   // wm-tunN reapplies the new endpoint and the mesh probe targets refresh.
   const ipChanged = ip !== undefined && ip !== existing.ip;
   const domainChanged = domain !== undefined && (domain || null) !== (existing.domain || null);
-  if (ipChanged || domainChanged) {
+  const mtuChanged = mtu !== undefined && (normalizedMtu ?? null) !== existing.mtu;
+  if (ipChanged || domainChanged || mtuChanged) {
     sseManager.notifyAllConfigUpdate(nodeId);
   }
 

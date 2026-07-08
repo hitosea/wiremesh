@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { settings } from "@/lib/db/schema";
 import { success, error } from "@/lib/api-response";
 import { writeAuditLog } from "@/lib/audit-log";
+import { MAX_MTU, MIN_MTU } from "@/lib/mtu";
 
 export async function GET() {
   const rows = db.select().from(settings).all();
@@ -37,6 +38,10 @@ export async function PUT(request: NextRequest) {
   const isValidIP = (v: string) => /^(\d{1,3}\.){3}\d{1,3}$/.test(v) && v.split(".").every((o) => parseInt(o) >= 0 && parseInt(o) <= 255);
   const isValidCIDR = (v: string) => { const [ip, mask] = v.split("/"); return isValidIP(ip) && parseInt(mask) >= 0 && parseInt(mask) <= 32; };
   const isPositiveInt = (v: string) => { const n = parseInt(v); return !isNaN(n) && n > 0 && String(n) === v; };
+  const isValidMtu = (v: string) => v === "" || (() => {
+    const n = parseInt(v, 10);
+    return Number.isInteger(n) && String(n) === v && n >= MIN_MTU && n <= MAX_MTU;
+  })();
 
   if (merged["wg_default_port"] && !isValidPort(merged["wg_default_port"])) {
     validationErrors.push("validation.wgPortRange");
@@ -69,6 +74,9 @@ export async function PUT(request: NextRequest) {
   const xrayPort = parseInt(merged["xray_default_port"] ?? "41443");
   if (merged["tunnel_port_start"] && !isValidPort(merged["tunnel_port_start"])) {
     validationErrors.push("validation.tunnelPortRange");
+  }
+  if (merged["default_mtu"] !== undefined && !isValidMtu(merged["default_mtu"])) {
+    validationErrors.push("validation.mtuRange");
   }
   if (merged["xray_default_port"] && !isValidPort(merged["xray_default_port"])) {
     validationErrors.push("validation.xrayPortRange");

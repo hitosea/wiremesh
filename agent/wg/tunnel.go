@@ -17,6 +17,7 @@ type ActiveTunnel struct {
 	PeerPublicKey string
 	PeerAddress   string
 	PeerPort      int
+	MTU           int
 }
 
 func SyncTunnels(desired []api.TunnelInterface, active map[string]ActiveTunnel) (map[string]ActiveTunnel, error) {
@@ -59,7 +60,7 @@ func SyncTunnels(desired []api.TunnelInterface, active map[string]ActiveTunnel) 
 			Name: iface.Name, PrivateKey: iface.PrivateKey,
 			Address: iface.Address, ListenPort: iface.ListenPort,
 			PeerPublicKey: iface.PeerPublicKey, PeerAddress: iface.PeerAddress,
-			PeerPort: iface.PeerPort,
+			PeerPort: iface.PeerPort, MTU: iface.MTU,
 		}
 	}
 
@@ -75,7 +76,8 @@ func tunnelChanged(active ActiveTunnel, desired api.TunnelInterface) bool {
 		active.ListenPort != desired.ListenPort ||
 		active.PeerPublicKey != desired.PeerPublicKey ||
 		active.PeerAddress != desired.PeerAddress ||
-		active.PeerPort != desired.PeerPort
+		active.PeerPort != desired.PeerPort ||
+		active.MTU != desired.MTU
 }
 
 func createTunnel(iface api.TunnelInterface) error {
@@ -86,6 +88,12 @@ func createTunnel(iface api.TunnelInterface) error {
 	if err := WgSetConf(iface.Name, confPath); err != nil {
 		IpLinkDel(iface.Name)
 		return fmt.Errorf("wg setconf: %w", err)
+	}
+	if iface.MTU > 0 {
+		if err := IpLinkSetMTU(iface.Name, iface.MTU); err != nil {
+			IpLinkDel(iface.Name)
+			return fmt.Errorf("ip link set mtu: %w", err)
+		}
 	}
 	if err := IpAddrAdd(iface.Address, iface.Name); err != nil {
 		IpLinkDel(iface.Name)
@@ -100,7 +108,15 @@ func createTunnel(iface api.TunnelInterface) error {
 
 func updateTunnel(iface api.TunnelInterface) error {
 	confPath := writeTunnelConf(iface)
-	return WgSyncConf(iface.Name, confPath)
+	if err := WgSyncConf(iface.Name, confPath); err != nil {
+		return err
+	}
+	if iface.MTU > 0 {
+		if err := IpLinkSetMTU(iface.Name, iface.MTU); err != nil {
+			return fmt.Errorf("ip link set mtu: %w", err)
+		}
+	}
+	return nil
 }
 
 func destroyTunnel(name string) error {

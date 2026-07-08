@@ -56,6 +56,7 @@ const SETTING_GROUPS: SettingGroup[] = [
     fields: [
       { key: "tunnel_subnet", placeholder: "10.211.0.0/16" },
       { key: "tunnel_port_start", placeholder: "41830", type: "number", min: 1, max: 65535 },
+      { key: "default_mtu", placeholder: "1420", type: "number", min: 1280, max: 9000 },
     ],
   },
   {

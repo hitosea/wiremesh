@@ -7,11 +7,12 @@ import { authenticateAgent } from "@/lib/agent-auth";
 import { getXrayDefaultPort } from "@/lib/proxy-port";
 import { BRANCH_MARK_START, XRAY_MARK_START, SOCKS5_MARK_START } from "@/lib/routing-constants";
 import { isPrivateIp } from "@/lib/ip-utils";
+import { effectiveTunnelMtu } from "@/lib/mtu";
 
-function getNodeHostInfo(nodeId: number): { host: string; ip: string } | null {
-  const n = db.select({ ip: nodes.ip, domain: nodes.domain }).from(nodes).where(eq(nodes.id, nodeId)).get();
+function getNodeHostInfo(nodeId: number): { host: string; ip: string; mtu: number | null } | null {
+  const n = db.select({ ip: nodes.ip, domain: nodes.domain, mtu: nodes.mtu }).from(nodes).where(eq(nodes.id, nodeId)).get();
   if (!n) return null;
-  return { host: n.domain || n.ip, ip: n.ip };
+  return { host: n.domain || n.ip, ip: n.ip, mtu: n.mtu };
 }
 
 export const dynamic = "force-dynamic";
@@ -24,6 +25,7 @@ export async function GET(request: NextRequest) {
 
   const nodeId = node.id;
   const extIface = node.externalInterface;
+  const systemDefaultMtu = db.select({ value: settings.value }).from(settings).where(eq(settings.key, "default_mtu")).get()?.value ?? null;
 
   // Decrypt WG private key
   let wgPrivateKey: string;
@@ -71,6 +73,7 @@ export async function GET(request: NextRequest) {
     peerPublicKey: string;
     peerAddress: string;
     peerPort: number;
+    mtu: number;
     role: "from" | "to";
   }[] = [];
 
@@ -137,13 +140,16 @@ export async function GET(request: NextRequest) {
         let peerAddress: string;
         let peerPort: number;
         let role: "from" | "to";
+        const fromInfo = getNodeHostInfo(tunnel.fromNodeId);
+        const toInfo = getNodeHostInfo(tunnel.toNodeId);
+        const mtu = effectiveTunnelMtu(fromInfo?.mtu, toInfo?.mtu, systemDefaultMtu);
 
         if (tunnel.fromNodeId === nodeId) {
           try { privateKey = decrypt(tunnel.fromWgPrivateKey); } catch { continue; }
           address = tunnel.fromWgAddress;
           listenPort = tunnel.fromWgPort;
           peerPublicKey = tunnel.toWgPublicKey;
-          peerAddress = getNodeHostInfo(tunnel.toNodeId)?.host ?? "";
+          peerAddress = toInfo?.host ?? "";
           peerPort = tunnel.toWgPort;
           role = "from";
         } else {
@@ -151,13 +157,12 @@ export async function GET(request: NextRequest) {
           address = tunnel.toWgAddress;
           listenPort = tunnel.toWgPort;
           peerPublicKey = tunnel.fromWgPublicKey;
-          const fromInfo = getNodeHostInfo(tunnel.fromNodeId);
           peerAddress = (fromInfo && isPrivateIp(fromInfo.ip)) ? "" : (fromInfo?.host ?? "");
           peerPort = tunnel.fromWgPort;
           role = "to";
         }
 
-        interfaces.push({ name: ifaceName, privateKey, address, listenPort, peerPublicKey, peerAddress, peerPort, role });
+        interfaces.push({ name: ifaceName, privateKey, address, listenPort, peerPublicKey, peerAddress, peerPort, mtu, role });
 
         // Resolve role for THIS tunnel by its branch (not by lineId), so a
         // node that's relay in one branch and exit in another gets the right

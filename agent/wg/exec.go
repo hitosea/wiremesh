@@ -55,6 +55,11 @@ func IpLinkSetUp(iface string) error {
 	return err
 }
 
+func IpLinkSetMTU(iface string, mtu int) error {
+	_, err := Run("ip", "link", "set", "dev", iface, "mtu", fmt.Sprintf("%d", mtu))
+	return err
+}
+
 func IpLinkSetDown(iface string) error {
 	_, err := Run("ip", "link", "set", iface, "down")
 	return err

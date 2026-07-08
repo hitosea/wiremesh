@@ -53,6 +53,7 @@ type TunnelInterface struct {
 	PeerPublicKey string `json:"peerPublicKey"`
 	PeerAddress   string `json:"peerAddress"`
 	PeerPort      int    `json:"peerPort"`
+	MTU           int    `json:"mtu,omitempty"`
 	Role          string `json:"role"` // "from" or "to"
 }
 

@@ -40,6 +40,7 @@ export default function NewNodePage() {
   const [port, setPort] = useState("");
   const [remark, setRemark] = useState("");
   const [externalInterface, setExternalInterface] = useState("eth0");
+  const [mtu, setMtu] = useState("");
   const [xrayPort, setXrayPort] = useState("");
   const [realityDest, setRealityDest] = useState(DEFAULT_REALITY_DEST);
   const [xrayTransport, setXrayTransport] = useState<"reality" | "ws-tls">("reality");
@@ -73,6 +74,7 @@ export default function NewNodePage() {
         port: port ? parseInt(port) : undefined,
         remark: remark.trim() || null,
         externalInterface: externalInterface.trim() || "eth0",
+        mtu: mtu ? parseInt(mtu, 10) : null,
         xrayPort: xrayPort ? parseInt(xrayPort) : null,
         xrayTransport,
       };
@@ -177,6 +179,21 @@ export default function NewNodePage() {
               />
               <p className="text-xs text-muted-foreground">
                 {t("externalInterfaceHint")}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="mtu">{t("mtu")}</Label>
+              <Input
+                id="mtu"
+                type="number"
+                min={1280}
+                max={9000}
+                value={mtu}
+                onChange={(e) => setMtu(e.target.value)}
+                placeholder={defaults.default_mtu || "1420"}
+              />
+              <p className="text-xs text-muted-foreground">
+                {t("mtuHint")}
               </p>
             </div>
             <div className="space-y-2">

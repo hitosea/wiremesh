@@ -16,6 +16,13 @@ import { normalizeRealityDest } from "@/lib/reality-dest";
 import { writeAuditLog } from "@/lib/audit-log";
 import { sseManager } from "@/lib/sse-manager";
 import { isCertMode } from "@/lib/cert-mode";
+import { parseMtu } from "@/lib/mtu";
+
+function normalizeOptionalMtu(value: unknown): number | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  return parseMtu(value) ?? undefined;
+}
 
 export async function GET(request: NextRequest) {
   const params = parsePaginationParams(request.nextUrl.searchParams);
@@ -56,6 +63,7 @@ export async function GET(request: NextRequest) {
       xrayVersion: nodes.xrayVersion,
       upgradeTriggeredAt: nodes.upgradeTriggeredAt,
       xrayUpgradeTriggeredAt: nodes.xrayUpgradeTriggeredAt,
+      mtu: nodes.mtu,
     })
     .from(nodes)
     .where(where)
@@ -170,6 +178,7 @@ export async function POST(request: NextRequest) {
     xrayTlsCert,
     xrayTlsKey,
     xrayCertMode,
+    mtu,
   } = body;
 
   if (!name || !ip) {
@@ -188,6 +197,10 @@ export async function POST(request: NextRequest) {
 
   if (transport === "ws-tls" && !normalizedTlsDomain) {
     return error("VALIDATION_ERROR", "validation.wsTlsDomainRequired");
+  }
+  const normalizedMtu = normalizeOptionalMtu(mtu);
+  if (mtu !== undefined && normalizedMtu === undefined) {
+    return error("VALIDATION_ERROR", "validation.mtuRange");
   }
 
   // Check IP uniqueness (exclude soft-deleted nodes)
@@ -264,6 +277,7 @@ export async function POST(request: NextRequest) {
       xrayPort: xrayPort ?? parseInt(settingsMap["xray_default_port"] ?? String(DEFAULT_PROXY_PORT)),
       xrayConfig: resolvedXrayConfig,
       externalInterface: externalInterface ?? "eth0",
+      mtu: normalizedMtu ?? null,
       remark: remark ?? null,
     })
     .returning({
@@ -280,6 +294,7 @@ export async function POST(request: NextRequest) {
       xrayPort: nodes.xrayPort,
       xrayConfig: nodes.xrayConfig,
       externalInterface: nodes.externalInterface,
+      mtu: nodes.mtu,
       status: nodes.status,
       remark: nodes.remark,
       createdAt: nodes.createdAt,
