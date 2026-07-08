@@ -67,6 +67,18 @@ type NodeDetail = {
   };
 };
 
+type CertStatusInfo = {
+  mode: "auto" | "certd" | "manual" | string;
+  domain: string;
+  status: "none" | "pending" | "valid" | "warning" | "expired" | "invalid";
+  notBefore?: string;
+  notAfter?: string;
+  daysRemaining?: number;
+  issuer?: string;
+  subject?: string;
+  serialNumber?: string;
+  nextRenewalAt?: string;
+};
 
 export default function NodeDetailPage() {
   const router = useRouter();
@@ -106,6 +118,9 @@ export default function NodeDetailPage() {
   const [addingPort, setAddingPort] = useState(false);
   const [removingPort, setRemovingPort] = useState<number | null>(null);
   const blacklistBusy = addingPort || removingPort !== null;
+  const [certStatus, setCertStatus] = useState<CertStatusInfo | null>(null);
+  const [certStatusLoading, setCertStatusLoading] = useState(false);
+  const [certStatusOpen, setCertStatusOpen] = useState(false);
 
   const blacklistPorts: number[] = node ? parseTunnelPortBlacklist(node.tunnelPortBlacklist) : [];
 
@@ -152,6 +167,98 @@ export default function NodeDetailPage() {
     }
   };
 
+  const fetchCertStatus = async () => {
+    setCertStatusLoading(true);
+    try {
+      const res = await fetch(`/api/nodes/${nodeId}/cert-status`);
+      const json = await res.json();
+      if (res.ok) {
+        setCertStatus(json.data);
+      } else {
+        toast.error(translateError(json.error, te, ts("tlsCertStatusLoadFailed")));
+      }
+    } catch {
+      toast.error(ts("tlsCertStatusLoadFailed"));
+    } finally {
+      setCertStatusLoading(false);
+    }
+  };
+
+  const formatCertDate = (value?: string) => value ? value.slice(0, 10) : ts("tlsCertUnknown");
+
+  const certStatusLabel = (info: CertStatusInfo | null) => {
+    if (!info) return ts("tlsCertStatusLoading");
+    if (info.status === "none") return ts("tlsCertStatusNone");
+    if (info.status === "pending") {
+      if (info.mode === "certd") return ts("tlsCertStatusPendingCertd");
+      if (info.mode === "manual") return ts("tlsCertStatusPendingManual");
+      return ts("tlsCertStatusPendingAuto");
+    }
+    if (info.status === "valid") return ts("tlsCertStatusValid");
+    if (info.status === "warning") return ts("tlsCertStatusWarning");
+    if (info.status === "expired") return ts("tlsCertStatusExpired");
+    return ts("tlsCertStatusInvalid");
+  };
+
+  const certStatusTone = (status?: CertStatusInfo["status"]) => {
+    if (status === "valid") return "border-green-200 bg-green-50 text-green-700";
+    if (status === "warning") return "border-amber-200 bg-amber-50 text-amber-700";
+    if (status === "expired" || status === "invalid") return "border-red-200 bg-red-50 text-red-700";
+    return "border-muted bg-muted/40 text-muted-foreground";
+  };
+
+  const certDotTone = (status?: CertStatusInfo["status"]) => {
+    if (status === "valid") return "bg-green-500";
+    if (status === "warning") return "bg-amber-500";
+    if (status === "expired" || status === "invalid") return "bg-red-500";
+    return "bg-muted-foreground";
+  };
+
+  const certSummary = (info: CertStatusInfo | null) => {
+    if (!info) return ts("tlsCertStatusLoading");
+    if (info.status === "none") return ts("tlsCertSummaryNone");
+    if (info.status === "pending") return ts("tlsCertSummaryPending");
+    if (info.status === "invalid") return ts("tlsCertSummaryInvalid");
+    if (info.status === "expired") return ts("tlsCertSummaryExpired", { date: formatCertDate(info.notAfter) });
+    return ts("tlsCertSummaryValid", { date: formatCertDate(info.notAfter), days: info.daysRemaining ?? 0 });
+  };
+
+  const certRenewalMethod = (mode?: string) => {
+    if (mode === "certd") return ts("tlsCertCertdRenewalMethod");
+    if (mode === "manual") return ts("tlsCertManualRenewalMethod");
+    return ts("tlsCertAutoRenewalMethod");
+  };
+
+  const certRenewalWindow = (info: CertStatusInfo | null) => {
+    if (!info) return ts("tlsCertUnknown");
+    if (info.mode === "certd") return ts("tlsCertCertdRenewalWindow");
+    if (info.mode === "manual") return ts("tlsCertNoRenewalWindow");
+    return info.nextRenewalAt ? ts("tlsCertAutoRenewalWindow", { date: formatCertDate(info.nextRenewalAt) }) : ts("tlsCertUnknown");
+  };
+
+  const certNotice = (info: CertStatusInfo | null) => {
+    if (!info || info.status === "none") return ts("tlsCertNoticeNone");
+    if (info.status === "invalid") return ts("tlsCertNoticeInvalid");
+    if (info.status === "pending") {
+      if (info.mode === "certd") return ts("tlsCertNoticeCertdPending");
+      if (info.mode === "manual") return ts("tlsCertNoticeManualPending");
+      return ts("tlsCertNoticeAutoPending");
+    }
+    if (info.status === "expired") {
+      if (info.mode === "certd") return ts("tlsCertNoticeExpiredCertd");
+      if (info.mode === "manual") return ts("tlsCertNoticeExpiredManual");
+      return ts("tlsCertNoticeExpiredAuto");
+    }
+    if (info.status === "warning") {
+      if (info.mode === "certd") return ts("tlsCertNoticeWarningCertd");
+      if (info.mode === "manual") return ts("tlsCertNoticeWarningManual");
+      return ts("tlsCertNoticeWarningAuto");
+    }
+    if (info.mode === "certd") return ts("tlsCertNoticeCertdValid");
+    if (info.mode === "manual") return ts("tlsCertNoticeManualValid");
+    return ts("tlsCertNoticeAutoValid");
+  };
+
   useEffect(() => {
     fetch(`/api/nodes/${nodeId}`)
       .then((res) => res.json())
@@ -190,6 +297,15 @@ export default function NodeDetailPage() {
       .finally(() => setLoading(false));
     fetch("/api/settings").then(r => r.json()).then(j => setDefaults(j.data ?? {})).catch(() => {});
   }, [nodeId, router]);
+
+  useEffect(() => {
+    if (node && node.xrayTransport === "ws-tls") {
+      fetchCertStatus();
+    } else {
+      setCertStatus(null);
+      setCertStatusOpen(false);
+    }
+  }, [node?.id, node?.xrayTransport, node?.xrayTlsCert, node?.xrayCertMode]);
 
   // SSE real-time updates for this node
   useAdminSSE("node_status", (update) => {
@@ -235,6 +351,7 @@ export default function NodeDetailPage() {
       if (res.ok) {
         toast.success(tc("save"));
         setNode((prev) => (prev ? { ...prev, ...json.data } : json.data));
+        if (body.xrayTransport === "ws-tls") fetchCertStatus();
       } else {
         toast.error(translateError(json.error, te, tc("saveFailed")));
       }
@@ -522,6 +639,42 @@ export default function NodeDetailPage() {
                   )}
                   {tlsCertMode === "certd" && (
                     <p className="text-xs text-muted-foreground">{ts("tlsCertCertdHint")}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>{ts("tlsCertStatus")}</Label>
+                  <button
+                    type="button"
+                    onClick={() => setCertStatusOpen((v) => !v)}
+                    className="flex w-full items-center justify-between gap-3 rounded-lg border bg-card px-3 py-2.5 text-left hover:bg-muted/40"
+                  >
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${certStatusTone(certStatus?.status)}`}>
+                        <span className={`size-2 rounded-full ${certDotTone(certStatus?.status)}`} />
+                        {certStatusLoading ? ts("tlsCertStatusLoading") : certStatusLabel(certStatus)}
+                      </span>
+                      <span className="text-sm text-muted-foreground">{certSummary(certStatus)}</span>
+                    </div>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {certStatusOpen ? ts("tlsCertStatusCollapse") : ts("tlsCertStatusExpand")}
+                    </span>
+                  </button>
+                  {certStatusOpen && (
+                    <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
+                      <div className="grid gap-2 sm:grid-cols-2 text-sm">
+                        <div><span className="text-muted-foreground">{ts("tlsCertDomain")}：</span>{certStatus?.domain || ts("tlsCertUnknown")}</div>
+                        <div><span className="text-muted-foreground">{ts("tlsCertExpiresAt")}：</span>{formatCertDate(certStatus?.notAfter)}</div>
+                        <div><span className="text-muted-foreground">{ts("tlsCertDaysRemaining")}：</span>{certStatus?.status === "expired" ? ts("tlsCertExpiredText") : typeof certStatus?.daysRemaining === "number" ? ts("tlsCertDaysText", { days: certStatus.daysRemaining }) : ts("tlsCertUnknown")}</div>
+                        <div><span className="text-muted-foreground">{ts("tlsCertIssuer")}：</span>{certStatus?.issuer || ts("tlsCertUnknown")}</div>
+                        <div><span className="text-muted-foreground">{ts("tlsCertRenewalMethod")}：</span>{certRenewalMethod(certStatus?.mode ?? tlsCertMode)}</div>
+                        <div><span className="text-muted-foreground">{ts("tlsCertRenewalWindow")}：</span>{certRenewalWindow(certStatus)}</div>
+                      </div>
+                      <p className="rounded-md bg-background px-3 py-2 text-sm text-muted-foreground">{certNotice(certStatus)}</p>
+                      <Button type="button" variant="outline" size="sm" onClick={fetchCertStatus} disabled={certStatusLoading}>
+                        {certStatusLoading && <Loader2 className="size-3 animate-spin" />}
+                        {ts("tlsCertStatusRefresh")}
+                      </Button>
+                    </div>
                   )}
                 </div>
                 {tlsCertMode === "manual" && (
