@@ -30,7 +30,7 @@ import { parseTunnelPortBlacklist } from "@/lib/ip-allocator";
 import { NodePortsDetail } from "@/components/node-ports-detail";
 import { useAdminSSE } from "@/components/admin-sse-provider";
 import { useSetBreadcrumbLabel } from "@/components/breadcrumb-context";
-import { Loader2 } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 
 type NodeDetail = {
   id: number;
@@ -201,10 +201,10 @@ export default function NodeDetailPage() {
   };
 
   const certStatusTone = (status?: CertStatusInfo["status"]) => {
-    if (status === "valid") return "border-green-200 bg-green-50 text-green-700";
-    if (status === "warning") return "border-amber-200 bg-amber-50 text-amber-700";
-    if (status === "expired" || status === "invalid") return "border-red-200 bg-red-50 text-red-700";
-    return "border-muted bg-muted/40 text-muted-foreground";
+    if (status === "valid") return "text-green-700";
+    if (status === "warning") return "text-amber-700";
+    if (status === "expired" || status === "invalid") return "text-red-700";
+    return "text-muted-foreground";
   };
 
   const certDotTone = (status?: CertStatusInfo["status"]) => {
@@ -645,22 +645,22 @@ export default function NodeDetailPage() {
                   <Label>{ts("tlsCertStatus")}</Label>
                   <button
                     type="button"
+                    aria-expanded={certStatusOpen}
+                    aria-label={certStatusOpen ? ts("tlsCertStatusCollapse") : ts("tlsCertStatusExpand")}
                     onClick={() => setCertStatusOpen((v) => !v)}
-                    className="flex w-full items-center justify-between gap-3 rounded-lg border bg-card px-3 py-2.5 text-left hover:bg-muted/40"
+                    className="flex items-center justify-between gap-3 rounded-lg border bg-card px-3 py-2 h-9 text-left hover:bg-muted/40"
                   >
-                    <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${certStatusTone(certStatus?.status)}`}>
+                    <div className="flex min-w-0 flex-wrap items-center gap-3">
+                      <span className={`inline-flex items-center gap-1.5 text-sm ${certStatusTone(certStatus?.status)}`}>
                         <span className={`size-2 rounded-full ${certDotTone(certStatus?.status)}`} />
                         {certStatusLoading ? ts("tlsCertStatusLoading") : certStatusLabel(certStatus)}
                       </span>
                       <span className="text-sm text-muted-foreground">{certSummary(certStatus)}</span>
                     </div>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {certStatusOpen ? ts("tlsCertStatusCollapse") : ts("tlsCertStatusExpand")}
-                    </span>
+                    <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition-transform ${certStatusOpen ? "rotate-180" : ""}`} aria-hidden="true" />
                   </button>
                   {certStatusOpen && (
-                    <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
+                    <div className="rounded-lg border bg-muted/50 p-3 space-y-3">
                       <div className="grid gap-2 sm:grid-cols-2 text-sm">
                         <div><span className="text-muted-foreground">{ts("tlsCertDomain")}：</span>{certStatus?.domain || ts("tlsCertUnknown")}</div>
                         <div><span className="text-muted-foreground">{ts("tlsCertExpiresAt")}：</span>{formatCertDate(certStatus?.notAfter)}</div>
