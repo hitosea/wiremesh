@@ -56,7 +56,7 @@ EOF
 docker compose up -d
 ```
 
-镜像地址：`ghcr.io/hitosea/wiremesh:latest`，支持 amd64 和 arm64。
+镜像地址：`ghcr.io/wiremesh-labs/wiremesh:latest`，支持 amd64 和 arm64。
 
 **从源码构建：**
 

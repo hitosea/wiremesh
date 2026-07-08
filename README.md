@@ -56,7 +56,7 @@ EOF
 docker compose up -d
 ```
 
-Image: `ghcr.io/hitosea/wiremesh:latest`, supports amd64 and arm64.
+Image: `ghcr.io/wiremesh-labs/wiremesh:latest`, supports amd64 and arm64.
 
 **Build from source:**
 

@@ -119,7 +119,7 @@ export default function Topbar() {
           title="GitHub"
         >
           <a
-            href="https://github.com/hitosea/wiremesh"
+            href="https://github.com/wiremesh-labs/wiremesh"
             target="_blank"
             rel="noreferrer noopener"
             aria-label="GitHub"

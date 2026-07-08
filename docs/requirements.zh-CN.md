@@ -739,7 +739,7 @@ Worker 进程与 Next.js 运行在同一容器内，启动后延迟 30 秒开始
 ```yaml
 services:
   wiremesh:
-    image: ghcr.io/hitosea/wiremesh:latest
+    image: ghcr.io/wiremesh-labs/wiremesh:latest
     build:
       context: .
       args:

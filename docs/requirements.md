@@ -739,7 +739,7 @@ The script supports upgrade mode (skips certain steps when an existing installat
 ```yaml
 services:
   wiremesh:
-    image: ghcr.io/hitosea/wiremesh:latest
+    image: ghcr.io/wiremesh-labs/wiremesh:latest
     build:
       context: .
       args:

@@ -1,6 +1,6 @@
 services:
   wiremesh:
-    image: ghcr.io/hitosea/wiremesh:latest
+    image: ghcr.io/wiremesh-labs/wiremesh:latest
     build:
       context: .
       args:
